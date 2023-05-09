@@ -45,8 +45,13 @@ func main() {
 			return
 		}
 
+		ur, err := utils.GenerateBitcoinURI(address, priceBTC)
+		if err != nil {
+			_ = fmt.Errorf("%v", err)
+		}
+
 		qrCodeFileName := fmt.Sprintf("%s.png", address)
-		err = payments.GenerateQRCode(address, qrCodeFileName)
+		err = payments.GenerateQRCode(ur, qrCodeFileName)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": fmt.Sprintf("Error generating QR code: %v", err.Error()),
