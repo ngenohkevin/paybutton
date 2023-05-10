@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/ngenohkevin/paybutton/payments"
 	"github.com/ngenohkevin/paybutton/utils"
@@ -11,6 +12,7 @@ import (
 
 func main() {
 	r := gin.Default()
+	r.Use(cors.Default())
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -45,21 +47,21 @@ func main() {
 			return
 		}
 
-		ur, err := utils.GenerateBitcoinURI(address, priceBTC)
-		if err != nil {
-			_ = fmt.Errorf("%v", err)
-		}
-
-		qrCodeFileName := fmt.Sprintf("%s.png", address)
-		err = payments.GenerateQRCode(ur, qrCodeFileName)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": fmt.Sprintf("Error generating QR code: %v", err.Error()),
-			})
-			// Add this line to log the actual error message:
-			fmt.Println(err)
-			return
-		}
+		//ur, err := utils.GenerateBitcoinURI(address, priceBTC)
+		//if err != nil {
+		//	_ = fmt.Errorf("%v", err)
+		//}
+		//
+		//qrCodeFileName := fmt.Sprintf("%s.png", address)
+		//err = payments.GenerateQRCode(ur, qrCodeFileName)
+		//if err != nil {
+		//	c.JSON(http.StatusInternalServerError, gin.H{
+		//		"message": fmt.Sprintf("Error generating QR code: %v", err.Error()),
+		//	})
+		//	// Add this line to log the actual error message:
+		//	fmt.Println(err)
+		//	return
+		//}
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -69,8 +71,8 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"address":     address,
-			"qrCodeUrl":   fmt.Sprintf("%s/%s", os.Getenv("QR_CODE_BASE_URL"), qrCodeFileName),
+			"address": address,
+			//"qrCodeUrl":   fmt.Sprintf("%s/%s", os.Getenv("QR_CODE_BASE_URL"), qrCodeFileName),
 			"priceInUSD":  priceUSD,
 			"priceInBTC":  priceBTC,
 			"email":       email,
