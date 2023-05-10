@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/joho/godotenv"
 	"io"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -16,13 +14,38 @@ type AddressResponse struct {
 	Address string `json:"address"`
 }
 
-func GenerateBitcoinAddress(email string, price float64) (string, error) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		return "", err
+type httpClient struct {
+	client *http.Client
+}
+
+var (
+	blockonomicsAPIKey string
+	httpClientInstance *httpClient
+)
+
+func init() {
+	//err := godotenv.Load(".env")
+	//if err != nil {
+	//	log.Fatal("Error loading .env file")
+	//}
+
+	//blockonomicsAPIKey = os.Getenv("BLOCKONOMICS_API_KEY")
+	blockonomicsAPIKey = `rA0Zdsj8UEcGHZWKcVT8Ng2jOfc8lett78jRWZXej48`
+
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     time.Second * 90,
 	}
 
-	apiKey := os.Getenv("BLOCKONOMICS_API_KEY")
+	httpClientInstance = &httpClient{
+		client: &http.Client{
+			Transport: transport,
+			Timeout:   time.Second * 10,
+		},
+	}
+}
+
+func GenerateBitcoinAddress(email string, price float64) (string, error) {
 	url := "https://www.blockonomics.co/api/new_address"
 
 	// Create a unique label using the user's email address and a timestamp
@@ -43,33 +66,49 @@ func GenerateBitcoinAddress(email string, price float64) (string, error) {
 		return "", err
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", blockonomicsAPIKey))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
+	respChan := make(chan *http.Response)
+	errChan := make(chan error)
+
+	go func() {
+		resp, err := httpClientInstance.client.Do(req)
 		if err != nil {
-
+			errChan <- err
+			return
 		}
-	}(resp.Body)
+		respChan <- resp
+	}()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("error generating bitcoin address, status code: %d", resp.StatusCode)
-	}
+	select {
+	case resp := <-respChan:
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
 
-	var addressResponse AddressResponse
-	if err := json.NewDecoder(resp.Body).Decode(&addressResponse); err != nil {
+			}
+		}(resp.Body)
+
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("error generating bitcoin address, status code: %v", resp)
+		}
+
+		var addressResponse AddressResponse
+		if err := json.NewDecoder(resp.Body).Decode(&addressResponse); err != nil {
+			return "", err
+		}
+
+		if addressResponse.Address == "" {
+			return "", errors.New("empty address returned")
+		}
+
+		return addressResponse.Address, nil
+
+	case err := <-errChan:
 		return "", err
-	}
 
-	if addressResponse.Address == "" {
-		return "", errors.New("empty address returned")
+	case <-time.After(time.Second * 30):
+		return "", errors.New("timed out waiting for API response")
 	}
-
-	return addressResponse.Address, nil
 }
