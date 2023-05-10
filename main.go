@@ -47,21 +47,21 @@ func main() {
 			return
 		}
 
-		//ur, err := utils.GenerateBitcoinURI(address, priceBTC)
-		//if err != nil {
-		//	_ = fmt.Errorf("%v", err)
-		//}
-		//
-		//qrCodeFileName := fmt.Sprintf("%s.png", address)
-		//err = payments.GenerateQRCode(ur, qrCodeFileName)
-		//if err != nil {
-		//	c.JSON(http.StatusInternalServerError, gin.H{
-		//		"message": fmt.Sprintf("Error generating QR code: %v", err.Error()),
-		//	})
-		//	// Add this line to log the actual error message:
-		//	fmt.Println(err)
-		//	return
-		//}
+		ur, err := utils.GenerateBitcoinURI(address, priceBTC)
+		if err != nil {
+			_ = fmt.Errorf("%v", err)
+		}
+
+		qrCodeFileName := fmt.Sprintf("%s.png", address)
+		err = payments.GenerateQRCode(ur, qrCodeFileName)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": fmt.Sprintf("Error generating QR code: %v", err.Error()),
+			})
+			// Add this line to log the actual error message:
+			fmt.Println(err)
+			return
+		}
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
