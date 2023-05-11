@@ -18,7 +18,7 @@ type Payment struct {
 
 var payments []*Payment
 
-func createPayment(email string, amount float64) (*Payment, error) {
+func CreatePayment(email string, amount float64) (*Payment, error) {
 	if !utils.IsValidEmail(email) {
 		return nil, errors.New("invalid email address")
 	}
@@ -55,7 +55,7 @@ func getPaymentByAddress(address string) (*Payment, error) {
 	return nil, errors.New("payment not found")
 }
 
-func markPaymentAsPaid(address string, paidAmount float64) error {
+func MarkPaymentAsPaid(address string, paidAmount float64) error {
 	payment, err := getPaymentByAddress(address)
 	if err != nil {
 		return err
