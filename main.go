@@ -83,6 +83,38 @@ func main() {
 		})
 	})
 
+	r.POST("/callback", func(c *gin.Context) {
+		address := c.PostForm("address")
+		paidAmountStr := c.PostForm("paidAmount")
+
+		if address == "" || paidAmountStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Invalid input: address and paidAmount are required",
+			})
+			return
+		}
+
+		paidAmount, err := utils.ParseFloat(paidAmountStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Invalid input: paidAmount must be a valid number",
+			})
+			return
+		}
+
+		err = payments.MarkPaymentAsPaid(address, paidAmount)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": fmt.Sprintf("Error marking payment as paid: %s", err.Error()),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": fmt.Sprintf("Payment with address %s has been marked as paid", address),
+		})
+	})
+
 	err := r.Run()
 	if err != nil {
 		return
