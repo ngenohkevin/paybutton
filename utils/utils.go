@@ -139,3 +139,7 @@ func GenerateBitcoinURI(address string, amountBTC float64) (string, error) {
 
 	return encodedURI.String(), nil
 }
+
+func parseFloat(str string) (float64, error) {
+	return strconv.ParseFloat(str, 64)
+}
