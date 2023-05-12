@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -140,6 +142,13 @@ func GenerateBitcoinURI(address string, amountBTC float64) (string, error) {
 	return encodedURI.String(), nil
 }
 
-func parseFloat(str string) (float64, error) {
-	return strconv.ParseFloat(str, 64)
+func GenerateOrderID() string {
+	rand.Seed(time.Now().UnixNano())
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	var result strings.Builder
+	for i := 0; i < 10; i++ {
+		randomIndex := rand.Intn(len(charset))
+		result.WriteByte(charset[randomIndex])
+	}
+	return result.String()
 }
