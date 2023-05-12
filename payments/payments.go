@@ -2,8 +2,6 @@ package payments
 
 import (
 	"errors"
-	"fmt"
-	"github.com/ngenohkevin/paybutton/utils"
 	"time"
 )
 
@@ -18,33 +16,33 @@ type Payment struct {
 
 var payments []*Payment
 
-func CreatePayment(email string, amount float64) (*Payment, error) {
-	if !utils.IsValidEmail(email) {
-		return nil, errors.New("invalid email address")
-	}
-
-	if amount <= 0 {
-		return nil, errors.New("amount must be greater than zero")
-	}
-
-	address, err := GenerateBitcoinAddress(email, amount)
-	if err != nil {
-		return nil, fmt.Errorf("error generating Bitcoin address: %v", err)
-	}
-
-	payment := &Payment{
-		Email:      email,
-		Amount:     amount,
-		Address:    address,
-		Paid:       false,
-		PaidAmount: 0,
-		Date:       time.Now(),
-	}
-
-	payments = append(payments, payment)
-
-	return payment, nil
-}
+//func CreatePayment(email string, amount float64) (*Payment, error) {
+//	if !utils.IsValidEmail(email) {
+//		return nil, errors.New("invalid email address")
+//	}
+//
+//	if amount <= 0 {
+//		return nil, errors.New("amount must be greater than zero")
+//	}
+//
+//	address, err := GenerateBitcoinAddress(email, amount)
+//	if err != nil {
+//		return nil, fmt.Errorf("error generating Bitcoin address: %v", err)
+//	}
+//
+//	payment := &Payment{
+//		Email:      email,
+//		Amount:     amount,
+//		Address:    address,
+//		Paid:       false,
+//		PaidAmount: 0,
+//		Date:       time.Now(),
+//	}
+//
+//	payments = append(payments, payment)
+//
+//	return payment, nil
+//}
 
 func getPaymentByAddress(address string) (*Payment, error) {
 	for _, payment := range payments {
