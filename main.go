@@ -46,7 +46,7 @@ func main() {
 			})
 			return
 		}
-
+		//comment GenerateQRCode when pushing to production
 		ur, err := utils.GenerateBitcoinURI(address, priceBTC)
 		if err != nil {
 			_ = fmt.Errorf("%v", err)
