@@ -63,6 +63,14 @@ func main() {
 			return
 		}
 
+		payment, err := payments.CreatePayment(address, priceUSD, priceBTC, email)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": fmt.Sprintf("Error creating payment: %s", err.Error()),
+			})
+			return
+		}
+
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": fmt.Sprintf("Error getting Bitcoin price: %s", err.Error()),
@@ -71,11 +79,11 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"address": address,
+			"address": payment.Address,
 			//"qrCodeUrl":   fmt.Sprintf("%s/%s", os.Getenv("QR_CODE_BASE_URL"), qrCodeFileName),
-			"priceInUSD":  priceUSD,
-			"priceInBTC":  priceBTC,
-			"email":       email,
+			"priceInUSD":  payment.PriceUSD,
+			"priceInBTC":  payment.PriceBTC,
+			"email":       payment.Email,
 			"created_at":  utils.GetCurrentTime(),
 			"expired_at":  utils.GetExpiryTime(),
 			"status":      "pending",
@@ -86,10 +94,11 @@ func main() {
 	r.POST("/callback", func(c *gin.Context) {
 		address := c.PostForm("address")
 		paidAmountStr := c.PostForm("paidAmount")
+		email := c.PostForm("email")
 
-		if address == "" || paidAmountStr == "" {
+		if address == "" || paidAmountStr == "" || email == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"message": "Invalid input: address and paidAmount are required",
+				"message": "Invalid input: address, paidAmount, and email are required",
 			})
 			return
 		}
@@ -102,7 +111,7 @@ func main() {
 			return
 		}
 
-		err = payments.MarkPaymentAsPaid(address, paidAmount)
+		err = payments.MarkPaymentAsPaid(address, paidAmount, email)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": fmt.Sprintf("Error marking payment as paid: %s", err.Error()),
@@ -110,8 +119,30 @@ func main() {
 			return
 		}
 
+		// Open the file for appending
+		file, err := os.OpenFile("paid_emails.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": fmt.Sprintf("Error writing paid email to file: %s", err.Error()),
+			})
+			return
+		}
+		defer func(file *os.File) {
+			if err := file.Close(); err != nil {
+				fmt.Printf("Error closing file: %v", err)
+			}
+		}(file)
+
+		// Write the email address to the file
+		if _, err := file.WriteString(fmt.Sprintf("%s ---> %s\n", email, address)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": fmt.Sprintf("Error writing paid email to file: %s", err.Error()),
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"message": fmt.Sprintf("Payment with address %s has been marked as paid", address),
+			"message": fmt.Sprintf("Payment with address %s has been marked as paid. Email %s has been saved.", address, email),
 		})
 	})
 
