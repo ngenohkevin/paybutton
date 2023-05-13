@@ -2,12 +2,15 @@ package payments
 
 import (
 	"errors"
+	"fmt"
+	"github.com/ngenohkevin/paybutton/utils"
 	"time"
 )
 
 type Payment struct {
 	Email      string
-	Amount     float64
+	PriceUSD   float64
+	PriceBTC   float64
 	Address    string
 	Paid       bool
 	PaidAmount float64
@@ -16,33 +19,33 @@ type Payment struct {
 
 var payments []*Payment
 
-//func CreatePayment(email string, amount float64) (*Payment, error) {
-//	if !utils.IsValidEmail(email) {
-//		return nil, errors.New("invalid email address")
-//	}
-//
-//	if amount <= 0 {
-//		return nil, errors.New("amount must be greater than zero")
-//	}
-//
-//	address, err := GenerateBitcoinAddress(email, amount)
-//	if err != nil {
-//		return nil, fmt.Errorf("error generating Bitcoin address: %v", err)
-//	}
-//
-//	payment := &Payment{
-//		Email:      email,
-//		Amount:     amount,
-//		Address:    address,
-//		Paid:       false,
-//		PaidAmount: 0,
-//		Date:       time.Now(),
-//	}
-//
-//	payments = append(payments, payment)
-//
-//	return payment, nil
-//}
+func CreatePayment(address string, priceUSD float64, priceBTC float64, email string) (*Payment, error) {
+	if !utils.IsValidEmail(email) {
+		return nil, errors.New("invalid email address")
+	}
+
+	if priceUSD <= 0 {
+		return nil, errors.New("price in USD must be greater than zero")
+	}
+
+	if priceBTC <= 0 {
+		return nil, errors.New("price in BTC must be greater than zero")
+	}
+
+	payment := &Payment{
+		Email:      email,
+		PriceUSD:   priceUSD,
+		PriceBTC:   priceBTC,
+		Address:    address,
+		Paid:       false,
+		PaidAmount: 0,
+		Date:       time.Now(),
+	}
+
+	payments = append(payments, payment)
+
+	return payment, nil
+}
 
 func getPaymentByAddress(address string) (*Payment, error) {
 	for _, payment := range payments {
@@ -53,10 +56,18 @@ func getPaymentByAddress(address string) (*Payment, error) {
 	return nil, errors.New("payment not found")
 }
 
-func MarkPaymentAsPaid(address string, paidAmount float64) error {
+func MarkPaymentAsPaid(address string, paidAmount float64, email string) error {
+	if address == "" || paidAmount <= 0 || email == "" {
+		return errors.New("invalid input: address, paidAmount, and email are required")
+	}
+
 	payment, err := getPaymentByAddress(address)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marking payment as paid: %v", err)
+	}
+
+	if payment.Email != email {
+		return errors.New("invalid input: email does not match the payment record")
 	}
 
 	payment.Paid = true
