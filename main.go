@@ -91,6 +91,8 @@ func main() {
 		})
 	})
 
+	//callback handler not working. Needs to some refactoring
+
 	r.POST("/callback", func(c *gin.Context) {
 		address := c.PostForm("address")
 		paidAmountStr := c.PostForm("paidAmount")
