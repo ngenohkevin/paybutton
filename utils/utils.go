@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -31,41 +29,6 @@ var cache RateCache
 func ParseFloat(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
-
-//func GetBitcoinPrice() (float64, error) {
-//	resp, err := http.Get(BlockonomicsRateApi)
-//	if err != nil {
-//		log.Printf("Error getting blockonomics rate: %s", err.Error())
-//		return 0, err
-//	}
-//	defer func(Body io.ReadCloser) {
-//		err := Body.Close()
-//		if err != nil {
-//
-//		}
-//	}(resp.Body)
-//
-//	body, err := io.ReadAll(resp.Body)
-//	if err != nil {
-//		log.Printf("Error reading blockonomics rate response: %s", err.Error())
-//		return 0, err
-//	}
-//
-//	var blockonomicsPrice map[string]interface{}
-//	err = json.Unmarshal(body, &blockonomicsPrice)
-//	if err != nil {
-//		log.Printf("Error unmarshaling blockonomics rate JSON: %s", err.Error())
-//		return 0, err
-//	}
-//
-//	bitcoinUSDPrice, ok := blockonomicsPrice["price"].(float64)
-//	if !ok {
-//		log.Printf("Error getting blockonomics rate: invalid response")
-//		return 0, err
-//	}
-//
-//	return bitcoinUSDPrice, nil
-//}
 
 func GetCurrentTime() time.Time {
 	return time.Now()
@@ -142,13 +105,13 @@ func GenerateBitcoinURI(address string, amountBTC float64) (string, error) {
 	return encodedURI.String(), nil
 }
 
-func GenerateOrderID() string {
-	rand.Seed(time.Now().UnixNano())
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	var result strings.Builder
-	for i := 0; i < 10; i++ {
-		randomIndex := rand.Intn(len(charset))
-		result.WriteByte(charset[randomIndex])
-	}
-	return result.String()
-}
+//func GenerateOrderID() string {
+//	rand.Seed(time.Now().UnixNano())
+//	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+//	var result strings.Builder
+//	for i := 0; i < 10; i++ {
+//		randomIndex := rand.Intn(len(charset))
+//		result.WriteByte(charset[randomIndex])
+//	}
+//	return result.String()
+//}
