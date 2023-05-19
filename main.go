@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ngenohkevin/paybutton/payments"
 	"github.com/ngenohkevin/paybutton/utils"
-	"log"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 )
@@ -14,6 +14,18 @@ import (
 func main() {
 	r := gin.Default()
 	r.Use(cors.Default())
+
+	// Create a new Logrus logger
+	logger := logrus.New()
+
+	// Set the log formatter
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+
+	// Set the logger as the default logger for Gin
+	logger.SetOutput(gin.DefaultWriter)
+	r.Use(Logger(logger))
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -53,7 +65,7 @@ func main() {
 		//	_ = fmt.Errorf("%v", err)
 		//}
 
-		log.Printf("Email: %s, Address: %s, Amount: %.2f", email, address, priceUSD)
+		//log.Printf("Email: %s, Address: %s, Amount: %.2f", email, address, priceUSD)
 
 		//qrCodeFileName := fmt.Sprintf("%s.png", address)
 		//err = payments.GenerateQRCode(ur, qrCodeFileName)
@@ -85,7 +97,8 @@ func main() {
 			"description": fmt.Sprintf("%s %s", os.Getenv("PRODUCT_NAME"), os.Getenv("PRODUCT_DESC")),
 		})
 
-		// Print address and email
+		logger := c.MustGet("logger").(*logrus.Logger)
+		logger.Infof("email: %s, address: %s, Address: %.2f", email, address, priceUSD)
 
 	})
 	//
@@ -150,4 +163,15 @@ func main() {
 	if err != nil {
 		return
 	} // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+}
+func Logger(logger *logrus.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Set the logger in the Gin context
+		c.Set("logger", logger)
+
+		c.Next()
+
+		entry := logger.WithFields(logrus.Fields{})
+		entry.Info()
+	}
 }
