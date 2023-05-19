@@ -104,14 +104,3 @@ func GenerateBitcoinURI(address string, amountBTC float64) (string, error) {
 
 	return encodedURI.String(), nil
 }
-
-//func GenerateOrderID() string {
-//	rand.Seed(time.Now().UnixNano())
-//	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-//	var result strings.Builder
-//	for i := 0; i < 10; i++ {
-//		randomIndex := rand.Intn(len(charset))
-//		result.WriteByte(charset[randomIndex])
-//	}
-//	return result.String()
-//}
