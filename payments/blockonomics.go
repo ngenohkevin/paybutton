@@ -30,7 +30,7 @@ func init() {
 	//}
 	//
 	//blockonomicsAPIKey = os.Getenv("BLOCKONOMICS_API_KEY")
-	blockonomicsAPIKey = `rA0Zdsj8UEcGHZWKcVT8Ng2jOfc8lett78jRWZXej48`
+	blockonomicsAPIKey = `BQ0q53TARHK7QezpY30ynTU0UsXCbiEUQEPqmmNVPbs`
 
 	transport := &http.Transport{
 		MaxIdleConnsPerHost: 100,
