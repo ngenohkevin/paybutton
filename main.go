@@ -7,6 +7,7 @@ import (
 	"github.com/ngenohkevin/paybutton/payments"
 	"github.com/ngenohkevin/paybutton/utils"
 	"github.com/sirupsen/logrus"
+	"log"
 	"net/http"
 	"os"
 )
@@ -65,7 +66,7 @@ func main() {
 		//	_ = fmt.Errorf("%v", err)
 		//}
 
-		//log.Printf("Email: %s, Address: %s, Amount: %.2f", email, address, priceUSD)
+		log.Printf("Email: %s, Address: %s, Amount: %.2f", email, address, priceUSD)
 
 		//qrCodeFileName := fmt.Sprintf("%s.png", address)
 		//err = payments.GenerateQRCode(ur, qrCodeFileName)
@@ -98,7 +99,7 @@ func main() {
 		})
 
 		logger := c.MustGet("logger").(*logrus.Logger)
-		logger.Infof("email: %s, address: %s, Address: %.2f", email, address, priceUSD)
+		logger.Printf("email: %s, address: %s, amount: %.2f", email, address, priceUSD)
 
 	})
 	//
@@ -172,6 +173,6 @@ func Logger(logger *logrus.Logger) gin.HandlerFunc {
 		c.Next()
 
 		entry := logger.WithFields(logrus.Fields{})
-		entry.Info()
+		entry.Print()
 	}
 }
