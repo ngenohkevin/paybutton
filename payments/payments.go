@@ -53,23 +53,3 @@ func getPaymentByAddress(address string) (*Payment, error) {
 	}
 	return nil, errors.New("payment not found")
 }
-
-//func MarkPaymentAsPaid(address string, paidAmount float64, email string) error {
-//	if address == "" || paidAmount <= 0 || email == "" {
-//		return errors.New("invalid input: address, paidAmount, and email are required")
-//	}
-//
-//	payment, err := getPaymentByAddress(address)
-//	if err != nil {
-//		return fmt.Errorf("error marking payment as paid: %v", err)
-//	}
-//
-//	if payment.Email != email {
-//		return errors.New("invalid input: email does not match the payment record")
-//	}
-//
-//	payment.Paid = true
-//	payment.PaidAmount = paidAmount
-//
-//	return nil
-//}
