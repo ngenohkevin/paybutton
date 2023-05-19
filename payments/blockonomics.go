@@ -5,11 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/joho/godotenv"
 	"io"
-	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -27,12 +24,13 @@ var (
 )
 
 func init() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	blockonomicsAPIKey = os.Getenv("BLOCKONOMICS_API_KEY")
+	//err := godotenv.Load(".env")
+	//if err != nil {
+	//	log.Fatal("Error loading .env file")
+	//}
+	//
+	//blockonomicsAPIKey = os.Getenv("BLOCKONOMICS_API_KEY")
+	blockonomicsAPIKey = `rA0Zdsj8UEcGHZWKcVT8Ng2jOfc8lett78jRWZXej48`
 
 	transport := &http.Transport{
 		MaxIdleConnsPerHost: 100,
