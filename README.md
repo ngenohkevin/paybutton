@@ -1,7 +1,8 @@
-
 # Bitcoin Payment Button
 
-The Bitcoin Payment Button is a simple Go-based backend application that generates a dynamic Bitcoin address and corresponding QR code for accepting payments. It integrates with a chosen Bitcoin payment processing system to facilitate seamless transactions.
+The Bitcoin Payment Button is a simple Go-based backend application that generates a dynamic Bitcoin address and
+corresponding QR code for accepting payments. It integrates with a chosen Bitcoin payment processing system to
+facilitate seamless transactions.
 
 ## Features
 
@@ -24,7 +25,7 @@ git clone https://github.com/ngenohkevin/paybutton.git
 cd paybutton
 ```
 
-2. Install the required dependencies:
+1. Install the required dependencies:
 
 ```bash
 go mod download
@@ -80,7 +81,8 @@ go run main.go
 
 ## Contributing
 
-Contributions to the Bitcoin Payment project are welcome! If you find a bug or have suggestions for improvement, please feel free to open an issue or submit a pull request.
+Contributions to the Bitcoin Payment project are welcome! If you find a bug or have suggestions for improvement, please
+feel free to open an issue or submit a pull request.
 
 ## License
 

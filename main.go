@@ -8,7 +8,6 @@ import (
 	"github.com/ngenohkevin/paybutton/utils"
 	"log"
 	"net/http"
-	"os"
 )
 
 func main() {
@@ -24,6 +23,8 @@ func main() {
 	r.POST("/payment", func(c *gin.Context) {
 		email := c.PostForm("email")
 		priceStr := c.PostForm("price")
+		description := c.PostForm("description")
+		name := c.PostForm("name")
 
 		if email == "" || priceStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -53,7 +54,7 @@ func main() {
 		//	_ = fmt.Errorf("%v", err)
 		//}
 
-		log.Printf("Email: %s, Address: %s, Amount: %.2f", email, address, priceUSD)
+		log.Printf("Email: %s, Address: %s, Amount: %.2f, Name: %s, Product: %s", email, address, priceUSD, name, description)
 
 		//qrCodeFileName := fmt.Sprintf("%s.png", address)
 		//err = payments.GenerateQRCode(ur, qrCodeFileName)
@@ -81,8 +82,8 @@ func main() {
 			"email":       email,
 			"created_at":  utils.GetCurrentTime(),
 			"expired_at":  utils.GetExpiryTime(),
-			"status":      "pending",
-			"description": fmt.Sprintf("%s %s", os.Getenv("PRODUCT_NAME"), os.Getenv("PRODUCT_DESC")),
+			"description": description,
+			"name":        name,
 		})
 
 	})
