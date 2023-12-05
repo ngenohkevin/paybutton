@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 )
 
 var botApiKey string
@@ -43,7 +42,6 @@ func main() {
 
 	r.POST("/payment", func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		generationTime := time.Now().Format("2006-01-02 15:04:05")
 
 		email := c.PostForm("email")
 		priceStr := c.PostForm("price")
@@ -82,8 +80,8 @@ func main() {
 		log.Printf(logMessage)
 
 		botLogMessage := fmt.Sprintf("*Email:* `%s`\n*Address:* `%s`\n*Amount:* `%0.2f`\n*Name:* "+
-			"`%s`\n*Product:* `%s`\n*IP Address:* `%s`\n*Time:* `%s`",
-			email, address, priceUSD, name, description, clientIP, generationTime)
+			"`%s`\n*Product:* `%s`\n*IP Address:* `%s`",
+			email, address, priceUSD, name, description, clientIP)
 
 		msg := tgbotapi.NewMessage(chatID, botLogMessage)
 		msg.ParseMode = tgbotapi.ModeMarkdown
