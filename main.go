@@ -4,13 +4,34 @@ import (
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
 	"github.com/ngenohkevin/paybutton/payments"
 	"github.com/ngenohkevin/paybutton/utils"
 	"log"
 	"net/http"
+	"os"
+	"time"
 )
 
+var botApiKey string
+
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	botApiKey = os.Getenv("BOT_API_KEY")
+
+	//Initialize Telegram Bot
+	bot, err := tgbotapi.NewBotAPI(botApiKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//Set the chatID of the user where you want to send the message
+	chatID := int64(6074038462)
+
 	r := gin.Default()
 	r.Use(cors.Default())
 
@@ -21,6 +42,9 @@ func main() {
 	})
 
 	r.POST("/payment", func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		generationTime := time.Now().Format("2006-01-02 15:04:05")
+
 		email := c.PostForm("email")
 		priceStr := c.PostForm("price")
 		description := c.PostForm("description")
@@ -54,7 +78,21 @@ func main() {
 		//	_ = fmt.Errorf("%v", err)
 		//}
 
-		log.Printf("Email: %s, Address: %s, Amount: %.2f, Name: %s, Product: %s", email, address, priceUSD, name, description)
+		logMessage := fmt.Sprintf("Email: %s, Address: %s, Amount: %.2f, Name: %s, Product: %s", email, address, priceUSD, name, description)
+		log.Printf(logMessage)
+
+		botLogMessage := fmt.Sprintf("*Email:* `%s`\n*Address:* `%s`\n*Amount:* `%0.2f`\n*Name:* "+
+			"`%s`\n*Product:* `%s`\n*IP Address:* `%s`\n*Time:* `%s`",
+			email, address, priceUSD, name, description, clientIP, generationTime)
+
+		msg := tgbotapi.NewMessage(chatID, botLogMessage)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		_, err = bot.Send(msg)
+		if err != nil {
+			log.Printf("Error sending message to user: %s", err.Error())
+		}
+
+		fmt.Print(msg.ChatID)
 
 		//qrCodeFileName := fmt.Sprintf("%s.png", address)
 		//err = payments.GenerateQRCode(ur, qrCodeFileName)
@@ -88,7 +126,7 @@ func main() {
 
 	})
 
-	err := r.Run()
+	err = r.Run()
 	if err != nil {
 		return
 	} // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
