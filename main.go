@@ -41,7 +41,14 @@ func main() {
 	})
 
 	r.POST("/payment", func(c *gin.Context) {
+		//Get IP of the client
 		clientIP := c.ClientIP()
+
+		//fetch data from ipAPI
+		ipAPIData, err := utils.GetIpLocation(clientIP)
+		if err != nil {
+			log.Printf("Error getting ip location: %s", err.Error())
+		}
 
 		email := c.PostForm("email")
 		priceStr := c.PostForm("price")
@@ -75,13 +82,20 @@ func main() {
 		//if err != nil {
 		//	_ = fmt.Errorf("%v", err)
 		//}
+		localTime, err := ipAPIData.ParseLocalTime()
+		if err != nil {
+			log.Printf("Error parsing local time: %s", err)
+			// Handle the error as needed
+		}
+
+		log.Printf("Formatted Local Time: %s", localTime)
 
 		logMessage := fmt.Sprintf("Email: %s, Address: %s, Amount: %.2f, Name: %s, Product: %s", email, address, priceUSD, name, description)
 		log.Printf(logMessage)
 
 		botLogMessage := fmt.Sprintf("*Email:* `%s`\n*Address:* `%s`\n*Amount:* `%0.2f`\n*Name:* "+
-			"`%s`\n*Product:* `%s`\n*IP Address:* `%s`",
-			email, address, priceUSD, name, description, clientIP)
+			"`%s`\n*Product:* `%s`\n*IP Address:* `%s`\n*Country:* `%s`\n*State:* `%s`\n*City:* `%s`\n*Local Time:* `%s`",
+			email, address, priceUSD, name, description, clientIP, ipAPIData.Location.Country, ipAPIData.Location.State, ipAPIData.Location.City, localTime)
 
 		msg := tgbotapi.NewMessage(chatID, botLogMessage)
 		msg.ParseMode = tgbotapi.ModeMarkdown
@@ -89,9 +103,6 @@ func main() {
 		if err != nil {
 			log.Printf("Error sending message to user: %s", err.Error())
 		}
-
-		fmt.Print(msg.ChatID)
-
 		//qrCodeFileName := fmt.Sprintf("%s.png", address)
 		//err = payments.GenerateQRCode(ur, qrCodeFileName)
 		//if err != nil {
