@@ -76,7 +76,5 @@ func GetIpLocation(ipAddr string) (*IPAPIData, error) {
 		return nil, err
 	}
 
-	log.Printf("IPAPI Response: %+v", ipData)
-
 	return &ipData, nil
 }
