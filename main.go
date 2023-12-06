@@ -87,9 +87,6 @@ func main() {
 			log.Printf("Error parsing local time: %s", err)
 			// Handle the error as needed
 		}
-
-		log.Printf("Formatted Local Time: %s", localTime)
-
 		logMessage := fmt.Sprintf("Email: %s, Address: %s, Amount: %.2f, Name: %s, Product: %s", email, address, priceUSD, name, description)
 		log.Printf(logMessage)
 
