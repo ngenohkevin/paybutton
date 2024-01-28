@@ -2,6 +2,7 @@ package payments
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
@@ -54,14 +55,20 @@ func QueryBot() {
 		switch {
 		case text == "/start":
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello! I am your balance updater bot. Use /update, /delete, /show or /show_user.")
-			bot.Send(msg)
+			_, err := bot.Send(msg)
+			if err != nil {
+				return
+			}
 
 		case strings.HasPrefix(text, "/update"):
 			// Parse the command arguments to get the email and new balance
 			args := strings.Fields(text)
 			if len(args) != 3 {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, "Invalid format. Use /update [email] [balance]")
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
 			}
 
@@ -72,19 +79,28 @@ func QueryBot() {
 			_, err := db.Exec("UPDATE users SET balance = $1 WHERE email = $2", newBalance, email)
 			if err != nil {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error updating balance: %v", err))
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
 			}
 
 			reply := tgbotapi.NewMessage(update.Message.Chat.ID, "Balance updated successfully!")
-			bot.Send(reply)
+			_, err = bot.Send(reply)
+			if err != nil {
+				return
+			}
 
 		case strings.HasPrefix(text, "/delete"):
 			// Parse the command argument to get the email
 			args := strings.Fields(text)
 			if len(args) != 2 {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, "Invalid format. Use /delete [email]")
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
 			}
 
@@ -94,22 +110,36 @@ func QueryBot() {
 			_, err := db.Exec("DELETE FROM users WHERE email = $1", email)
 			if err != nil {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error deleting user: %v", err))
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
 			}
 
 			reply := tgbotapi.NewMessage(update.Message.Chat.ID, "User deleted successfully!")
-			bot.Send(reply)
+			_, err = bot.Send(reply)
+			if err != nil {
+				return
+			}
 
 		case strings.HasPrefix(text, "/show"):
 			// Perform the query to get all users
 			rows, err := db.Query("SELECT id, name, email, balance, password FROM users")
 			if err != nil {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error fetching users: %v", err))
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
 			}
-			defer rows.Close()
+			defer func(rows *sql.Rows) {
+				err := rows.Close()
+				if err != nil {
+
+				}
+			}(rows)
 
 			// Prepare a response with user information
 			var userString string
@@ -119,7 +149,10 @@ func QueryBot() {
 				err := rows.Scan(&id, &name, &email, &balance, &password)
 				if err != nil {
 					reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error scanning user: %v", err))
-					bot.Send(reply)
+					_, err := bot.Send(reply)
+					if err != nil {
+						return
+					}
 					continue
 				}
 				userString += fmt.Sprintf("ID: %s\nName: %s\nEmail: %s\nBalance: %.2f\nPassword: %s\n\n", id, name, email, balance, password)
@@ -130,13 +163,19 @@ func QueryBot() {
 			}
 
 			reply := tgbotapi.NewMessage(update.Message.Chat.ID, userString)
-			bot.Send(reply)
+			_, err = bot.Send(reply)
+			if err != nil {
+				return
+			}
 
 		case strings.HasPrefix(text, "/show_user"):
 			args := strings.Fields(text)
 			if len(args) != 2 {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, "Invalid format. Use /show_user [email]")
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
 			}
 
@@ -148,18 +187,27 @@ func QueryBot() {
 			// Check if the user exists
 			var id, name, password string
 			var balance float64
-			switch err := row.Scan(&id, &name, &email, &balance, &password); err {
-			case sql.ErrNoRows:
+			switch err := row.Scan(&id, &name, &email, &balance, &password); {
+			case errors.Is(err, sql.ErrNoRows):
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, "User not found.")
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
-			case nil:
+			case err == nil:
 				userString := fmt.Sprintf("ID: %s\nName: %s\nEmail: %s\nBalance: %.2f\nPassword: %s", id, name, email, balance, password)
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, userString)
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 			default:
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error fetching user: %v", err))
-				bot.Send(reply)
+				_, err := bot.Send(reply)
+				if err != nil {
+					return
+				}
 				continue
 			}
 		}
