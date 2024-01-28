@@ -53,7 +53,7 @@ func QueryBot() {
 		text := update.Message.Text
 		switch {
 		case text == "/start":
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello! I am your balance updater bot. Use /update, /delete, or /show.")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello! I am your balance updater bot. Use /update, /delete, /show or /show_user.")
 			bot.Send(msg)
 
 		case strings.HasPrefix(text, "/update"):
@@ -165,7 +165,7 @@ func QueryBot() {
 			}
 
 		default:
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Invalid command. Use /update, /delete, or /show.")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Invalid command. Use /update, /delete, /show or /show_user.")
 			bot.Send(msg)
 		}
 	}
