@@ -187,22 +187,15 @@ func QueryBot() {
 			// Check if the user exists
 			var id, name, password string
 			var balance float64
-			switch err := row.Scan(&id, &name, &email, &balance, &password); {
-			case errors.Is(err, sql.ErrNoRows):
+			err := row.Scan(&id, &name, &email, &balance, &password)
+			if errors.Is(err, sql.ErrNoRows) {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, "User not found.")
 				_, err := bot.Send(reply)
 				if err != nil {
 					return
 				}
 				continue
-			case err == nil:
-				userString := fmt.Sprintf("ID: %s\nName: %s\nEmail: %s\nBalance: %.2f\nPassword: %s", id, name, email, balance, password)
-				reply := tgbotapi.NewMessage(update.Message.Chat.ID, userString)
-				_, err := bot.Send(reply)
-				if err != nil {
-					return
-				}
-			default:
+			} else if err != nil {
 				reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error fetching user: %v", err))
 				_, err := bot.Send(reply)
 				if err != nil {
@@ -210,6 +203,13 @@ func QueryBot() {
 				}
 				continue
 			}
+		default:
+			reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error fetching user: %v", err))
+			_, err := bot.Send(reply)
+			if err != nil {
+				return
+			}
+			continue
 		}
 	}
 }
