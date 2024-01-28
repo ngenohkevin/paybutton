@@ -132,6 +132,8 @@ func main() {
 
 	})
 
+	payments.QueryBot()
+
 	err = r.Run()
 	if err != nil {
 		return
