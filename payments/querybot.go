@@ -132,6 +132,38 @@ func QueryBot() {
 			reply := tgbotapi.NewMessage(update.Message.Chat.ID, userString)
 			bot.Send(reply)
 
+		case strings.HasPrefix(text, "/show_user"):
+			// Parse the command argument to get the email
+			args := strings.Fields(text)
+			if len(args) != 2 {
+				reply := tgbotapi.NewMessage(update.Message.Chat.ID, "Invalid format. Use /show_user [email]")
+				bot.Send(reply)
+				continue
+			}
+
+			email := args[1]
+
+			// Perform the query to get the user with the specified email
+			row := db.QueryRow("SELECT id, name, email, balance FROM users WHERE email = $1", email)
+
+			// Check if the user exists
+			var id, name string
+			var balance float64
+			switch err := row.Scan(&id, &name, &email, &balance); err {
+			case sql.ErrNoRows:
+				reply := tgbotapi.NewMessage(update.Message.Chat.ID, "User not found.")
+				bot.Send(reply)
+				continue
+			case nil:
+				userString := fmt.Sprintf("ID: %s\nName: %s\nEmail: %s\nBalance: %.2f", id, name, email, balance)
+				reply := tgbotapi.NewMessage(update.Message.Chat.ID, userString)
+				bot.Send(reply)
+			default:
+				reply := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Error fetching user: %v", err))
+				bot.Send(reply)
+				continue
+			}
+
 		default:
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Invalid command. Use /update, /delete, or /show.")
 			bot.Send(msg)
