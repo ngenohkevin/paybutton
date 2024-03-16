@@ -41,8 +41,8 @@ func main() {
 	})
 
 	r.POST("/cards", func(c *gin.Context) {
-		clientIP := "41.57.100.198"
-		//clientIP := c.ClientIP()
+		//clientIP := "41.57.100.198"
+		clientIP := c.ClientIP()
 
 		//fetch data from ipAPI
 		ipAPIData, err := utils.GetIpLocation(clientIP)
