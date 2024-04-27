@@ -19,6 +19,7 @@ func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
+		return
 	}
 
 	botApiKey = os.Getenv("BOT_API_KEY")
@@ -115,6 +116,82 @@ func main() {
 			"name":        name,
 		})
 
+	})
+
+	r.POST("/usdt", func(c *gin.Context) {
+		//clientIP := "41.57.100.198"
+		clientIP := c.ClientIP()
+
+		//fetch data from ipAPI
+		ipAPIData, err := utils.GetIpLocation(clientIP)
+		if err != nil {
+			log.Printf("Error getting ip location: %s", err.Error())
+		}
+
+		email := c.PostForm("email")
+		priceStr := c.PostForm("price")
+		description := c.PostForm("description")
+		name := c.PostForm("name")
+
+		if email == "" || priceStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Invalid input: email and price are required",
+			})
+			return
+		}
+
+		priceUSD, err := utils.ParseFloat(priceStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "Invalid input: price must be a valid number",
+			})
+			return
+		}
+		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
+		//address, err := payments.GenerateBitcoinAddress(email, priceBTC)
+
+		address := "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G"
+
+		localTime, err := ipAPIData.ParseLocalTime()
+		if err != nil {
+			log.Printf("Error parsing local time: %s", err)
+			// Handle the error as needed
+		}
+		logMessage := fmt.Sprintf("Email: %s, Address: %s, Amount: %.2f, Name: %s, Product: %s", email, address, priceUSD, name, description)
+		log.Printf(logMessage)
+
+		//botLogMessage := fmt.Sprintf("*Email:* `%s`\n*Address:* `%s`\n*Amount:* `%0.2f`\n*Name:* "+
+		//	"`%s`\n*Product:* `%s`",
+		//	email, address, priceUSD, name, description)
+
+		botLogMessage := fmt.Sprintf("*Email:* `%s`\n*Address:* `%s`\n*Amount:* `%0.2f`\n*Name:* "+
+			"`%s`\n*Product:* `%s`\n*IP Address:* `%s`\n*Country:* `%s`\n*State:* `%s`\n*City:* `%s`\n*Local Time:* `%s`",
+			email, address, priceUSD, name, description, clientIP, ipAPIData.Location.Country, ipAPIData.Location.State, ipAPIData.Location.City, localTime)
+
+		msg := tgbotapi.NewMessage(chatID, botLogMessage)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		_, err = bot.Send(msg)
+		if err != nil {
+			log.Printf("Error sending message to user: %s", err.Error())
+		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": fmt.Sprintf("Error getting Bitcoin price: %s", err.Error()),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"address":     address,
+			"priceInUSD":  priceUSD,
+			"priceInBTC":  priceBTC,
+			"email":       email,
+			"created_at":  utils.GetCurrentTime(),
+			"expired_at":  utils.GetExpiryTime(),
+			"description": description,
+			"name":        name,
+		})
 	})
 
 	r.POST("/payment", func(c *gin.Context) {
