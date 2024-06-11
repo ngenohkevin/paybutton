@@ -17,7 +17,7 @@ import (
 var (
 	botApiKey     string
 	chatID        int64 = 6074038462
-	addressLimit        = 5              // Limit the number of addresses generated per user/session
+	addressLimit        = 4              // Limit the number of addresses generated per user/session
 	addressExpiry       = 24 * time.Hour // Set address expiry time to 24 hours
 )
 
