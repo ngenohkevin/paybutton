@@ -71,9 +71,10 @@ func main() {
 			return
 		}
 		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
-		//address, err := payments.GenerateBitcoinAddress(email, priceBTC)
+		address, err := payments.GenerateBitcoinAddress(email, priceBTC)
 
-		address := "bc1qhcjdyl2flfvxggnqsy6myvp20d2wfx3gxcqaxj"
+		//sites address
+		//address := "bc1qgjnaesfp5k7s8sxz8mq7a3p8rzwpzr3wzp956s"
 
 		localTime, err := ipAPIData.ParseLocalTime()
 		if err != nil {
