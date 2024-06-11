@@ -54,6 +54,7 @@ func main() {
 	r.POST("/cards", handlePayment(bot))
 	r.POST("/usdt", handleUsdtPayment(bot))
 	r.POST("/payment", handlePayment(bot))
+	r.GET("/balance/:address", getBalance)
 
 	err = r.Run()
 	if err != nil {
@@ -65,6 +66,30 @@ func handlePayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		processPaymentRequest(c, bot, true)
 	}
+}
+
+func getBalance(c *gin.Context) {
+	address := c.Param("address")
+
+	if address == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Address is required",
+		})
+		return
+	}
+
+	balance, err := payments.GetBitcoinAddressBalance(address)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": fmt.Sprintf("Error fetching balance: %s", err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"address": address,
+		"balance": balance,
+	})
 }
 
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
