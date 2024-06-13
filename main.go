@@ -54,7 +54,7 @@ func main() {
 	r.POST("/cards", handlePayment(bot))
 	r.POST("/usdt", handleUsdtPayment(bot))
 	r.POST("/payment", handlePayment(bot))
-	r.GET("balance/:address", getBalance)
+	r.GET("/balance/:address", getBalance)
 
 	err = r.Run()
 	if err != nil {
