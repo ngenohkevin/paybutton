@@ -10,12 +10,12 @@ import (
 )
 
 type BalanceResponse struct {
-	Address string `json:"address"`
+	Address string `json:"addr"`
 	Balance int64  `json:"balance"`
 }
 
 func GetBitcoinAddressBalance(address string) (int64, error) {
-	url := fmt.Sprintf("https://www.blockonomics.co/api/balance")
+	url := "https://www.blockonomics.co/api/balance"
 
 	data := map[string]interface{}{
 		"addr": []string{address},
@@ -51,7 +51,7 @@ func GetBitcoinAddressBalance(address string) (int64, error) {
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			if err != nil {
-
+				// Handle error closing the body
 			}
 		}(resp.Body)
 
@@ -59,16 +59,18 @@ func GetBitcoinAddressBalance(address string) (int64, error) {
 			return 0, fmt.Errorf("error fetching balance, status code: %v", resp.StatusCode)
 		}
 
-		var balanceResponses []BalanceResponse
-		if err := json.NewDecoder(resp.Body).Decode(&balanceResponses); err != nil {
+		var balanceResponse struct {
+			Response []BalanceResponse `json:"response"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&balanceResponse); err != nil {
 			return 0, err
 		}
 
-		if len(balanceResponses) == 0 {
+		if len(balanceResponse.Response) == 0 {
 			return 0, fmt.Errorf("no balance data returned")
 		}
 
-		return balanceResponses[0].Balance, nil
+		return balanceResponse.Response[0].Balance, nil
 
 	case err := <-errChan:
 		return 0, err
