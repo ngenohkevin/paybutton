@@ -54,7 +54,7 @@ func main() {
 	r.POST("/cards", handlePayment(bot))
 	r.POST("/usdt", handleUsdtPayment(bot))
 	r.POST("/payment", handlePayment(bot))
-	r.GET("/balance/:address", getBalance)
+	r.GET("/api/balance/:address", getBalance) // Ensure the correct URL
 
 	err = r.Run()
 	if err != nil {
