@@ -89,7 +89,7 @@ func getBalance(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"address": address,
-		"balance": btc,
+		"balance": utils.ConvertBtcToUsd(btc),
 	})
 }
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
