@@ -54,7 +54,7 @@ func main() {
 	r.POST("/cards", handlePayment(bot))
 	r.POST("/usdt", handleUsdtPayment(bot))
 	r.POST("/payment", handlePayment(bot))
-	r.GET("/api/balance/:address", getBalance)
+	r.GET("/balance/:address", getBalance)
 
 	err = r.Run()
 	if err != nil {
@@ -80,7 +80,6 @@ func getBalance(c *gin.Context) {
 
 	balance, err := payments.GetBitcoinAddressBalance(address)
 	if err != nil {
-		log.Printf("Error fetching balance for address %s: %s", address, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": fmt.Sprintf("Error fetching balance: %s", err.Error()),
 		})
