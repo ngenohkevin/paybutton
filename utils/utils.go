@@ -78,17 +78,6 @@ func GetBlockonomicsRate() (float64, error) {
 	return bitcoinUSDPrice, nil
 }
 
-func ConvertBtcToUsd(priceInBTC float64) (float64, error) {
-	bitcoinUSDPrice, err := GetBlockonomicsRate()
-	if err != nil {
-		return 0, err
-	}
-
-	priceInUSD := priceInBTC * bitcoinUSDPrice
-
-	return priceInUSD, nil
-}
-
 func ConvertToBitcoinUSD(priceInUSD float64) (float64, error) {
 	bitcoinUSDPrice, err := GetBlockonomicsRate()
 	if err != nil {

@@ -97,9 +97,12 @@ func getBalance(c *gin.Context) {
 
 	balanceUSD := btc * rate
 
+	// Round balanceUSD to 2 decimal places
+	balanceUSDFormatted := fmt.Sprintf("%.2f", balanceUSD)
+
 	c.JSON(http.StatusOK, gin.H{
 		"address": address,
-		"balance": balanceUSD,
+		"balance": balanceUSDFormatted,
 	})
 }
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
