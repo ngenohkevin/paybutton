@@ -87,9 +87,19 @@ func getBalance(c *gin.Context) {
 	}
 	btc := float64(balance) / 100000000 // Convert satoshis to BTC
 
+	rate, err := utils.GetBlockonomicsRate()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": fmt.Sprintf("Error fetching rate: %s", err.Error()),
+		})
+		return
+	}
+
+	balanceUSD := btc * rate
+
 	c.JSON(http.StatusOK, gin.H{
 		"address": address,
-		"balance": utils.ConvertBtcToUsd(btc),
+		"balance": balanceUSD,
 	})
 }
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {

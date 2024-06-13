@@ -38,7 +38,7 @@ func GetExpiryTime() time.Time {
 	return time.Now().Add(15 * time.Minute)
 }
 
-func getBlockonomicsRate() (float64, error) {
+func GetBlockonomicsRate() (float64, error) {
 	if cache.expiration.After(time.Now()) {
 		// Rate is still valid, return it from cache
 		return cache.rate, nil
@@ -79,7 +79,7 @@ func getBlockonomicsRate() (float64, error) {
 }
 
 func ConvertBtcToUsd(priceInBTC float64) (float64, error) {
-	bitcoinUSDPrice, err := getBlockonomicsRate()
+	bitcoinUSDPrice, err := GetBlockonomicsRate()
 	if err != nil {
 		return 0, err
 	}
@@ -90,7 +90,7 @@ func ConvertBtcToUsd(priceInBTC float64) (float64, error) {
 }
 
 func ConvertToBitcoinUSD(priceInUSD float64) (float64, error) {
-	bitcoinUSDPrice, err := getBlockonomicsRate()
+	bitcoinUSDPrice, err := GetBlockonomicsRate()
 	if err != nil {
 		return 0, err
 	}
