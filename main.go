@@ -80,6 +80,7 @@ func getBalance(c *gin.Context) {
 
 	balance, err := payments.GetBitcoinAddressBalance(address)
 	if err != nil {
+		log.Printf("Error fetching balance for address %s: %s", address, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": fmt.Sprintf("Error fetching balance: %s", err.Error()),
 		})
