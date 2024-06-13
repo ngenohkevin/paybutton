@@ -85,10 +85,11 @@ func getBalance(c *gin.Context) {
 		})
 		return
 	}
+	usd := float64(balance) / 100000000 // Convert satoshis to BTC
 
 	c.JSON(http.StatusOK, gin.H{
 		"address": address,
-		"balance": float64(balance) / 100000000, // Convert satoshis to BTC
+		"balance": utils.ConvertToBitcoinUSD(usd),
 	})
 }
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
