@@ -88,10 +88,9 @@ func getBalance(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"address": address,
-		"balance": balance,
+		"balance": float64(balance) / 100000000, // Convert satoshis to BTC
 	})
 }
-
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		processPaymentRequest(c, bot, false)
