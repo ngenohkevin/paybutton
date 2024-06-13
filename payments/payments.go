@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -47,7 +48,12 @@ func GetBitcoinAddressBalance(address string) (int64, error) {
 
 	select {
 	case resp := <-respChan:
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+
+			}
+		}(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
 			return 0, fmt.Errorf("error fetching balance, status code: %v", resp.StatusCode)
