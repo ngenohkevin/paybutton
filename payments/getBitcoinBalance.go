@@ -26,13 +26,19 @@ func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, erro
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-
+			return
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("error fetching balance, status code: %v", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body) // Read the response body
+		return 0, fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
 	}
+
+	// Log rate limit headers
+	fmt.Printf("Rate Limit: %s\n", resp.Header.Get("X-RateLimit-Limit"))
+	fmt.Printf("Rate Limit Remaining: %s\n", resp.Header.Get("X-RateLimit-Remaining"))
+	fmt.Printf("Rate Limit Reset: %s\n", resp.Header.Get("X-RateLimit-Reset"))
 
 	var balanceResponse BlockCypherBalance
 	if err := json.NewDecoder(resp.Body).Decode(&balanceResponse); err != nil {
