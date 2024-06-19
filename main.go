@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	botApiKey     string
-	chatID        int64 = 6074038462
-	addressLimit        = 4              // Limit the number of addresses generated per user/session
-	addressExpiry       = 24 * time.Hour // Set address expiry time to 24 hours
+	botApiKey        string
+	chatID           int64 = 6074038462
+	addressLimit           = 4              // Limit the number of addresses generated per user/session
+	addressExpiry          = 24 * time.Hour // Set address expiry time to 24 hours
+	blockCypherToken string
 )
 
 type UserSession struct {
@@ -37,6 +38,11 @@ func main() {
 	botApiKey = os.Getenv("BOT_API_KEY")
 	if botApiKey == "" {
 		log.Fatal("BOT_API_KEY not set in .env file")
+	}
+
+	blockCypherToken = os.Getenv("BLOCKCYPHER_TOKEN")
+	if blockCypherToken == "" {
+		log.Fatal("BLOCKCYPHER_TOKEN not set in .env file")
 	}
 
 	bot, err := tgbotapi.NewBotAPI(botApiKey)
@@ -78,7 +84,7 @@ func getBalance(c *gin.Context) {
 		return
 	}
 
-	balance, err := payments.GetBitcoinAddressBalance(address)
+	balance, err := payments.GetBitcoinAddressBalanceWithBlockCypher(address, blockCypherToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": fmt.Sprintf("Error fetching balance: %s", err.Error()),
