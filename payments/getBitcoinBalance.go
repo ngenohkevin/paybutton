@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type BlockCypherBalance struct {
@@ -19,33 +20,53 @@ type BlockCypherBalance struct {
 func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, error) {
 	url := fmt.Sprintf("https://api.blockcypher.com/v1/btc/main/addrs/%s/balance?token=%s", address, token)
 
-	resp, err := http.Get(url)
-	if err != nil {
-		return 0, err
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body) // Read the response body
-		return 0, fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
-	}
-
-	// Log rate limit headers
-	fmt.Printf("Rate Limit: %s\n", resp.Header.Get("X-RateLimit-Limit"))
-	fmt.Printf("Rate Limit Remaining: %s\n", resp.Header.Get("X-RateLimit-Remaining"))
-	fmt.Printf("Rate Limit Reset: %s\n", resp.Header.Get("X-RateLimit-Reset"))
-
 	var balanceResponse BlockCypherBalance
-	if err := json.NewDecoder(resp.Body).Decode(&balanceResponse); err != nil {
-		return 0, err
+	var err error
+	var resp *http.Response
+
+	retries := 3
+	for i := 0; i < retries; i++ {
+		resp, err = http.Get(url)
+		if err != nil {
+			return 0, err
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			if err := json.NewDecoder(resp.Body).Decode(&balanceResponse); err != nil {
+				err := resp.Body.Close()
+				if err != nil {
+					return 0, err
+				}
+				return 0, err
+			}
+			err := resp.Body.Close()
+			if err != nil {
+				return 0, err
+			}
+			break
+		} else if resp.StatusCode == 403 {
+			body, _ := io.ReadAll(resp.Body)
+			err := resp.Body.Close()
+			if err != nil {
+				return 0, err
+			}
+			err = fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
+			fmt.Println(err)
+			if i == retries-1 {
+				return 0, err
+			}
+			time.Sleep(time.Second * 2) // Wait for 2 seconds before retrying
+		} else {
+			body, _ := io.ReadAll(resp.Body)
+			err := resp.Body.Close()
+			if err != nil {
+				return 0, err
+			}
+			err = fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
+			return 0, err
+		}
 	}
 
 	totalBalance := balanceResponse.Balance + balanceResponse.UnconfirmedBalance
-
 	return totalBalance, nil
 }
