@@ -111,6 +111,7 @@ func getBalance(c *gin.Context) {
 		"balance": balanceUSDFormatted,
 	})
 }
+
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		processPaymentRequest(c, bot, false)
