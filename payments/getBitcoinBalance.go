@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type BlockCypherBalance struct {
+type BlockcypherBalance struct {
 	Address            string `json:"address"`
 	TotalReceived      int64  `json:"total_received"`
 	TotalSent          int64  `json:"total_sent"`
@@ -20,7 +20,7 @@ type BlockCypherBalance struct {
 func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, error) {
 	url := fmt.Sprintf("https://api.blockcypher.com/v1/btc/main/addrs/%s/balance?token=%s", address, token)
 
-	var balanceResponse BlockCypherBalance
+	var balanceResponse BlockcypherBalance
 	var err error
 	var resp *http.Response
 
@@ -55,7 +55,7 @@ func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, erro
 			if i == retries-1 {
 				return 0, err
 			}
-			time.Sleep(time.Second * 2) // Wait for 2 seconds before retrying
+			time.Sleep(time.Duration(2<<i) * time.Second) // Exponential backoff: 2, 4, 8 seconds
 		} else {
 			body, _ := io.ReadAll(resp.Body)
 			err := resp.Body.Close()
