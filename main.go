@@ -174,8 +174,8 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress
 	}
 
 	if len(session.GeneratedAddresses) >= addressLimit {
-		c.JSON(http.StatusTooManyRequests, gin.H{"message": "Address generation limit reached"})
-		return
+		log.Printf("Address generation limit reached for user %s. Using static address.", email)
+		generateAddress = false
 	}
 
 	var address string
@@ -195,7 +195,7 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress
 		// Start a goroutine to check the balance
 		go checkBalancePeriodically(address, email, blockCypherToken, bot)
 	} else {
-		address = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G" // Static USDT address for demonstration
+		address = staticBTCAddress
 	}
 
 	// Remove expired addresses
