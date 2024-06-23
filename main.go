@@ -258,7 +258,7 @@ func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
-	checkDuration := 25 * time.Minute
+	checkDuration := 15 * time.Minute
 	ticker := time.NewTicker(40 * time.Second)
 	defer ticker.Stop()
 	timeout := time.After(checkDuration)
@@ -273,12 +273,35 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 			}
 
 			if balance > 0 {
+				// Get the current BTC to USD exchange rate
+				rate, err := utils.GetBlockonomicsRate()
+				if err != nil {
+					log.Printf("Error fetching rate: %s", err)
+				}
+
+				// Convert the balance from satoshis to USD
+				balanceUSD := float64(balance) / 100000000 * rate
+				balanceUSDFormatted := fmt.Sprintf("%.2f", balanceUSD)
+
 				// Update user balance in the database
-				err := updateUserBalance(email, balance, bot)
+				err = updateUserBalance(email, balanceUSD, bot)
 				if err != nil {
 					log.Printf("Error updating balance for user %s: %s", email, err)
 				} else {
 					log.Printf("Balance updated successfully for user %s", email)
+				}
+
+				// Send confirmation to the bot in USD
+				confirmationTime := time.Now().Format(time.RFC3339)
+				botLogMessage := fmt.Sprintf(
+					"*Email:* `%s`\n*New Balance Added:* `%s USD`\n*Confirmation Time:* `%s`",
+					email, balanceUSDFormatted, confirmationTime)
+
+				msg := tgbotapi.NewMessage(chatID, botLogMessage)
+				msg.ParseMode = tgbotapi.ModeMarkdown
+				_, err = bot.Send(msg)
+				if err != nil {
+					log.Printf("Error sending confirmation message to bot: %s", err)
 				}
 				return // Stop checking after updating the balance
 			}
@@ -292,32 +315,18 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	}
 }
 
-func updateUserBalance(email string, newBalance int64, bot *tgbotapi.BotAPI) error {
+func updateUserBalance(email string, newBalanceUSD float64, bot *tgbotapi.BotAPI) error {
 	var currentBalance float64
 	err := db.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
 	if err != nil {
 		return fmt.Errorf("error fetching current balance for user %s: %w", email, err)
 	}
 
-	newBalanceFloat := float64(newBalance) / 100000000 // Convert satoshis to BTC
-	updatedBalance := currentBalance + newBalanceFloat
+	updatedBalance := currentBalance + newBalanceUSD
 
 	_, err = db.Exec("UPDATE users SET balance = $1 WHERE email = $2", updatedBalance, email)
 	if err != nil {
 		return fmt.Errorf("error updating balance for user %s: %w", email, err)
-	}
-
-	// Send confirmation to the bot
-	confirmationTime := time.Now().Format(time.RFC3339)
-	botLogMessage := fmt.Sprintf(
-		"*Email:* `%s`\n*New Balance Added:* `%0.8f BTC`\n*Confirmation Time:* `%s`",
-		email, newBalanceFloat, confirmationTime)
-
-	msg := tgbotapi.NewMessage(chatID, botLogMessage)
-	msg.ParseMode = tgbotapi.ModeMarkdown
-	_, err = bot.Send(msg)
-	if err != nil {
-		log.Printf("Error sending confirmation message to bot: %s", err)
 	}
 
 	return nil
