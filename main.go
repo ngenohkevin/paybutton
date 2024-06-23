@@ -195,7 +195,7 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress
 		// Start a goroutine to check the balance
 		go checkBalancePeriodically(address, email, blockCypherToken, bot)
 	} else {
-		address = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G" // Static USDT address
+		address = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G" // Static USDT address for demonstration
 	}
 
 	// Remove expired addresses
@@ -274,8 +274,13 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 
 			if balance > 0 {
 				// Update user balance in the database
-				updateUserBalance(email, balance, bot)
-				return
+				err := updateUserBalance(email, balance, bot)
+				if err != nil {
+					log.Printf("Error updating balance for user %s: %s", email, err)
+				} else {
+					log.Printf("Balance updated successfully for user %s", email)
+				}
+				return // Stop checking after updating the balance
 			}
 
 			log.Printf("Address: %s, Balance: %d satoshis", address, balance)
@@ -287,12 +292,11 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	}
 }
 
-func updateUserBalance(email string, newBalance int64, bot *tgbotapi.BotAPI) {
+func updateUserBalance(email string, newBalance int64, bot *tgbotapi.BotAPI) error {
 	var currentBalance float64
 	err := db.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
 	if err != nil {
-		log.Printf("Error fetching current balance for user %s: %s", email, err)
-		return
+		return fmt.Errorf("error fetching current balance for user %s: %w", email, err)
 	}
 
 	newBalanceFloat := float64(newBalance) / 100000000 // Convert satoshis to BTC
@@ -300,8 +304,7 @@ func updateUserBalance(email string, newBalance int64, bot *tgbotapi.BotAPI) {
 
 	_, err = db.Exec("UPDATE users SET balance = $1 WHERE email = $2", updatedBalance, email)
 	if err != nil {
-		log.Printf("Error updating balance for user %s: %s", email, err)
-		return
+		return fmt.Errorf("error updating balance for user %s: %w", email, err)
 	}
 
 	// Send confirmation to the bot
@@ -316,4 +319,6 @@ func updateUserBalance(email string, newBalance int64, bot *tgbotapi.BotAPI) {
 	if err != nil {
 		log.Printf("Error sending confirmation message to bot: %s", err)
 	}
+
+	return nil
 }
