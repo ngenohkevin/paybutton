@@ -2,11 +2,9 @@ package utils
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 )
@@ -87,20 +85,4 @@ func ConvertToBitcoinUSD(priceInUSD float64) (float64, error) {
 	bitcoinAmount := priceInUSD / bitcoinUSDPrice
 
 	return bitcoinAmount, nil
-}
-
-func GenerateBitcoinURI(address string, amountBTC float64) (string, error) {
-	// Format the amount in BTC as a string with 8 decimal places
-	amountStr := fmt.Sprintf("%.8f", amountBTC)
-
-	// Construct the URI with the Bitcoin address and amount
-	uri := fmt.Sprintf("bitcoin:%s?amount=%s", address, amountStr)
-
-	// Encode the URI as a URL
-	encodedURI, err := url.Parse(uri)
-	if err != nil {
-		return "", err
-	}
-
-	return encodedURI.String(), nil
 }

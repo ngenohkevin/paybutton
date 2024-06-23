@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type BlockcypherBalance struct {
+type BlockCypherBalance struct {
 	Address            string `json:"address"`
 	TotalReceived      int64  `json:"total_received"`
 	TotalSent          int64  `json:"total_sent"`
@@ -20,7 +20,7 @@ type BlockcypherBalance struct {
 func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, error) {
 	url := fmt.Sprintf("https://api.blockcypher.com/v1/btc/main/addrs/%s/balance?token=%s", address, token)
 
-	var balanceResponse BlockcypherBalance
+	var balanceResponse BlockCypherBalance
 	var err error
 	var resp *http.Response
 
