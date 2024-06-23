@@ -258,8 +258,8 @@ func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
-	checkDuration := 15 * time.Minute
-	ticker := time.NewTicker(40 * time.Second)
+	checkDuration := 25 * time.Minute
+	ticker := time.NewTicker(50 * time.Second)
 	defer ticker.Stop()
 	timeout := time.After(checkDuration)
 
@@ -284,7 +284,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				balanceUSDFormatted := fmt.Sprintf("%.2f", balanceUSD)
 
 				// Update user balance in the database
-				err = updateUserBalance(email, balanceUSD, bot)
+				err = updateUserBalance(email, balanceUSD)
 				if err != nil {
 					log.Printf("Error updating balance for user %s: %s", email, err)
 				} else {
@@ -315,7 +315,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	}
 }
 
-func updateUserBalance(email string, newBalanceUSD float64, bot *tgbotapi.BotAPI) error {
+func updateUserBalance(email string, newBalanceUSD float64) error {
 	var currentBalance float64
 	err := db.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
 	if err != nil {
