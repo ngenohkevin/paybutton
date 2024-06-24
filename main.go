@@ -245,12 +245,12 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress
 }
 
 func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) {
-	balance, err := payments.GetBitcoinAddressBalanceWithBlockCypher(address, token)
+	balance, err := payments.GetBitcoinAddressBalanceWithBlockonomics(address)
 	if err != nil {
-		log.Printf("Error with BlockCypher, trying Blockonomics: %s", err)
-		balance, err = payments.GetBitcoinAddressBalanceWithBlockonomics(address)
+		log.Printf("Error with Blockonomics, trying BlockCypher: %s", err)
+		balance, err = payments.GetBitcoinAddressBalanceWithBlockCypher(address, token)
 		if err != nil {
-			log.Printf("Error with Blockonomics, using static address: %s", err)
+			log.Printf("Error with BlockCypher, using static address: %s", err)
 			balance, err = payments.GetBitcoinAddressBalanceWithBlockonomics(staticBTCAddress)
 		}
 	}
@@ -258,8 +258,8 @@ func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
-	checkDuration := 20 * time.Minute
-	ticker := time.NewTicker(50 * time.Second)
+	checkDuration := 25 * time.Minute
+	ticker := time.NewTicker(55 * time.Second)
 	defer ticker.Stop()
 	timeout := time.After(checkDuration)
 
@@ -284,7 +284,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				balanceUSDFormatted := fmt.Sprintf("%.2f", balanceUSD)
 
 				// Update user balance in the database
-				err = updateUserBalance(email, balanceUSD)
+				err = updateUserBalance(email, balanceUSD, bot)
 				if err != nil {
 					log.Printf("Error updating balance for user %s: %s", email, err)
 				} else {
@@ -315,7 +315,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	}
 }
 
-func updateUserBalance(email string, newBalanceUSD float64) error {
+func updateUserBalance(email string, newBalanceUSD float64, bot *tgbotapi.BotAPI) error {
 	var currentBalance float64
 	err := db.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
 	if err != nil {
