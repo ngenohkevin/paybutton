@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -281,7 +282,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 
 				// Convert the balance from satoshis to USD
 				balanceUSD := float64(balance) / 100000000 * rate
-				balanceUSDFormatted := fmt.Sprintf("%.2f", balanceUSD)
+				balanceUSD = roundToTwoDecimalPlaces(balanceUSD)
 
 				// Update user balance in the database
 				err = updateUserBalance(email, balanceUSD, bot)
@@ -295,7 +296,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				confirmationTime := time.Now().Format(time.RFC3339)
 				botLogMessage := fmt.Sprintf(
 					"*Email:* `%s`\n*New Balance Added:* `%s USD`\n*Confirmation Time:* `%s`",
-					email, balanceUSDFormatted, confirmationTime)
+					email, fmt.Sprintf("%.2f", balanceUSD), confirmationTime)
 
 				msg := tgbotapi.NewMessage(chatID, botLogMessage)
 				msg.ParseMode = tgbotapi.ModeMarkdown
@@ -322,7 +323,7 @@ func updateUserBalance(email string, newBalanceUSD float64, bot *tgbotapi.BotAPI
 		return fmt.Errorf("error fetching current balance for user %s: %w", email, err)
 	}
 
-	updatedBalance := currentBalance + newBalanceUSD
+	updatedBalance := roundToTwoDecimalPlaces(currentBalance + newBalanceUSD)
 
 	_, err = db.Exec("UPDATE users SET balance = $1 WHERE email = $2", updatedBalance, email)
 	if err != nil {
@@ -330,4 +331,8 @@ func updateUserBalance(email string, newBalanceUSD float64, bot *tgbotapi.BotAPI
 	}
 
 	return nil
+}
+
+func roundToTwoDecimalPlaces(value float64) float64 {
+	return math.Round(value*100) / 100
 }
