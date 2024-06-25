@@ -285,7 +285,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				balanceUSD = roundToTwoDecimalPlaces(balanceUSD)
 
 				// Update user balance in the database
-				err = updateUserBalance(email, balanceUSD, bot)
+				err = updateUserBalance(email, balanceUSD)
 				if err != nil {
 					log.Printf("Error updating balance for user %s: %s", email, err)
 				} else {
@@ -295,7 +295,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				// Send confirmation to the bot in USD
 				confirmationTime := time.Now().Format(time.RFC3339)
 				botLogMessage := fmt.Sprintf(
-					"*Email:* `%s`\n*New Balance Added:* `%s USD`\n*Confirmation Time:* `%s`",
+					"*Email:* `%s`\n*New Balance Added🎉:* `%s USD`\n*Confirmation Time:* `%s`",
 					email, fmt.Sprintf("%.2f", balanceUSD), confirmationTime)
 
 				msg := tgbotapi.NewMessage(chatID, botLogMessage)
@@ -316,7 +316,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	}
 }
 
-func updateUserBalance(email string, newBalanceUSD float64, bot *tgbotapi.BotAPI) error {
+func updateUserBalance(email string, newBalanceUSD float64) error {
 	var currentBalance float64
 	err := db.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
 	if err != nil {
