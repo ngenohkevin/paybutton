@@ -19,13 +19,14 @@ import (
 )
 
 var (
-	botApiKey        string
-	chatID           int64 = 6074038462
-	addressLimit           = 4              // Limit the number of addresses generated per user/session
-	addressExpiry          = 24 * time.Hour // Set address expiry time to 24 hours
-	blockCypherToken string
-	db               *sql.DB
-	staticBTCAddress = "bc1qgjnaesfp5k7s8sxz8mq7a3p8rzwpzr3wzp956s" // Fallback static BTC address
+	botApiKey         string
+	chatID            int64 = 6074038462
+	addressLimit            = 4              // Limit the number of addresses generated per user/session
+	addressExpiry           = 24 * time.Hour // Set address expiry time to 24 hours
+	blockCypherToken  string
+	db                *sql.DB
+	staticBTCAddress  = "bc1qgjnaesfp5k7s8sxz8mq7a3p8rzwpzr3wzp956s" // Fallback static BTC address
+	staticUSDTAddress = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G"         // Fallback static USDT address
 )
 
 type UserSession struct {
@@ -93,7 +94,13 @@ func main() {
 
 func handlePayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		processPaymentRequest(c, bot, true)
+		processPaymentRequest(c, bot, true, false)
+	}
+}
+
+func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		processPaymentRequest(c, bot, false, true)
 	}
 }
 
@@ -135,13 +142,7 @@ func getBalance(c *gin.Context) {
 	})
 }
 
-func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		processPaymentRequest(c, bot, false)
-	}
-}
-
-func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress bool) {
+func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddress bool, generateUsdtAddress bool) {
 	clientIP := c.ClientIP()
 	ipAPIData, err := utils.GetIpLocation(clientIP)
 	if err != nil {
@@ -176,11 +177,12 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress
 
 	if len(session.GeneratedAddresses) >= addressLimit {
 		log.Printf("Address generation limit reached for user %s. Using static address.", email)
-		generateAddress = false
+		generateBtcAddress = false
+		generateUsdtAddress = false
 	}
 
 	var address string
-	if generateAddress {
+	if generateBtcAddress {
 		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("Error getting Bitcoin price: %s", err)})
@@ -195,6 +197,8 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress
 
 		// Start a goroutine to check the balance
 		go checkBalancePeriodically(address, email, blockCypherToken, bot)
+	} else if generateUsdtAddress {
+		address = staticUSDTAddress
 	} else {
 		address = staticBTCAddress
 	}
@@ -235,7 +239,7 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateAddress
 		"name":        name,
 	}
 
-	if generateAddress {
+	if generateBtcAddress {
 		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
 		if err == nil {
 			responseData["priceInBTC"] = priceBTC
@@ -259,8 +263,8 @@ func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
-	checkDuration := 25 * time.Minute
-	ticker := time.NewTicker(55 * time.Second)
+	checkDuration := 15 * time.Minute
+	ticker := time.NewTicker(40 * time.Second)
 	defer ticker.Stop()
 	timeout := time.After(checkDuration)
 
@@ -295,7 +299,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				// Send confirmation to the bot in USD
 				confirmationTime := time.Now().Format(time.RFC3339)
 				botLogMessage := fmt.Sprintf(
-					"*Email:* `%s`\n*New Balance Added🎉:* `%s USD`\n*Confirmation Time:* `%s`",
+					"*Email:* `%s`\n*New Balance Added:* `%s USD`\n*Confirmation Time:* `%s`",
 					email, fmt.Sprintf("%.2f", balanceUSD), confirmationTime)
 
 				msg := tgbotapi.NewMessage(chatID, botLogMessage)
