@@ -290,6 +290,14 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				balanceUSD := float64(balance) / 100000000 * rate
 				balanceUSD = roundToTwoDecimalPlaces(balanceUSD)
 
+				// Fetch the user's name from the database
+				var userName string
+				err = db.QueryRow("SELECT name FROM users WHERE email = $1", email).Scan(&userName)
+				if err != nil {
+					log.Printf("Error fetching user name for email %s: %s", email, err)
+					continue
+				}
+
 				// Update user balance in the database
 				err = updateUserBalance(email, balanceUSD)
 				if err != nil {
@@ -313,7 +321,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 
 				// Send confirmation email to the user
 				log.Println("Sending confirmation email to user:", email)
-				err = utils.SendEmail(email, email, fmt.Sprintf("%.2f", balanceUSD))
+				err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSD))
 				if err != nil {
 					log.Printf("Error sending email to user %s: %s", email, err)
 				} else {
