@@ -173,13 +173,15 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	session, exists := userSessions[email]
 	if !exists {
 		session = &UserSession{
-			Email:              email,
-			GeneratedAddresses: make(map[string]time.Time),
+			Email:                email,
+			GeneratedAddresses:   make(map[string]time.Time),
+			AddressesWithBalance: make(map[string]bool),
 		}
 		userSessions[email] = session
 	}
 
-	if len(session.GeneratedAddresses) >= addressLimit {
+	addressLimitReached := len(session.GeneratedAddresses) >= addressLimit
+	if addressLimitReached && !session.ExtendedAddressAllowed {
 		log.Printf("Address generation limit reached for user %s. Using static address.", email)
 		generateBtcAddress = false
 		generateUsdtAddress = false
