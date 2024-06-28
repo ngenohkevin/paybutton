@@ -200,16 +200,15 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 			address = staticBTCAddress
 		} else {
 			session.GeneratedAddresses[address] = time.Now()
-		}
 
-		// Start a goroutine to check the balance
-		go checkBalancePeriodically(address, email, blockCypherToken, bot)
+			// Start a goroutine to check the balance
+			go checkBalancePeriodically(address, email, blockCypherToken, bot)
+		}
 	} else if generateUsdtAddress {
 		address = staticUSDTAddress
 	} else {
 		address = staticBTCAddress
-		// Start a goroutine to check the balance for the static address as well
-		go checkBalancePeriodically(address, email, blockCypherToken, bot)
+		// Do not start a goroutine to check the balance for the static address
 	}
 
 	// Remove expired addresses
@@ -311,6 +310,13 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 					log.Printf("Error updating balance for user %s: %s", email, err)
 				} else {
 					log.Printf("Balance updated successfully for user %s", email)
+				}
+
+				// Update session to allow an extra address generation
+				session := userSessions[email]
+				session.AddressesWithBalance[address] = true
+				if len(session.AddressesWithBalance) > 0 && !session.ExtendedAddressAllowed {
+					session.ExtendedAddressAllowed = true
 				}
 
 				// Send confirmation to the bot in USD
