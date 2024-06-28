@@ -30,8 +30,10 @@ var (
 )
 
 type UserSession struct {
-	Email              string
-	GeneratedAddresses map[string]time.Time // Track generated addresses and their creation time
+	Email                  string
+	GeneratedAddresses     map[string]time.Time // Track generated addresses and their creation time
+	AddressesWithBalance   map[string]bool      // Track addresses that have received balance
+	ExtendedAddressAllowed bool                 // Flag to allow an extra address generation
 }
 
 var userSessions = make(map[string]*UserSession)
