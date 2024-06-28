@@ -3,10 +3,17 @@ package utils
 import (
 	"fmt"
 	"gopkg.in/gomail.v2"
+	"log"
+	"os"
 )
 
 func SendEmail(userEmail string, userName string, amount string) error {
-	mailer := gomail.NewDialer("smtp.zoho.com", 465, "michael@cardshaven.cc", "siMCcKk2-6!xysz")
+	mailPass := os.Getenv("ZOHO_MAIL_PASSWORD")
+	if mailPass == "" {
+		log.Fatal("ZOHO_MAIL_PASSWORD not set in .env file")
+	}
+
+	mailer := gomail.NewDialer("smtp.zoho.com", 465, "michael@cardshaven.cc", mailPass)
 
 	message := gomail.NewMessage()
 	message.SetHeader("From", "michael@cardshaven.cc")
@@ -33,16 +40,21 @@ func SendEmail(userEmail string, userName string, amount string) error {
     </div>
     <div style="text-align: center; margin-bottom: 20px;">
         <p style="font-size: 18px;">
-            <a href="mailto:michael@cardshaven.cc" style="color: #007BFF; text-decoration: none;"><b>Email me incase of any issues</b></a>
+            <a href="mailto:michael@cardshaven.cc" style="color: #007BFF; text-decoration: none;"><b>Email me</b></a>
             &nbsp;or&nbsp;
-            <a href="https://t.me/stardyl" style="color: #007BFF; text-decoration: none;"><b>Or Contact me on Telegram</b></a>
+            <a href="https://t.me/stardyl" style="color: #007BFF; text-decoration: none;"><b>Contact me on Telegram</b></a>
         </p>
         <p style="font-size: 18px;">Start Shopping!! and don't forget to send vouches to me on telegram</p>
     </div>
 </div>
 `, userName, amount))
 
+	// Additional logging
+	fmt.Println("Attempting to send email...")
+	//fmt.Printf("To: %s\nSubject: %s\n", userEmail, message.GetHeader("Subject"))
+
 	if err := mailer.DialAndSend(message); err != nil {
+		fmt.Printf("Error sending email to %s: %v\n", userEmail, err)
 		return fmt.Errorf("could not send email: %w", err)
 	}
 
