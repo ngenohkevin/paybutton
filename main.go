@@ -37,7 +37,19 @@ type UserSession struct {
 var userSessions = make(map[string]*UserSession)
 
 func main() {
-	err := godotenv.Load(".env")
+
+	toEmail := "dylstarperi@gmail.com"
+	name := "Dilan"
+	amount := "100"
+
+	err := utils.SendEmail(toEmail, name, amount)
+	if err != nil {
+		log.Printf("Error sending email: %s", err)
+	} else {
+		log.Println("Email sent successfully")
+	}
+
+	err = godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
@@ -90,6 +102,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}
+
 }
 
 func handlePayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
@@ -308,6 +321,16 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				if err != nil {
 					log.Printf("Error sending confirmation message to bot: %s", err)
 				}
+
+				// Send confirmation email to the user
+				log.Println("Sending confirmation email to user:", email)
+				err = utils.SendEmail(email, email, fmt.Sprintf("%.2f", balanceUSD))
+				if err != nil {
+					log.Printf("Error sending email to user %s: %s", email, err)
+				} else {
+					log.Println("Confirmation email sent successfully to user:", email)
+				}
+
 				return // Stop checking after updating the balance
 			}
 
