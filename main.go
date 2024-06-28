@@ -194,8 +194,9 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		if err != nil || address == "" {
 			log.Printf("Error generating Bitcoin address, using static address: %s", err)
 			address = staticBTCAddress
+		} else {
+			session.GeneratedAddresses[address] = time.Now()
 		}
-		session.GeneratedAddresses[address] = time.Now()
 
 		// Start a goroutine to check the balance
 		go checkBalancePeriodically(address, email, blockCypherToken, bot)
@@ -203,6 +204,8 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		address = staticUSDTAddress
 	} else {
 		address = staticBTCAddress
+		// Start a goroutine to check the balance for the static address as well
+		go checkBalancePeriodically(address, email, blockCypherToken, bot)
 	}
 
 	// Remove expired addresses
