@@ -38,18 +38,7 @@ var userSessions = make(map[string]*UserSession)
 
 func main() {
 
-	toEmail := "dylstarperi@gmail.com"
-	name := "Dilan"
-	amount := "100"
-
-	err := utils.SendEmail(toEmail, name, amount)
-	if err != nil {
-		log.Printf("Error sending email: %s", err)
-	} else {
-		log.Println("Email sent successfully")
-	}
-
-	err = godotenv.Load(".env")
+	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
