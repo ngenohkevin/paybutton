@@ -25,6 +25,7 @@ var (
 	addressLimit            = 4
 	addressExpiry           = 24 * time.Hour // Set address expiry time to 24 hours
 	blockCypherToken  string
+	checkingAddresses = make(map[string]bool)
 	db                *sql.DB
 	staticBTCAddress  = "bc1qgjnaesfp5k7s8sxz8mq7a3p8rzwpzr3wzp956s"
 	staticUSDTAddress = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G"
@@ -164,6 +165,7 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	// Retrieve or create user session
 	session, exists := userSessions[email]
 	if !exists {
 		session = &UserSession{
@@ -174,6 +176,7 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		userSessions[email] = session
 	}
 
+	// Check address generation limit
 	addressLimitReached := len(session.GeneratedAddresses) >= addressLimit
 	if addressLimitReached && !session.ExtendedAddressAllowed {
 		log.Printf("Address generation limit reached for user %s. Using static address.", email)
@@ -183,8 +186,10 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 
 	var address string
 	if generateBtcAddress {
+		// Attempt to get a reusable address
 		address, err = getReusableAddress(session)
 		if err != nil || address == "" {
+			// No reusable address found, generate a new one
 			address, err = payments.GenerateBitcoinAddress(email, priceUSD)
 			if err != nil || address == "" {
 				log.Printf("Error generating Bitcoin address, using static address: %s", err)
@@ -192,10 +197,17 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 			} else {
 				session.GeneratedAddresses[address] = time.Now()
 				log.Printf("Generated new address: %s for email: %s", address, email)
-				go checkBalancePeriodically(address, email, blockCypherToken, bot)
+				if !checkingAddresses[address] {
+					checkingAddresses[address] = true
+					go checkBalancePeriodically(address, email, blockCypherToken, bot)
+				}
 			}
 		} else {
 			log.Printf("Reused address: %s for email: %s", address, email)
+			if !checkingAddresses[address] {
+				checkingAddresses[address] = true
+				go checkBalancePeriodically(address, email, blockCypherToken, bot)
+			}
 		}
 	} else if generateUsdtAddress {
 		address = staticUSDTAddress
