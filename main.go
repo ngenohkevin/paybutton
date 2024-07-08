@@ -296,11 +296,13 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 					log.Printf("Balance updated successfully for user %s", email)
 				}
 
+				mutex.Lock()
 				session := userSessions[email]
 				session.UsedAddresses[address] = true
 				if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
 					session.ExtendedAddressAllowed = true
 				}
+				mutex.Unlock()
 
 				confirmationTime := time.Now().Format(time.RFC3339)
 				botLogMessage := fmt.Sprintf(
