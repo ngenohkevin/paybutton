@@ -25,7 +25,7 @@ var (
 	addressLimit            = 4
 	addressExpiry           = 24 * time.Hour // Set address expiry time to 24 hours
 	blockCypherToken  string
-	checkingAddresses = make(map[string]time.Time)
+	checkingAddresses = make(map[string]bool)
 	db                *sql.DB
 	staticBTCAddress  = "bc1qgjnaesfp5k7s8sxz8mq7a3p8rzwpzr3wzp956s"
 	staticUSDTAddress = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G"
@@ -191,8 +191,8 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 				} else {
 					session.GeneratedAddresses[address] = time.Now()
 					log.Printf("Generated new address: %s for email: %s", address, email)
-					if _, checking := checkingAddresses[address]; !checking {
-						checkingAddresses[address] = time.Now().Add(15 * time.Minute)
+					if !checkingAddresses[address] {
+						checkingAddresses[address] = true
 						go checkBalancePeriodically(address, email, blockCypherToken, bot)
 					}
 				}
@@ -202,12 +202,8 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 			}
 		} else {
 			log.Printf("Reused address: %s for email: %s", address, email)
-			expiration, checking := checkingAddresses[address]
-			if checking && time.Until(expiration) <= 5*time.Minute {
-				checkingAddresses[address] = expiration.Add(5 * time.Minute)
-				log.Printf("Extended checking duration for address: %s by 5 minutes", address)
-			} else if !checking {
-				checkingAddresses[address] = time.Now().Add(15 * time.Minute)
+			if !checkingAddresses[address] {
+				checkingAddresses[address] = true
 				go checkBalancePeriodically(address, email, blockCypherToken, bot)
 			}
 		}
@@ -283,6 +279,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	checkDuration := 15 * time.Minute
 	ticker := time.NewTicker(40 * time.Second)
 	defer ticker.Stop()
+	timeout := time.After(checkDuration)
 
 	for {
 		select {
@@ -348,16 +345,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				return
 			}
 
-			mutex.Lock()
-			expiration, checking := checkingAddresses[address]
-			if checking && time.Now().After(expiration) {
-				delete(checkingAddresses, address)
-				mutex.Unlock()
-				return
-			}
-			mutex.Unlock()
-
-		case <-time.After(checkDuration):
+		case <-timeout:
 			mutex.Lock()
 			delete(checkingAddresses, address)
 			mutex.Unlock()
