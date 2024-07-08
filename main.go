@@ -284,6 +284,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	for {
 		select {
 		case <-ticker.C:
+			log.Printf("Checking balance for address %s", address)
 			balance, err := getBitcoinAddressBalanceWithFallback(address, token)
 			if err != nil {
 				log.Printf("Error fetching balance for address %s: %s", address, err)
@@ -346,6 +347,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 			}
 
 		case <-timeout:
+			log.Printf("Stopped checking balance for address %s after %v", address, checkDuration)
 			mutex.Lock()
 			delete(checkingAddresses, address)
 			mutex.Unlock()
