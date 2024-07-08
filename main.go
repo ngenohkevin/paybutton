@@ -291,7 +291,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				continue
 			}
 
-			log.Printf("Address: %s, Balance: %d satoshis", address, balance)
+			//log.Printf("Address: %s, Balance: %d satoshis", address, balance)
 			if balance > 0 {
 				rate, err := utils.GetBlockonomicsRate()
 				if err != nil {
