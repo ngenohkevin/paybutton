@@ -314,6 +314,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
 					session.ExtendedAddressAllowed = true
 				}
+				delete(checkingAddresses, address)
 				mutex.Unlock()
 
 				confirmationTime := time.Now().Format(time.RFC3339)
@@ -343,6 +344,9 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 
 		case <-timeout:
 			log.Printf("Stopped checking balance for address %s after %v", address, checkDuration)
+			mutex.Lock()
+			delete(checkingAddresses, address)
+			mutex.Unlock()
 			return
 		}
 	}
