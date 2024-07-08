@@ -180,12 +180,12 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	if generateBtcAddress {
 		// Attempt to get a reusable address
 		address, err = getReusableAddress(session)
-		if err != nil || address == "" {
+		if (err != nil) || (address == "") {
 			// No reusable address found, generate a new one if limit not reached
 			addressLimitReached := len(session.GeneratedAddresses) >= addressLimit
 			if !addressLimitReached {
 				address, err = payments.GenerateBitcoinAddress(email, priceUSD)
-				if err != nil || address == "" {
+				if (err != nil) || (address == "") {
 					log.Printf("Error generating Bitcoin address, attempting fallback to static address: %s", err)
 					address = fallbackToStaticAddress()
 				} else {
