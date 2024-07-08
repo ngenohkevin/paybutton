@@ -176,31 +176,29 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		userSessions[email] = session
 	}
 
-	// Check address generation limit
-	addressLimitReached := len(session.GeneratedAddresses) >= addressLimit
-	if addressLimitReached && !session.ExtendedAddressAllowed {
-		log.Printf("Address generation limit reached for user %s. Using static address.", email)
-		generateBtcAddress = false
-		generateUsdtAddress = false
-	}
-
 	var address string
 	if generateBtcAddress {
 		// Attempt to get a reusable address
 		address, err = getReusableAddress(session)
 		if err != nil || address == "" {
-			// No reusable address found, generate a new one
-			address, err = payments.GenerateBitcoinAddress(email, priceUSD)
-			if err != nil || address == "" {
-				log.Printf("Error generating Bitcoin address, using static address: %s", err)
-				address = staticBTCAddress
-			} else {
-				session.GeneratedAddresses[address] = time.Now()
-				log.Printf("Generated new address: %s for email: %s", address, email)
-				if !checkingAddresses[address] {
-					checkingAddresses[address] = true
-					go checkBalancePeriodically(address, email, blockCypherToken, bot)
+			// No reusable address found, generate a new one if limit not reached
+			addressLimitReached := len(session.GeneratedAddresses) >= addressLimit
+			if !addressLimitReached {
+				address, err = payments.GenerateBitcoinAddress(email, priceUSD)
+				if err != nil || address == "" {
+					log.Printf("Error generating Bitcoin address, attempting fallback to static address: %s", err)
+					address = fallbackToStaticAddress()
+				} else {
+					session.GeneratedAddresses[address] = time.Now()
+					log.Printf("Generated new address: %s for email: %s", address, email)
+					if !checkingAddresses[address] {
+						checkingAddresses[address] = true
+						go checkBalancePeriodically(address, email, blockCypherToken, bot)
+					}
 				}
+			} else {
+				log.Printf("Address generation limit reached for user %s. Reusing address if available.", email)
+				address = fallbackToStaticAddress()
 			}
 		} else {
 			log.Printf("Reused address: %s for email: %s", address, email)
@@ -212,7 +210,7 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	} else if generateUsdtAddress {
 		address = staticUSDTAddress
 	} else {
-		address = staticBTCAddress
+		address = fallbackToStaticAddress()
 	}
 
 	// Remove expired addresses
@@ -263,11 +261,18 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 
 func getReusableAddress(session *UserSession) (string, error) {
 	for addr, createdAt := range session.GeneratedAddresses {
+		// Check if the address is not used and has not expired
 		if !session.UsedAddresses[addr] && time.Since(createdAt) <= addressExpiry {
 			return addr, nil
 		}
 	}
 	return "", fmt.Errorf("no reusable address found")
+}
+
+func fallbackToStaticAddress() string {
+	// Log that a fallback is being used
+	log.Printf("Using fallback static address")
+	return staticBTCAddress
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
