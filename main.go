@@ -276,8 +276,8 @@ func fallbackToStaticAddress() string {
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
-	checkDuration := 15 * time.Minute
-	ticker := time.NewTicker(40 * time.Second)
+	checkDuration := 20 * time.Minute
+	ticker := time.NewTicker(50 * time.Second)
 	defer ticker.Stop()
 	timeout := time.After(checkDuration)
 
@@ -291,6 +291,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				continue
 			}
 
+			log.Printf("Address: %s, Balance: %d satoshis", address, balance)
 			if balance > 0 {
 				rate, err := utils.GetBlockonomicsRate()
 				if err != nil {
