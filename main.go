@@ -284,14 +284,14 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 	for {
 		select {
 		case <-ticker.C:
-			log.Printf("Checking balance for address %s", address)
+			//log.Printf("Checking balance for address %s", address)
 			balance, err := getBitcoinAddressBalanceWithFallback(address, token)
 			if err != nil {
 				log.Printf("Error fetching balance for address %s: %s", address, err)
 				continue
 			}
 
-			//log.Printf("Address: %s, Balance: %d satoshis", address, balance)
+			log.Printf("Address: %s, Balance: %d satoshis", address, balance)
 			if balance > 0 {
 				rate, err := utils.GetBlockonomicsRate()
 				if err != nil {
