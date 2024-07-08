@@ -161,6 +161,9 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		return
 	}
 
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	session, exists := userSessions[email]
 	if !exists {
 		session = &UserSession{
