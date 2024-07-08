@@ -7,13 +7,14 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq" // Postgres driver
+	_ "github.com/lib/pq"
 	"github.com/ngenohkevin/paybutton/payments"
 	"github.com/ngenohkevin/paybutton/utils"
 )
@@ -21,25 +22,25 @@ import (
 var (
 	botApiKey         string
 	chatID            int64 = 6074038462
-	addressLimit            = 4              // Limit the number of addresses generated per user/session
+	addressLimit            = 4
 	addressExpiry           = 24 * time.Hour // Set address expiry time to 24 hours
 	blockCypherToken  string
 	db                *sql.DB
-	staticBTCAddress  = "bc1qgjnaesfp5k7s8sxz8mq7a3p8rzwpzr3wzp956s" // Fallback static BTC address
-	staticUSDTAddress = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G"         // Fallback static USDT address
+	staticBTCAddress  = "bc1qgjnaesfp5k7s8sxz8mq7a3p8rzwpzr3wzp956s"
+	staticUSDTAddress = "TMm1VE3JhqDiKyMmizSkcUsx4i4LJkfq7G"
 )
 
 type UserSession struct {
 	Email                  string
-	GeneratedAddresses     map[string]time.Time // Track generated addresses and their creation time
-	AddressesWithBalance   map[string]bool      // Track addresses that have received balance
-	ExtendedAddressAllowed bool                 // Flag to allow an extra address generation
+	GeneratedAddresses     map[string]time.Time
+	UsedAddresses          map[string]bool
+	ExtendedAddressAllowed bool
 }
 
 var userSessions = make(map[string]*UserSession)
+var mutex sync.Mutex
 
 func main() {
-
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -60,17 +61,11 @@ func main() {
 	PostgresPassword := os.Getenv("POSTGRES_PASSWORD")
 	PostgresDatabase := os.Getenv("POSTGRES_DATABASE")
 
-	// Initialize database connection
 	db, err = sql.Open("postgres", fmt.Sprintf("user=%s host=%s password=%s dbname=%s sslmode=require", PostgresUser, PostgresHost, PostgresPassword, PostgresDatabase))
 	if err != nil {
 		log.Fatal("Error connecting to the database:", err)
 	}
-	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-			log.Fatal("Error closing the database:", err)
-		}
-	}(db)
+	defer db.Close()
 
 	bot, err := tgbotapi.NewBotAPI(botApiKey)
 	if err != nil {
@@ -93,7 +88,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}
-
 }
 
 func handlePayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
@@ -125,7 +119,7 @@ func getBalance(c *gin.Context) {
 		})
 		return
 	}
-	btc := float64(balance) / 100000000 // Convert satoshis to BTC
+	btc := float64(balance) / 100000000
 
 	rate, err := utils.GetBlockonomicsRate()
 	if err != nil {
@@ -136,8 +130,6 @@ func getBalance(c *gin.Context) {
 	}
 
 	balanceUSD := btc * rate
-
-	// Round balanceUSD to 2 decimal places
 	balanceUSDFormatted := fmt.Sprintf("%.2f", balanceUSD)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -169,13 +161,12 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		return
 	}
 
-	// Limit address generation
 	session, exists := userSessions[email]
 	if !exists {
 		session = &UserSession{
-			Email:                email,
-			GeneratedAddresses:   make(map[string]time.Time),
-			AddressesWithBalance: make(map[string]bool),
+			Email:              email,
+			GeneratedAddresses: make(map[string]time.Time),
+			UsedAddresses:      make(map[string]bool),
 		}
 		userSessions[email] = session
 	}
@@ -189,26 +180,24 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 
 	var address string
 	if generateBtcAddress {
-		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("Error getting Bitcoin price: %s", err)})
-			return
-		}
-		address, err = payments.GenerateBitcoinAddress(email, priceBTC)
+		address, err = getReusableAddress(session)
 		if err != nil || address == "" {
-			log.Printf("Error generating Bitcoin address, using static address: %s", err)
-			address = staticBTCAddress
+			address, err = payments.GenerateBitcoinAddress(email, priceUSD)
+			if err != nil || address == "" {
+				log.Printf("Error generating Bitcoin address, using static address: %s", err)
+				address = staticBTCAddress
+			} else {
+				session.GeneratedAddresses[address] = time.Now()
+				log.Printf("Generated new address: %s for email: %s", address, email)
+				go checkBalancePeriodically(address, email, blockCypherToken, bot)
+			}
 		} else {
-			session.GeneratedAddresses[address] = time.Now()
-
-			// Start a goroutine to check the balance
-			go checkBalancePeriodically(address, email, blockCypherToken, bot)
+			log.Printf("Reused address: %s for email: %s", address, email)
 		}
 	} else if generateUsdtAddress {
 		address = staticUSDTAddress
 	} else {
 		address = staticBTCAddress
-		// Do not start a goroutine to check the balance for the static address
 	}
 
 	// Remove expired addresses
@@ -257,17 +246,13 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	c.JSON(http.StatusOK, responseData)
 }
 
-func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) {
-	balance, err := payments.GetBitcoinAddressBalanceWithBlockonomics(address)
-	if err != nil {
-		log.Printf("Error with Blockonomics, trying BlockCypher: %s", err)
-		balance, err = payments.GetBitcoinAddressBalanceWithBlockCypher(address, token)
-		if err != nil {
-			log.Printf("Error with BlockCypher, using static address: %s", err)
-			balance, err = payments.GetBitcoinAddressBalanceWithBlockonomics(staticBTCAddress)
+func getReusableAddress(session *UserSession) (string, error) {
+	for addr, createdAt := range session.GeneratedAddresses {
+		if !session.UsedAddresses[addr] && time.Since(createdAt) <= addressExpiry {
+			return addr, nil
 		}
 	}
-	return balance, err
+	return "", fmt.Errorf("no reusable address found")
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
@@ -286,17 +271,14 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 			}
 
 			if balance > 0 {
-				// Get the current BTC to USD exchange rate
 				rate, err := utils.GetBlockonomicsRate()
 				if err != nil {
 					log.Printf("Error fetching rate: %s", err)
 				}
 
-				// Convert the balance from satoshis to USD
 				balanceUSD := float64(balance) / 100000000 * rate
 				balanceUSD = roundToTwoDecimalPlaces(balanceUSD)
 
-				// Fetch the user's name from the database
 				var userName string
 				err = db.QueryRow("SELECT name FROM users WHERE email = $1", email).Scan(&userName)
 				if err != nil {
@@ -304,7 +286,6 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 					continue
 				}
 
-				// Update user balance in the database
 				err = updateUserBalance(email, balanceUSD)
 				if err != nil {
 					log.Printf("Error updating balance for user %s: %s", email, err)
@@ -312,14 +293,12 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 					log.Printf("Balance updated successfully for user %s", email)
 				}
 
-				// Update session to allow an extra address generation
 				session := userSessions[email]
-				session.AddressesWithBalance[address] = true
-				if len(session.AddressesWithBalance) > 0 && !session.ExtendedAddressAllowed {
+				session.UsedAddresses[address] = true
+				if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
 					session.ExtendedAddressAllowed = true
 				}
 
-				// Send confirmation to the bot in USD
 				confirmationTime := time.Now().Format(time.RFC3339)
 				botLogMessage := fmt.Sprintf(
 					"*Email:* `%s`\n*New Balance Added:* `%s USD`\n*Confirmation Time:* `%s`",
@@ -332,7 +311,6 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 					log.Printf("Error sending confirmation message to bot: %s", err)
 				}
 
-				// Send confirmation email to the user
 				log.Println("Sending confirmation email to user:", email)
 				err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSD))
 				if err != nil {
@@ -341,7 +319,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 					log.Println("Confirmation email sent successfully to user:", email)
 				}
 
-				return // Stop checking after updating the balance
+				return
 			}
 
 			log.Printf("Address: %s, Balance: %d satoshis", address, balance)
@@ -351,6 +329,19 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 			return
 		}
 	}
+}
+
+func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) {
+	balance, err := payments.GetBitcoinAddressBalanceWithBlockonomics(address)
+	if err != nil {
+		log.Printf("Error with Blockonomics, trying BlockCypher: %s", err)
+		balance, err = payments.GetBitcoinAddressBalanceWithBlockCypher(address, token)
+		if err != nil {
+			log.Printf("Error with BlockCypher, using static address: %s", err)
+			balance, err = payments.GetBitcoinAddressBalanceWithBlockonomics(staticBTCAddress)
+		}
+	}
+	return balance, err
 }
 
 func updateUserBalance(email string, newBalanceUSD float64) error {
