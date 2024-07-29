@@ -66,7 +66,12 @@ func main() {
 	if err != nil {
 		log.Fatal("Error connecting to the database:", err)
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			return
+		}
+	}(db)
 
 	bot, err := tgbotapi.NewBotAPI(botApiKey)
 	if err != nil {
