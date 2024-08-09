@@ -294,8 +294,8 @@ func fallbackToStaticAddress() string {
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
-	checkDuration := 20 * time.Minute
-	ticker := time.NewTicker(50 * time.Second)
+	checkDuration := 30 * time.Minute
+	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	timeout := time.After(checkDuration)
 
