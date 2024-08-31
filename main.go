@@ -388,6 +388,7 @@ func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 	return balance, err
 }
 
+// update balance for user
 func updateUserBalance(email string, newBalanceUSD float64) error {
 	var currentBalance float64
 	err := db.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
