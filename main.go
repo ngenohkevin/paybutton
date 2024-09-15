@@ -20,15 +20,16 @@ import (
 )
 
 var (
-	botApiKey         string
-	chatID            int64 = 6074038462
-	addressLimit            = 6
-	addressExpiry           = 72 * time.Hour // Set address expiry time to 72 hours
-	blockCypherToken  string
-	checkingAddresses = make(map[string]bool)
-	db                *sql.DB
-	staticBTCAddress  = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
-	staticUSDTAddress = "TM21DMXaiEycnQV4gaj7a9zdAVr2xRdYtA"
+	botApiKey          string
+	chatID             int64 = 6074038462
+	addressLimit             = 6
+	addressExpiry            = 72 * time.Hour // Set address expiry time to 72 hours
+	blockCypherToken   string
+	checkingAddresses  = make(map[string]bool)
+	db                 *sql.DB
+	staticBTCAddress   = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
+	staticUSDTAddress  = "TM21DMXaiEycnQV4gaj7a9zdAVr2xRdYtA"
+	staticUSDTAddress2 = "TPmW7EfcbgSAj8UVtLHeUDb4pDA1euWkbH"
 )
 
 type UserSession struct {
