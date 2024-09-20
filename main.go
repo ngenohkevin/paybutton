@@ -28,7 +28,7 @@ var (
 	checkingAddresses  = make(map[string]bool)
 	db                 *sql.DB
 	staticBTCAddress   = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
-	staticUSDTAddress  = "TM21DMXaiEycnQV4gaj7a9zdAVr2xRdYtA"
+	staticUSDTAddress  = "TSYvtbp3jZ4zBYmwG4MzPAm8f9fpc2Ccv7"
 	staticUSDTAddress2 = "TPmW7EfcbgSAj8UVtLHeUDb4pDA1euWkbH"
 )
 
