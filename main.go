@@ -29,7 +29,7 @@ var (
 	db                 *sql.DB
 	staticBTCAddress   = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
 	staticUSDTAddress  = "TSYvtbp3jZ4zBYmwG4MzPAm8f9fpc2Ccv7"
-	staticUSDTAddress2 = "TPmW7EfcbgSAj8UVtLHeUDb4pDA1euWkbH"
+	staticUSDTAddress2 = "TSYvtbp3jZ4zBYmwG4MzPAm8f9fpc2Ccv7"
 )
 
 type UserSession struct {
