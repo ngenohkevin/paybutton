@@ -78,6 +78,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	//updateBalanceManually() // Uncomment this to update balance manually
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -95,7 +96,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}
+
 }
+
+//func updateBalanceManually() {
+//	email := "example@gmail.com" // Existing user's email
+//	btcAddress := "bc1qp....."   // Replace with the actual BTC address
+//
+//	bot, err := tgbotapi.NewBotAPI(botApiKey)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	checkBalancePeriodically(btcAddress, email, blockCypherToken, bot)
+//}
 
 func handlePayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -333,7 +347,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				} else {
 					log.Printf("Balance updated successfully for user %s", email)
 				}
-
+				// comment this to update manually
 				mutex.Lock()
 				session := userSessions[email]
 				session.UsedAddresses[address] = true
