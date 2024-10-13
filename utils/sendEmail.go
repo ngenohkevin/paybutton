@@ -13,10 +13,10 @@ func SendEmail(userEmail string, userName string, amount string) error {
 		log.Fatal("ZOHO_MAIL_PASSWORD not set in .env file")
 	}
 
-	mailer := gomail.NewDialer("smtp.zoho.com", 465, "michael@cardshaven.cc", mailPass)
+	mailer := gomail.NewDialer("smtp.zoho.com", 465, "michael@cardershaven.cc", mailPass)
 
 	message := gomail.NewMessage()
-	message.SetHeader("From", "michael@cardshaven.cc")
+	message.SetHeader("From", "michael@cardershaven.cc")
 	message.SetHeader("To", userEmail)
 	message.SetHeader("Subject", "Payment Successful - Balance Added")
 	message.SetBody("text/html", fmt.Sprintf(`
@@ -40,7 +40,7 @@ func SendEmail(userEmail string, userName string, amount string) error {
     </div>
     <div style="text-align: center; margin-bottom: 20px;">
         <p style="font-size: 18px;">
-            <a href="mailto:michael@cardshaven.cc" style="color: #007BFF; text-decoration: none;"><b>Email me</b></a>
+            <a href="mailto:michael@cardershaven.cc" style="color: #007BFF; text-decoration: none;"><b>Email me</b></a>
             &nbsp;or&nbsp;
             <a href="https://t.me/stardyl" style="color: #007BFF; text-decoration: none;"><b>Contact me on Telegram</b></a>
         </p>
