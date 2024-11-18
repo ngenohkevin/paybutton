@@ -20,16 +20,15 @@ import (
 )
 
 var (
-	botApiKey          string
-	chatID             int64 = 6074038462
-	addressLimit             = 6
-	addressExpiry            = 72 * time.Hour // Set address expiry time to 72 hours
-	blockCypherToken   string
-	checkingAddresses  = make(map[string]bool)
-	db                 *sql.DB
-	staticBTCAddress   = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
-	staticUSDTAddress  = "TSYvtbp3jZ4zBYmwG4MzPAm8f9fpc2Ccv7"
-	staticUSDTAddress2 = "TSYvtbp3jZ4zBYmwG4MzPAm8f9fpc2Ccv7"
+	botApiKey         string
+	chatID            int64 = 6074038462
+	addressLimit            = 6
+	addressExpiry           = 72 * time.Hour // Set address expiry time to 72 hours
+	blockCypherToken  string
+	checkingAddresses = make(map[string]bool)
+	db                *sql.DB
+	staticBTCAddress  = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
+	staticUSDTAddress = "TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE"
 )
 
 type UserSession struct {
@@ -241,7 +240,8 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 			}
 		}
 	} else if generateUsdtAddress {
-		address = staticUSDTAddress
+		randomUsdtAddress := utils.RandomUSDTAddress()
+		address = randomUsdtAddress
 	} else {
 		address = fallbackToStaticAddress()
 	}
