@@ -28,7 +28,7 @@ var (
 	checkingAddresses = make(map[string]bool)
 	db                *sql.DB
 	staticBTCAddress  = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
-	staticUSDTAddress = "TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE"
+	//staticUSDTAddress = "TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE"
 )
 
 type UserSession struct {
