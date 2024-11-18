@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -85,4 +86,23 @@ func ConvertToBitcoinUSD(priceInUSD float64) (float64, error) {
 	bitcoinAmount := priceInUSD / bitcoinUSDPrice
 
 	return bitcoinAmount, nil
+}
+
+func RandomUSDTAddress() string {
+	// List of USDT addresses
+	addresses := []string{
+		"TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE",
+		"TQMFu4XpK2paEPxKhBWtYpHva11Awrn48F",
+		"TLR3JMH6u1chcdjdnLqkEW1jaMWKRBHZu3",
+		"THzcboCRkkdBrbUMjAgKUGXuqu3QLYNwPP",
+		"TCtWyMdkSvdLJqjH7dc1XyF2hFyub5Av4r",
+	}
+
+	// Seed the random number generator
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	// Select a random address
+	randomIndex := rand.Intn(len(addresses))
+
+	return addresses[randomIndex]
 }
