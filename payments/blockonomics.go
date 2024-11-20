@@ -94,7 +94,8 @@ func GenerateBitcoinAddress(email string, price float64) (string, error) {
 		}(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("error generating bitcoin address, status code: %v", resp)
+			body, _ := io.ReadAll(resp.Body)
+			return "", fmt.Errorf("error generating bitcoin address, status code: %v, body: %s", resp.StatusCode, string(body))
 		}
 
 		var addressResponse AddressResponse
