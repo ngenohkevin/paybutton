@@ -6,6 +6,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"time"
 )
@@ -23,7 +25,33 @@ type RateCache struct {
 	expiration time.Time
 }
 
-var cache RateCache
+var (
+	cache              RateCache
+	blockonomicsClient *http.Client
+)
+
+func init() {
+	proxyURL := os.Getenv("PROXY_URL")
+
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     time.Second * 30,
+	}
+
+	// Set up proxy if it is provided
+	if proxyURL != "" {
+		parsedProxyURL, err := url.Parse(proxyURL)
+		if err != nil {
+			log.Fatalf("Invalid PROXY_URL: %v", err)
+		}
+		transport.Proxy = http.ProxyURL(parsedProxyURL)
+	}
+
+	blockonomicsClient = &http.Client{
+		Transport: transport,
+		Timeout:   time.Second * 10,
+	}
+}
 
 func ParseFloat(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
@@ -43,7 +71,7 @@ func GetBlockonomicsRate() (float64, error) {
 		return cache.rate, nil
 	}
 
-	resp, err := http.Get(BlockonomicsRateApi)
+	resp, err := blockonomicsClient.Get(BlockonomicsRateApi)
 	if err != nil {
 		log.Printf("Error getting blockonomics rate: %s", err.Error())
 		return 0, err
@@ -51,7 +79,7 @@ func GetBlockonomicsRate() (float64, error) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-
+			log.Printf("Error closing blockonomics rate response body: %s", err)
 		}
 	}(resp.Body)
 
