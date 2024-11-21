@@ -77,6 +77,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	//updateBalanceManually() // Uncomment this to update balance manually
 
 	r := gin.Default()
@@ -393,11 +394,15 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 func getBitcoinAddressBalanceWithFallback(address, token string) (int64, error) {
 	balance, err := payments.GetBitcoinAddressBalanceWithBlockonomics(address)
 	if err != nil {
-		log.Printf("Error with Blockonomics, trying BlockCypher: %s", err)
-		balance, err = payments.GetBitcoinAddressBalanceWithBlockCypher(address, token)
+		log.Printf("Error with Blockonomics, trying Blockchain: %s", err)
+		balance, err = payments.GetBitcoinAddressBalanceWithBlockChain(address)
+		if err != nil {
+			log.Printf("Error with Blockchain, trying BlockCypher: %s", err)
+			balance, err = payments.GetBitcoinAddressBalanceWithBlockCypher(address, token)
+		}
 		if err != nil {
 			log.Printf("Error with BlockCypher, using static address: %s", err)
-			balance, err = payments.GetBitcoinAddressBalanceWithBlockonomics(staticBTCAddress)
+			balance, err = payments.GetBitcoinAddressBalanceWithBlockChain(staticBTCAddress)
 		}
 	}
 	return balance, err
