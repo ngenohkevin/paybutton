@@ -34,8 +34,8 @@ func GetBitcoinAddressBalanceWithBlockonomics(address string) (int64, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", blockonomicsAPIKey))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	//client := &http.Client{}
+	resp, err := httpClientInstance.client.Do(req)
 	if err != nil {
 		return 0, err
 	}
