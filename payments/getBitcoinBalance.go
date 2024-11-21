@@ -17,6 +17,12 @@ type BlockCypherBalance struct {
 	FinalBalance       int64  `json:"final_balance"`
 }
 
+type BlockChainBalanceResponse struct {
+	Address       string `json:"address"`
+	FinalBalance  int64  `json:"final_balance"`
+	TotalReceived int64  `json:"total_received"`
+}
+
 func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, error) {
 	url := fmt.Sprintf("https://api.blockcypher.com/v1/btc/main/addrs/%s/balance?token=%s", address, token)
 
@@ -69,4 +75,35 @@ func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, erro
 
 	totalBalance := balanceResponse.Balance + balanceResponse.UnconfirmedBalance
 	return totalBalance, nil
+}
+
+func GetBitcoinAddressBalanceWithBlockChain(address string) (int64, error) {
+	url := fmt.Sprintf("https://blockchain.info/rawaddr/%s", address)
+
+	// Create an HTTP client with a timeout to prevent hanging
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch balance: %w", err)
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			return
+		}
+	}(resp.Body)
+
+	// Check if the response status is OK
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("error fetching balance, status code: %v", resp.StatusCode)
+	}
+
+	// Parse the JSON response
+	var balanceResponse BlockChainBalanceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&balanceResponse); err != nil {
+		return 0, fmt.Errorf("failed to parse balance response: %w", err)
+	}
+
+	// Return the final balance, including unconfirmed transactions
+	return balanceResponse.FinalBalance, nil
 }
