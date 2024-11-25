@@ -100,7 +100,7 @@ func main() {
 }
 
 //func updateBalanceManually() {
-//	email := "email@gmail.com"                         // Existing user's email
+//	email := "rawdog2796@gmail.com"                            // Existing user's email
 //	btcAddress := "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw" // Replace with the actual BTC address
 //
 //	bot, err := tgbotapi.NewBotAPI(botApiKey)
@@ -164,7 +164,24 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	ipAPIData, err := utils.GetIpLocation(clientIP)
 	if err != nil {
 		log.Printf("Error getting IP location: %s", err)
+		// Proceed with default or partial data
+		ipAPIData = &utils.IPAPIData{
+			Location: utils.IPAPILocation{
+				Continent: "Unknown",
+				Country:   "Unknown",
+				City:      "Unknown",
+				Timezone:  "UTC",
+			},
+		}
 	}
+
+	localTime, err := ipAPIData.ParseLocalTime()
+	if err != nil {
+		log.Printf("Error parsing local time: %s", err)
+		localTime = "00:00" // Default time
+	}
+
+	log.Printf("Client IP: %s, Local Time: %s", clientIP, localTime)
 
 	email := c.PostForm("email")
 	priceStr := c.PostForm("price")
@@ -254,7 +271,7 @@ func processPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		}
 	}
 
-	localTime, err := ipAPIData.ParseLocalTime()
+	localTime, err = ipAPIData.ParseLocalTime()
 	if err != nil {
 		log.Printf("Error parsing local time: %s", err)
 	}
