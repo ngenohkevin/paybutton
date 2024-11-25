@@ -31,10 +31,17 @@ type IPAPIData struct {
 }
 
 func (i *IPAPIData) ParseLocalTime() (string, error) {
+	// Check if Location data is valid
+	if i.Location.LocalTime == "" {
+		return "00:00", fmt.Errorf("LocalTime is empty")
+	}
+
 	// Parse the local time
 	parsedTime, err := time.Parse(time.RFC3339, i.Location.LocalTime)
 	if err != nil {
-		return "", err
+		log.Printf("Error parsing LocalTime: %s", err)
+		// Return a default fallback time
+		return "00:00", nil
 	}
 
 	// Format the time in the desired format (24-hour)
@@ -48,33 +55,58 @@ var ipLocationAPI string
 func GetIpLocation(ipAddr string) (*IPAPIData, error) {
 	err := godotenv.Load(".env")
 	if err != nil {
-		return nil, err
+		log.Printf("Error loading .env file: %s", err)
 	}
-	ipLocationAPI = os.Getenv("IP_LOCATION_API_KEY")
 
-	//apiUrl := fmt.Sprintf("https://ipapi.co/%s/json/", ipAddr)
+	ipLocationAPI = os.Getenv("IP_LOCATION_API_KEY")
 	apiUrl := fmt.Sprintf("https://api.ipapi.is?q=%s&key=%s", ipAddr, ipLocationAPI)
 
 	resp, err := http.Get(apiUrl)
 	if err != nil {
-		return nil, err
+		log.Printf("Error making request to IPAPI: %s", err)
+		// Return default data in case of failure
+		return &IPAPIData{
+			Location: IPAPILocation{
+				Continent: "Unknown",
+				Country:   "Unknown",
+				City:      "Unknown",
+				Timezone:  "UTC",
+			},
+		}, nil
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log.Printf("Error closing response body: %s", err)
+			return
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("IPAPI request failed. Status: %d", resp.StatusCode)
-		return nil, fmt.Errorf("IPAPI request failed with status %d", resp.StatusCode)
+		// Return default data if API responds with an error
+		return &IPAPIData{
+			Location: IPAPILocation{
+				Continent: "Unknown",
+				Country:   "Unknown",
+				City:      "Unknown",
+				Timezone:  "UTC",
+			},
+		}, nil
 	}
 
 	var ipData IPAPIData
 	err = json.NewDecoder(resp.Body).Decode(&ipData)
 	if err != nil {
-		return nil, err
+		log.Printf("Error decoding IPAPI response: %s", err)
+		// Return default data in case of a decoding error
+		return &IPAPIData{
+			Location: IPAPILocation{
+				Continent: "Unknown",
+				Country:   "Unknown",
+				City:      "Unknown",
+				Timezone:  "UTC",
+			},
+		}, nil
 	}
 
 	return &ipData, nil
