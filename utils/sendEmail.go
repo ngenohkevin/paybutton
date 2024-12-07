@@ -16,7 +16,7 @@ func SendEmail(userEmail string, userName string, amount string) error {
 	mailer := gomail.NewDialer("smtp.eu.mailgun.org", 465, "balance@cardershaven.cc", mailPass)
 
 	message := gomail.NewMessage()
-	message.SetHeader("From", "balanceupdate@cardershaven.cc")
+	message.SetHeader("From", "balance@cardershaven.cc")
 	message.SetHeader("To", userEmail)
 	message.SetHeader("Subject", "Payment Successful - Balance Added")
 	message.SetBody("text/html", fmt.Sprintf(`
@@ -40,8 +40,6 @@ func SendEmail(userEmail string, userName string, amount string) error {
     </div>
     <div style="text-align: center; margin-bottom: 20px;">
         <p style="font-size: 18px;">
-            <a href="mailto:michaels@cardershaven.cc" style="color: #007BFF; text-decoration: none;"><b>Email me</b></a>
-            &nbsp;or&nbsp;
             <a href="https://t.me/stardyl" style="color: #007BFF; text-decoration: none;"><b>Contact me on Telegram</b></a>
         </p>
         <p style="font-size: 18px;">Start Shopping!! and don't forget to send vouches to me on telegram</p>
