@@ -100,8 +100,8 @@ func main() {
 }
 
 //func updateBalanceManually() {
-//	email := "rawdog2796@gmail.com"                            // Existing user's email
-//	btcAddress := "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw" // Replace with the actual BTC address
+//	email := "ngenohkelvin19@gmail.com"                        // Existing user's email
+//	btcAddress := "bc1qc9gv0q4g4rag2rrtaz40em5dm9pl56cmz7v9kj" // Replace with the actual BTC address
 //
 //	bot, err := tgbotapi.NewBotAPI(botApiKey)
 //	if err != nil {
