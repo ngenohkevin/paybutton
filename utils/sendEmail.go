@@ -8,12 +8,12 @@ import (
 )
 
 func SendEmail(userEmail string, userName string, amount string) error {
-	mailPass := os.Getenv("ZOHO_MAIL_PASSWORD")
+	mailPass := os.Getenv("MAILGUN_PASSWORD")
 	if mailPass == "" {
-		log.Fatal("ZOHO_MAIL_PASSWORD not set in .env file")
+		log.Fatal("MAILGUN_PASSWORD not set in .env file")
 	}
 
-	mailer := gomail.NewDialer("smtp.zoho.com", 465, "balanceupdate@cardershaven.cc", mailPass)
+	mailer := gomail.NewDialer("smtp.eu.mailgun.org", 465, "balance@cardershaven.cc", mailPass)
 
 	message := gomail.NewMessage()
 	message.SetHeader("From", "balanceupdate@cardershaven.cc")
