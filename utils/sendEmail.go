@@ -13,10 +13,10 @@ func SendEmail(userEmail string, userName string, amount string) error {
 		log.Fatal("MAILGUN_PASSWORD not set in .env file")
 	}
 
-	mailer := gomail.NewDialer("smtp.eu.mailgun.org", 465, "balance@cardershaven.cc", mailPass)
+	mailer := gomail.NewDialer("smtp.eu.mailgun.org", 465, "balance@cardinghaven.cc", mailPass)
 
 	message := gomail.NewMessage()
-	message.SetHeader("From", "balance@cardershaven.cc")
+	message.SetHeader("From", "balance@cardinghaven.cc")
 	message.SetHeader("To", userEmail)
 	message.SetHeader("Subject", "Payment Successful - Balance Added")
 	message.SetBody("text/html", fmt.Sprintf(`
