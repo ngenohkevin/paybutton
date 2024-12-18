@@ -6,8 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
-	"os"
 	"strconv"
 	"time"
 )
@@ -31,7 +29,7 @@ var (
 )
 
 func init() {
-	proxyURL := os.Getenv("PROXY_URL")
+	//proxyURL := os.Getenv("PROXY_URL")
 
 	transport := &http.Transport{
 		MaxIdleConnsPerHost: 10,
@@ -39,13 +37,13 @@ func init() {
 	}
 
 	// Set up proxy if it is provided
-	if proxyURL != "" {
-		parsedProxyURL, err := url.Parse(proxyURL)
-		if err != nil {
-			log.Fatalf("Invalid PROXY_URL: %v", err)
-		}
-		transport.Proxy = http.ProxyURL(parsedProxyURL)
-	}
+	//if proxyURL != "" {
+	//	parsedProxyURL, err := url.Parse(proxyURL)
+	//	if err != nil {
+	//		log.Fatalf("Invalid PROXY_URL: %v", err)
+	//	}
+	//	transport.Proxy = http.ProxyURL(parsedProxyURL)
+	//}
 
 	blockonomicsClient = &http.Client{
 		Transport: transport,
