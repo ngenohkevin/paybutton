@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -32,7 +33,7 @@ func init() {
 	}
 
 	blockonomicsAPIKey = os.Getenv("BLOCKONOMICS_API_KEY")
-	//proxyURL := os.Getenv("PROXY_URL")
+	proxyURL := os.Getenv("PROXY_URL")
 
 	// Configure the transport with or without proxy
 	transport := &http.Transport{
@@ -40,13 +41,13 @@ func init() {
 		IdleConnTimeout:     time.Second * 90,
 	}
 
-	//if proxyURL != "" {
-	//	parsedProxyURL, err := url.Parse(proxyURL)
-	//	if err != nil {
-	//		log.Fatalf("Invalid PROXY_URL: %v", err)
-	//	}
-	//	transport.Proxy = http.ProxyURL(parsedProxyURL)
-	//}
+	if proxyURL != "" {
+		parsedProxyURL, err := url.Parse(proxyURL)
+		if err != nil {
+			log.Fatalf("Invalid PROXY_URL: %v", err)
+		}
+		transport.Proxy = http.ProxyURL(parsedProxyURL)
+	}
 
 	httpClientInstance = &httpClient{
 		client: &http.Client{
