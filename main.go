@@ -21,7 +21,7 @@ import (
 
 var (
 	botApiKey         string
-	chatID            int64 = 6074038462
+	chatID            int64 = 7933331471
 	addressLimit            = 6
 	addressExpiry           = 72 * time.Hour // Set address expiry time to 72 hours
 	blockCypherToken  string
