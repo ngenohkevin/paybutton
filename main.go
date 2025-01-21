@@ -27,7 +27,7 @@ var (
 	blockCypherToken  string
 	checkingAddresses = make(map[string]bool)
 	db                *sql.DB
-	staticBTCAddress  = "bc1qzdhle7flgehjjr54qejhzuyxy3qpcygpzyhxuw"
+	staticBTCAddress  = "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms"
 	//staticUSDTAddress = "TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE"
 )
 
