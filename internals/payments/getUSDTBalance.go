@@ -80,6 +80,5 @@ func GetUSDTBalance(address string) (float64, error) {
 		}
 	}
 
-	logger.Info("USDT balance not found", "address", address)
 	return 0, nil
 }
