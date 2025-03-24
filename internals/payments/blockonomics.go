@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/joho/godotenv"
+	"github.com/ngenohkevin/paybutton/utils"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -26,12 +25,13 @@ var (
 )
 
 func init() {
-	err := godotenv.Load(".env")
+
+	config, err := utils.LoadConfig()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatal("could not load config")
 	}
 
-	blockonomicsAPIKey = os.Getenv("BLOCKONOMICS_API_KEY")
+	blockonomicsAPIKey = config.BlockonomicsAPI
 	//proxyURL := os.Getenv("PROXY_URL")
 
 	// Configure the transport with or without proxy
