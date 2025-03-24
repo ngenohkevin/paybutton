@@ -3,11 +3,9 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/joho/godotenv"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -53,12 +51,12 @@ func (i *IPAPIData) ParseLocalTime() (string, error) {
 var ipLocationAPI string
 
 func GetIpLocation(ipAddr string) (*IPAPIData, error) {
-	err := godotenv.Load(".env")
+	location, err := LoadConfig()
 	if err != nil {
-		log.Printf("Error loading .env file: %s", err)
+		log.Fatal("could not load config")
 	}
 
-	ipLocationAPI = os.Getenv("IP_LOCATION_API_KEY")
+	ipLocationAPI = location.IpLocation
 	apiUrl := fmt.Sprintf("https://api.ipapi.is?q=%s&key=%s", ipAddr, ipLocationAPI)
 
 	resp, err := http.Get(apiUrl)
