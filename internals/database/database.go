@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	db *sql.DB
+	DB *sql.DB
 )
 
 func InitDB() error {
@@ -26,19 +26,13 @@ func InitDB() error {
 	PostgresPassword := config.PostgresPassword
 	PostgresDatabase := config.PostgresDB
 
-	db, err = sql.Open("postgres", fmt.Sprintf("user=%s host=%s password=%s dbname=%s sslmode=require", PostgresUser, PostgresHost, PostgresPassword, PostgresDatabase))
+	DB, err = sql.Open("postgres", fmt.Sprintf("user=%s host=%s password=%s DBname=%s sslmode=require", PostgresUser, PostgresHost, PostgresPassword, PostgresDatabase))
 	if err != nil {
 		log.Fatal("Error connecting to the database:", err)
 	}
-	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-			return
-		}
-	}(db)
 
 	// Check if the database connection is alive
-	err = db.Ping()
+	err = DB.Ping()
 	if err != nil {
 		return fmt.Errorf("database is unreachable: %w", err)
 	}
@@ -50,8 +44,8 @@ func InitDB() error {
 
 // CloseDB closes the database connection
 func CloseDB() {
-	if db != nil {
-		_ = db.Close()
+	if DB != nil {
+		_ = DB.Close()
 		log.Println("Successfully closed the database")
 	}
 }
@@ -59,14 +53,14 @@ func CloseDB() {
 func UpdateUserBalance(email string, newBalanceUSD float64) error {
 	var currentBalance float64
 
-	err := db.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
+	err := DB.QueryRow("SELECT balance FROM users WHERE email = $1", email).Scan(&currentBalance)
 	if err != nil {
 		return fmt.Errorf("error fetching current balance for user %s: %w", email, err)
 	}
 
 	updatedBalance := RoundToTwoDecimalPlaces(currentBalance + newBalanceUSD)
 
-	_, err = db.Exec("UPDATE users SET balance = $1 WHERE email = $2", updatedBalance, email)
+	_, err = DB.Exec("UPDATE users SET balance = $1 WHERE email = $2", updatedBalance, email)
 	if err != nil {
 		return fmt.Errorf("error updating balance for user %s: %w", email, err)
 	}
