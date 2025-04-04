@@ -47,7 +47,6 @@ func InitDB() error {
 	DB.SetConnMaxLifetime(5 * time.Minute)
 	DB.SetConnMaxIdleTime(10 * time.Minute)
 
-	// Check if this connection works
 	pingErr := DB.Ping()
 	if pingErr != nil {
 		return fmt.Errorf("database is unreachable with both SSL modes: %w", pingErr)
