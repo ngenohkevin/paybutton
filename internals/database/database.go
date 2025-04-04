@@ -7,6 +7,7 @@ import (
 	"github.com/ngenohkevin/paybutton/utils"
 	"log"
 	"math"
+	"time"
 )
 
 var (
@@ -26,19 +27,33 @@ func InitDB() error {
 	PostgresPassword := config.PostgresPassword
 	PostgresDatabase := config.PostgresDB
 
-	DB, err = sql.Open("postgres", fmt.Sprintf("user=%s host=%s password=%s DBname=%s sslmode=require", PostgresUser, PostgresHost, PostgresPassword, PostgresDatabase))
-	if err != nil {
-		log.Fatal("Error connecting to the database:", err)
+	log.Printf("Attempting to connect to PostgreSQL database: %s@%s/%s",
+		PostgresUser, PostgresHost, PostgresDatabase)
+
+	connStr := fmt.Sprintf(
+		"user=%s host=%s password=%s dbname=%s sslmode=disable connect_timeout=10",
+		PostgresUser, PostgresHost, PostgresPassword, PostgresDatabase)
+
+	var dbErr error
+
+	DB, dbErr = sql.Open("postgres", connStr)
+	if dbErr != nil {
+		return fmt.Errorf("error opening database connection: %w", dbErr)
 	}
 
-	// Check if the database connection is alive
-	err = DB.Ping()
-	if err != nil {
-		return fmt.Errorf("database is unreachable: %w", err)
+	// Configure connection pool
+	DB.SetMaxOpenConns(25)
+	DB.SetMaxIdleConns(5)
+	DB.SetConnMaxLifetime(5 * time.Minute)
+	DB.SetConnMaxIdleTime(10 * time.Minute)
+
+	// Check if this connection works
+	pingErr := DB.Ping()
+	if pingErr != nil {
+		return fmt.Errorf("database is unreachable with both SSL modes: %w", pingErr)
 	}
 
 	log.Println("Successfully connected to the database")
-
 	return nil
 }
 
