@@ -131,7 +131,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 
 				// Try to get username from the database, but don't fail if not found
 				var userName string
-				err = db.QueryRow("SELECT name FROM users WHERE email = $1", email).Scan(&userName)
+				err = database.DB.QueryRow("SELECT name FROM users WHERE email = $1", email).Scan(&userName)
 				if err != nil {
 					log.Printf("User with email %s not found in database: %s", email, err)
 					userName = "User" // Set default name
