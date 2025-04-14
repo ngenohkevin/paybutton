@@ -47,7 +47,7 @@ func ProductEmail(userEmail, userName, productName string) error {
 
 	if isRPSXTool {
 		// Special email for RPSX tool with download link
-		rpsxToolLink := "https://mega.nz/file/GjYjhBbD#kG10S8hIMzcjuDAGDJxXpZMwYW6DjGIxhw7glU4kxjY"
+		rpsxToolLink := "https://mega.nz/file/CrR3lZAD#ZwRBU5EFbwuKP2_ByNqFB3awlBlldXY2OjabyR3nILY"
 		message.SetBody("text/html", fmt.Sprintf(`
 <div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px; margin: auto;">
     <div style="text-align: center; margin-bottom: 20px;">
@@ -72,6 +72,11 @@ func ProductEmail(userEmail, userName, productName string) error {
         </ol>
     </div>
     <div style="text-align: center; margin-bottom: 20px;">
+        <p style="font-size: 14px; color: #777;"><em>
+			Note: This tool might be flagged as malicious by antivirus. 
+			But it is a false positive and it has nothing malicious in it. 
+			You can run on a sandbox or a vm if you're skeptical.
+		</em></p>
         <p style="font-size: 16px; color: #555;">If you have any questions or need assistance with the tool, please don't hesitate to contact our support team.</p>
     </div>
     <div style="text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
