@@ -10,12 +10,12 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-
+	"strings"
 	"time"
 )
 
 // Regular expressions for Bitcoin and USDT addresses
-var btcRegex = regexp.MustCompile(`^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,39}$`)
+var btcRegex = regexp.MustCompile(`^(1|3)[A-HJ-NP-Za-km-z1-9]{25,34}$|^bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{39,59}$`)
 var usdtRegex = regexp.MustCompile(`^T[a-zA-HJ-NP-Z0-9]{33}$`)
 
 func GetBalance(c *gin.Context) {
@@ -75,6 +75,28 @@ func GetBalance(c *gin.Context) {
 			"message": "Invalid address format",
 		})
 	}
+}
+
+// GetProductFromDescription attempts to extract a product name from the payment description
+func GetProductFromDescription(description string) string {
+	// This function helps in cases where the product name might be stored in different formats
+	// or needs to be normalized from the payment description
+
+	// Check if description is empty
+	if description == "" {
+		return "Unknown Product"
+	}
+
+	// If description contains "Product:" extract the product
+	if strings.Contains(description, "Product:") {
+		parts := strings.Split(description, "Product:")
+		if len(parts) > 1 {
+			return strings.TrimSpace(parts[1])
+		}
+	}
+
+	// If no specific product info found, return the entire description as the product
+	return description
 }
 
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
@@ -167,7 +189,32 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 					log.Printf("Error sending confirmation message to bot: %s", err)
 				}
 
-				// Only try to send email if user exists in database
+				// Extract product information from the session data
+				productName := ""
+				mutex.Lock()
+				session, exists := userSessions[email]
+				if exists && session != nil && len(session.PaymentInfo) > 0 {
+					// Get the latest payment info
+					latestPayment := session.PaymentInfo[len(session.PaymentInfo)-1]
+					productName = latestPayment.Description
+				}
+				mutex.Unlock()
+
+				// If we have a product name, proceed with delivery
+				if productName != "" {
+					log.Printf("Attempting automatic product delivery for %s: %s", email, productName)
+					// Use the proper function to handle delivery
+					err = HandleAutomaticDelivery(email, userName, productName, bot)
+					if err != nil {
+						log.Printf("Error in automatic product delivery: %s", err)
+					} else {
+						log.Printf("Automatic product delivery successful for %s", email)
+					}
+				} else {
+					log.Printf("Skipping product delivery for %s as product not found in session", email)
+				}
+
+				// Send balance confirmation email
 				if userName != "User" {
 					log.Println("Sending confirmation email to user:", email)
 					err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSD))
