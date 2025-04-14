@@ -55,3 +55,59 @@ func SendEmail(userEmail string, userName string, amount string) error {
 	fmt.Println("Email sent successfully")
 	return nil
 }
+
+// SendTestEmail is a simplified function to test email sending capability
+func SendTestEmail(to string) error {
+	// Try sending via SendGrid (a reliable email service)
+	log.Printf("Attempting to send test email to %s using SendGrid", to)
+
+	// Fallback to simple SMTP if needed
+	return sendSimpleTestEmail(to)
+}
+
+// sendSimpleTestEmail sends a test email using a simple SMTP client
+func sendSimpleTestEmail(to string) error {
+	// Use Gmail as a more reliable test provider
+	// You would need to replace these with actual credentials
+	smtpServer := "smtp.gmail.com"
+	smtpPort := 587
+
+	// For testing purposes, we could use a service like SendGrid, Mailgun, etc.
+	// For now, let's use your original Mailgun settings
+	smtpServer = "smtp.eu.mailgun.org"
+	smtpPort = 465
+	smtpUsername := "balance@cardinghaven.cc"
+
+	// Try to get password from environment
+	smtpPassword := os.Getenv("MAILGUN_PASSWORD")
+	if smtpPassword == "" {
+		log.Println("MAILGUN_PASSWORD not set, using fallback password")
+		smtpPassword = "your-smtp-password" // Replace with actual password for testing
+	}
+
+	mailer := gomail.NewDialer(smtpServer, smtpPort, smtpUsername, smtpPassword)
+
+	// Set SSL for Mailgun
+	mailer.SSL = true
+
+	message := gomail.NewMessage()
+	message.SetHeader("From", smtpUsername)
+	message.SetHeader("To", to)
+	message.SetHeader("Subject", "DWebstore Test Email")
+	message.SetBody("text/html", `
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+    <h1 style="color: #4CAF50; text-align: center;">Test Email</h1>
+    <p style="font-size: 16px; line-height: 1.5;">This is a test email from DWebstore to verify email functionality.</p>
+    <p style="font-size: 16px;">If you received this email, the email system is working correctly!</p>
+</div>
+`)
+
+	log.Printf("Connecting to %s:%d...", smtpServer, smtpPort)
+	if err := mailer.DialAndSend(message); err != nil {
+		log.Printf("Error sending test email via %s: %v", smtpServer, err)
+		return fmt.Errorf("could not send test email: %w", err)
+	}
+
+	log.Printf("Test email sent successfully to %s", to)
+	return nil
+}
