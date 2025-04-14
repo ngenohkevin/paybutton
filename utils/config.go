@@ -17,6 +17,9 @@ type Config struct {
 	MailGunAPIKey    string
 	MailGunPassword  string
 	TronScanAPI      string
+	SmtpServer       string
+	SmtpUser         string
+	SmtpPassword     string
 }
 
 func LoadConfig() (config Config, err error) {
@@ -36,6 +39,9 @@ func LoadConfig() (config Config, err error) {
 	mailGunAPI := os.Getenv("MAILGUN_API_KEY")
 	mailGunPass := os.Getenv("MAILGUN_PASSWORD")
 	tronScanAPI := os.Getenv("TRONSCAN_API")
+	smtpServer := os.Getenv("PROTON_SMTP_SERVER")
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPassword := os.Getenv("SMTP_PASSWORD")
 
 	config = Config{
 		PostgresUser:     user,
@@ -49,6 +55,9 @@ func LoadConfig() (config Config, err error) {
 		MailGunAPIKey:    mailGunAPI,
 		MailGunPassword:  mailGunPass,
 		TronScanAPI:      tronScanAPI,
+		SmtpServer:       smtpServer,
+		SmtpUser:         smtpUser,
+		SmtpPassword:     smtpPassword,
 	}
 
 	return config, err
