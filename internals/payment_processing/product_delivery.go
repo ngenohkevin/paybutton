@@ -108,7 +108,7 @@ func HandleAutomaticDelivery(email, userName, productName string, bot *tgbotapi.
 	return nil
 }
 
-// ParsePaymentNotification parses a payment confirmation notification to extract relevant details
+//// ParsePaymentNotification parses a payment confirmation notification to extract relevant details
 //func ParsePaymentNotification(notification string) (email, amount, product string, confirmationTime time.Time, err error) {
 //	// Extract email
 //	emailStart := strings.Index(notification, "**Email:** `")
