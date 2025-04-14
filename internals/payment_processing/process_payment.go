@@ -24,11 +24,20 @@ var (
 	staticUSDTAddress = "TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE"
 )
 
+type PaymentInfo struct {
+	Price       float64
+	Description string
+	Name        string
+	Site        string
+	CreatedAt   time.Time
+}
+
 type UserSession struct {
 	Email                  string
 	GeneratedAddresses     map[string]time.Time
 	UsedAddresses          map[string]bool
 	ExtendedAddressAllowed bool
+	PaymentInfo            []PaymentInfo // Store payment information for automatic delivery
 }
 
 var userSessions = make(map[string]*UserSession)
@@ -86,9 +95,20 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 			Email:              email,
 			GeneratedAddresses: make(map[string]time.Time),
 			UsedAddresses:      make(map[string]bool),
+			PaymentInfo:        []PaymentInfo{},
 		}
 		userSessions[email] = session
 	}
+
+	// Store the payment information for future use
+	paymentInfo := PaymentInfo{
+		Price:       priceUSD,
+		Description: description,
+		Name:        name,
+		Site:        site,
+		CreatedAt:   time.Now(),
+	}
+	session.PaymentInfo = append(session.PaymentInfo, paymentInfo)
 
 	var address string
 	if generateBtcAddress {
