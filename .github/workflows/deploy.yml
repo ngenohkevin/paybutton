@@ -40,9 +40,9 @@ jobs:
 
       - name: Deploy
         run: |
-          # Get SSH URL for the repository
-          REPO_SSH_URL="git@github.com:${{ github.repository }}.git"
+          # Use the HTTPS URL instead of SSH
+          REPO_URL="https://github.com/${{ github.repository }}"
           
           # Execute deployment scripts
-          ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/build.sh ${{ github.event.repository.name }} $REPO_SSH_URL main"
+          ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/build.sh ${{ github.event.repository.name }} $REPO_URL main"
           ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/deploy.sh ${{ github.event.repository.name }}"
