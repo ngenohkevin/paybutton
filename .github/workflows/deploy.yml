@@ -3,7 +3,7 @@ name: Deploy Go App to VPS
 on:
   push:
     branches:
-      - main # Or your deployment branch
+      - main
 
 jobs:
   build-and-deploy:
@@ -16,52 +16,44 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # Use your Go version
+          go-version: '1.22'
 
       - name: Build Go Application
-        # Adjust build path and output name as needed
         run: |
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o my-app-binary ./cmd/server/main.go
-          echo "Build complete: my-app-binary"
-        # -ldflags="-s -w" creates a smaller binary (strips debug info)
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ${{ secrets.APP_NAME }} ./cmd/server/main.go
+          echo "Build complete: ${{ secrets.APP_NAME }}"
 
-      # Optional: Run tests
-      # - name: Run Unit Tests
-      #   run: go test ./...
+      - name: Run Tests
+        run: go test ./...
 
       - name: Prepare Artifact
         run: |
-          # Create a tarball containing the binary and any other necessary files
-          # Example: If you have static assets or config templates
-          # mkdir release_content
-          # cp my-app-binary release_content/
-          # cp -r static/ release_content/ # Example: copy static files
-          # tar -czf artifact.tar.gz -C release_content .
-          # For just the binary:
-          tar -czf artifact.tar.gz my-app-binary
+          tar -czf artifact.tar.gz ${{ secrets.APP_NAME }}
           echo "Artifact created: artifact.tar.gz"
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.3 # Use a reliable SSH action
+      - name: Upload to VPS and Deploy
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "artifact.tar.gz"
+          target: "/home/${{ secrets.VPS_SSH_USER }}/uploads"
+
+      - name: Execute Deployment
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_SSH_HOST }}
           port: ${{ secrets.VPS_SSH_PORT }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            # Define variables on the remote server
-            APP_NAME="${{ secrets.APP_NAME }}"
-            UPLOAD_PATH="/home/${{ secrets.VPS_SSH_USER }}/deploy_upload_${APP_NAME}_$(date +%s).tar.gz"
-            DEPLOY_SCRIPT="/opt/deploy/scripts/deploy.sh"
-
-            echo "-----> Uploading artifact to ${UPLOAD_PATH}"
-            # Use scp within the script section; this action handles artifact transfer implicitly
-            # Need to ensure the artifact exists from the previous step
-            # `ssh-action` v1+ doesn't have direct scp/sync, we pipe it
-            cat artifact.tar.gz | ssh -p ${{ secrets.VPS_SSH_PORT }} -i $SSH_AUTH_SOCK -o StrictHostKeyChecking=no ${{ secrets.VPS_SSH_USER }}@${{ secrets.VPS_SSH_HOST }} "cat > ${UPLOAD_PATH}"
-
-
-            echo "-----> Executing deployment script on server"
-            ssh -p ${{ secrets.VPS_SSH_PORT }} -i $SSH_AUTH_SOCK -o StrictHostKeyChecking=no ${{ secrets.VPS_SSH_USER }}@${{ secrets.VPS_SSH_HOST }} "sudo ${DEPLOY_SCRIPT} ${APP_NAME} ${UPLOAD_PATH}"
-
-            echo "-----> Deployment script finished"
+            TIMESTAMP=$(date +%s)
+            ARTIFACT_PATH="/home/${{ secrets.VPS_SSH_USER }}/uploads/artifact.tar.gz"
+            RENAMED_PATH="/opt/deploy/artifacts/${{ secrets.APP_NAME }}_${TIMESTAMP}.tar.gz"
+            sudo mkdir -p /opt/deploy/artifacts
+            sudo cp $ARTIFACT_PATH $RENAMED_PATH
+            sudo chown perigrine:perigrine $RENAMED_PATH
+            sudo /opt/deploy/scripts/deploy.sh ${{ secrets.APP_NAME }} $RENAMED_PATH
+            rm $ARTIFACT_PATH
