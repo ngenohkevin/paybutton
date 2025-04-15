@@ -18,17 +18,13 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Debug - List repository structure
-        run: |
-          # Replace this path with your actual main.go location
-          # For example, if main.go is at the root:
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ${{ secrets.APP_NAME }} .
-          
-          echo "Build complete: ${{ secrets.APP_NAME }}"
+      - name: List Go files
+        run: find . -name "*.go" | sort
 
       - name: Build Go Application
         run: |
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ${{ secrets.APP_NAME }} ./cmd/server/main.go
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ${{ secrets.APP_NAME }} .
+          
           echo "Build complete: ${{ secrets.APP_NAME }}"
 
       - name: Run Tests
