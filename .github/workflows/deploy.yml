@@ -1,0 +1,44 @@
+name: Deploy Go Application
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Test
+        run: go test -v ./...
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p 22 perigrine.cloud >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        run: |
+          ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/build.sh ${{ github.event.repository.name }} ${{ github.event.repository.clone_url }} main"
+          ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/deploy.sh ${{ github.event.repository.name }}"
