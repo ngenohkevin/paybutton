@@ -15,7 +15,7 @@ jobs:
 #      - name: Set up Go
 #        uses: actions/setup-go@v4
 #        with:
-#          go-version: '1.23'
+#          go-version: '1.21'
 #
 #      - name: Test
 #        run: go test -v ./...
@@ -40,5 +40,9 @@ jobs:
 
       - name: Deploy
         run: |
-          ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/build.sh ${{ github.event.repository.name }} ${{ github.event.repository.clone_url }} main"
+          # Get SSH URL for the repository
+          REPO_SSH_URL="git@github.com:${{ github.repository }}.git"
+          
+          # Execute deployment scripts
+          ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/build.sh ${{ github.event.repository.name }} $REPO_SSH_URL main"
           ssh -p 2222 deployer@perigrine.cloud "sudo /opt/deploy/scripts/deploy.sh ${{ github.event.repository.name }}"
