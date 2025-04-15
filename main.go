@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/ngenohkevin/paybutton/internals/database"
 	"github.com/ngenohkevin/paybutton/internals/server"
+	"log"
 	"log/slog"
 	"os"
 )
@@ -30,4 +31,6 @@ func main() {
 		logger.Error("Error starting server:", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+
+	log.Printf("server is live")
 }
