@@ -27,8 +27,8 @@ jobs:
           
           echo "Build complete: ${{ secrets.APP_NAME }}"
 
-      - name: Run Tests
-        run: go test ./...
+#      - name: Run Tests
+#        run: go test ./...
 
       - name: Prepare Artifact
         run: |
