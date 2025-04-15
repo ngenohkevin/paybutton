@@ -18,21 +18,20 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: List Go files
-        run: find . -name "*.go" | sort
-
       - name: Build Go Application
         run: |
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ${{ secrets.APP_NAME }} .
+          # Make sure the binary name is exactly "paybutton"
+          # This must match what the systemd service expects
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o paybutton .
+          echo "Build complete: paybutton"
           
-          echo "Build complete: ${{ secrets.APP_NAME }}"
-
-#      - name: Run Tests
-#        run: go test ./...
+          # Verify the binary exists
+          ls -la paybutton
 
       - name: Prepare Artifact
         run: |
-          tar -czf artifact.tar.gz ${{ secrets.APP_NAME }}
+          # Include only the binary in the artifact
+          tar -czf artifact.tar.gz paybutton
           echo "Artifact created: artifact.tar.gz"
 
       - name: Upload to VPS and Deploy
