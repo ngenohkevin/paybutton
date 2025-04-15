@@ -36,7 +36,7 @@ jobs:
       - name: Add host key
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p 22 perigrine.cloud >> ~/.ssh/known_hosts
+          ssh-keyscan -p 2222 perigrine.cloud >> ~/.ssh/known_hosts
 
       - name: Deploy
         run: |
