@@ -53,16 +53,23 @@ jobs:
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            # Debug commands to check environment and permissions
+            echo "Current user: $(whoami)"
+            echo "Home directory: $HOME"
+            ls -la /opt/deploy
+
+            # Simplified deployment approach
             TIMESTAMP=$(date +%s)
             ARTIFACT_PATH="/home/${{ secrets.VPS_SSH_USER }}/uploads/artifact.tar.gz"
-            MKDIR_PATH="/opt/deploy/artifacts"
-            RENAMED_PATH="${MKDIR_PATH}/${{ secrets.APP_NAME }}_${TIMESTAMP}.tar.gz"
 
-            # No sudo needed since perigrine owns these directories
-            mkdir -p ${MKDIR_PATH}
-            cp ${ARTIFACT_PATH} ${RENAMED_PATH}
+            # Use sudo with -n flag (non-interactive) to check sudo permissions
+            sudo -n mkdir -p /opt/deploy/artifacts || echo "Sudo permission issue"
 
-            # Only use sudo for the deploy script
-            sudo /opt/deploy/scripts/deploy.sh ${{ secrets.APP_NAME }} ${RENAMED_PATH}
-
-            rm ${ARTIFACT_PATH}
+            # Proceed with deployment if possible
+            if sudo -n true; then
+              sudo -n cp $ARTIFACT_PATH /opt/deploy/artifacts/${{ secrets.APP_NAME }}_${TIMESTAMP}.tar.gz
+              sudo -n /opt/deploy/scripts/deploy.sh ${{ secrets.APP_NAME }} /opt/deploy/artifacts/${{ secrets.APP_NAME }}_${TIMESTAMP}.tar.gz
+            else
+              echo "ERROR: Sudo permissions are not configured correctly"
+              exit 1
+            fi
