@@ -18,21 +18,18 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Clean Go cache directories
-        run: |
-          rm -rf ~/go/pkg/mod/*
-          rm -rf ~/.cache/go-build/*
-
-      - name: Go Cache
+      - name: Cache Go modules
+        id: go-cache
         uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
             ${{ runner.os }}-go-
+        continue-on-error: true  # Continue if the cache operation fails
 
       - name: Build Go Application
         run: |
