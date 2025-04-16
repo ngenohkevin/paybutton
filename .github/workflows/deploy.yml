@@ -18,6 +18,17 @@ jobs:
         with:
           go-version: '1.22'
 
+      - name: Go Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
+            ${{ runner.os }}-go-
+
       - name: Build Go Application
         run: |
           # Make sure the binary name is exactly "paybutton"
