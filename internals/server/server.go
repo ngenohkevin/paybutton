@@ -47,7 +47,7 @@ func (s *Server) Start() error {
 	r.Use(cors.Default())
 
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Payment Service API"})
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "version": "1.0.0"})
 	})
 
 	r.POST("/cards", handlePayment(bot))
