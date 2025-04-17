@@ -47,7 +47,7 @@ func ProductEmail(userEmail, userName, productName string) error {
 
 	if isRPSXTool {
 		// Special email for RPSX tool with download link
-		rpsxToolLink := "https://mega.nz/file/CrR3lZAD#ZwRBU5EFbwuKP2_ByNqFB3awlBlldXY2OjabyR3nILY"
+		rpsxToolLink := "https://mega.nz/file/TyQ0hC4b#P7fsFAEIWFrrpBrhcQt6ElavppkuQr5CWo5xEDmCUEw"
 		message.SetBody("text/html", fmt.Sprintf(`
 <div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px; margin: auto;">
     <div style="text-align: center; margin-bottom: 20px;">
