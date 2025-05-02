@@ -47,8 +47,15 @@ func handleWebhookUpdates(bot *tgbotapi.BotAPI) {
 }
 
 // HandleAutomaticDelivery sends a product email when a payment is confirmed
-func HandleAutomaticDelivery(email, userName, productName string, bot *tgbotapi.BotAPI) error {
-	log.Printf("Handling automatic delivery for %s: %s", email, productName)
+// Only delivers products for sites named "Dwebstore"
+func HandleAutomaticDelivery(email, userName, productName, site string, bot *tgbotapi.BotAPI) error {
+	log.Printf("Handling automatic delivery request for %s: %s (site: %s)", email, productName, site)
+
+	// Check if site is authorized for automatic product delivery
+	if site != "Dwebstore" && site != "dwebstore" {
+		log.Printf("Automatic delivery skipped: site '%s' is not authorized for product delivery", site)
+		return fmt.Errorf("site '%s' is not authorized for automatic product delivery", site)
+	}
 
 	// Send the product email
 	err := utils.ProductEmail(email, userName, productName)
