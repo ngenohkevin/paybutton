@@ -24,6 +24,11 @@ var (
 	staticUSDTAddress = "TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE"
 )
 
+// GetChatID returns the chat ID for Telegram notifications
+func GetChatID() int64 {
+	return chatID
+}
+
 type PaymentInfo struct {
 	Price       float64
 	Description string
