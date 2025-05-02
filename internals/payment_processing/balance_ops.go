@@ -191,20 +191,22 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 
 				// Extract product information from the session data
 				productName := ""
+				site := ""
 				mutex.Lock()
 				session, exists := userSessions[email]
 				if exists && session != nil && len(session.PaymentInfo) > 0 {
 					// Get the latest payment info
 					latestPayment := session.PaymentInfo[len(session.PaymentInfo)-1]
 					productName = latestPayment.Description
+					site = latestPayment.Site
 				}
 				mutex.Unlock()
 
 				// If we have a product name, proceed with delivery
 				if productName != "" {
-					log.Printf("Attempting automatic product delivery for %s: %s", email, productName)
+					log.Printf("Attempting automatic product delivery for %s: %s (site: %s)", email, productName, site)
 					// Use the proper function to handle delivery
-					err = HandleAutomaticDelivery(email, userName, productName, bot)
+					err = HandleAutomaticDelivery(email, userName, productName, site, bot)
 					if err != nil {
 						log.Printf("Error in automatic product delivery: %s", err)
 					} else {
