@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 )
@@ -136,4 +137,26 @@ func RandomUSDTAddress() string {
 	randomIndex := rand.Intn(len(addresses))
 
 	return addresses[randomIndex]
+}
+
+// IsProduction checks if the app is running in production (Render)
+func IsProduction() bool {
+	// Render sets this environment variable in production
+	return os.Getenv("RENDER") != ""
+}
+
+// GetWebhookURL constructs the webhook URL for the Telegram bot
+func GetWebhookURL() string {
+	// Get the host from environment variables
+	renderURL := os.Getenv("RENDER_EXTERNAL_URL")
+	if renderURL == "" {
+		// Fallback for testing
+		renderURL = "https://paybutton.onrender.com"
+	}
+
+	// Get the bot token
+	botToken := os.Getenv("BOT_API_KEY")
+
+	// Construct the webhook URL with the token as part of the path for security
+	return renderURL + "/bot" + botToken + "/webhook"
 }
