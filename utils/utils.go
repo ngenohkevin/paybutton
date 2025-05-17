@@ -118,16 +118,16 @@ func ConvertToBitcoinUSD(priceInUSD float64) (float64, error) {
 func RandomUSDTAddress() string {
 	// List of USDT addresses
 	addresses := []string{
-		"TGMNL6ArsAZTRNHGr5grrA2FPZvPqRqUnu",
-		"TVdgysNmtGHSifXJqfqoCeZovP9Ez5gpqH",
-		"TWMtviX1jZqzFZxh3mJHvLGv48d1qYLWwu",
-		"TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE",
-		"TQMFu4XpK2paEPxKhBWtYpHva11Awrn48F",
-		"TLR3JMH6u1chcdjdnLqkEW1jaMWKRBHZu3",
-		"THzcboCRkkdBrbUMjAgKUGXuqu3QLYNwPP",
-		"TCtWyMdkSvdLJqjH7dc1XyF2hFyub5Av4r",
-		"TCEJW5sSVDQuHXwApaxReHWcjh4NykDP26",
-		"TT7wKXWk29kGTi6gC1jN6fXbx59Ve8exYf",
+		"TWZT22ddFy5GjmQ7i26BJxwB88hp9u1ZXF",
+		"TVLsfnessfyCxrtSvYgEb9s9exScXz4epS",
+		"TY39T4Xx7SUCw2iTZQPcVFHZqCs6hvhcdQ",
+		"TGcRztjFEBHyhvxtavJVJEwGJo6JtGAHXq",
+		"THxuDaeVQUYZDcm2TnP6MVjthgA3CvSuQJ",
+		"TSNBdAVF3ERMPKz2nkKCEUHxq2z2yexYP6",
+		"TKQEwi15GtqWG1qHHESm7eFqt9b5qtyW6Z",
+		"TJwLnEYFNRPgFQ3GBTEVEq7aZDcFM15eaH",
+		"THxoGNFakcgVpQinNtXhBiT5WRpTviwGmR",
+		"TC5PUugKrgPj63vQM2s1YubnDDu7CoEUjv",
 	}
 
 	// Seed the random number generator
