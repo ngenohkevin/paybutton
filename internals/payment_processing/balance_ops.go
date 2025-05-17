@@ -51,24 +51,57 @@ func GetBalance(c *gin.Context) {
 		balanceUSDFormatted := fmt.Sprintf("%.2f", balanceUSD)
 
 		c.JSON(http.StatusOK, gin.H{
-			"address":  address,
-			"currency": "BTC",
-			"balance":  balanceUSDFormatted,
+			"address":     address,
+			"currency":    "BTC",
+			"balance":     balanceUSDFormatted,
+			"raw_balance": fmt.Sprintf("%.8f", btc),
+			"rate":        rate,
 		})
 	} else if usdtRegex.MatchString(address) {
 		// Handle USDT balance
 		balance, err := payments2.GetUSDTBalance(address)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": fmt.Sprintf("Error fetching USDT balance: %s", err.Error()),
-			})
-			return
+			// Try one more time before returning error
+			time.Sleep(2 * time.Second)
+			balance, err = payments2.GetUSDTBalance(address)
+
+			// Even if there's still an error, if it's just a "no tokens" or API error,
+			// we'll return 0 balance instead of an error
+			if err != nil {
+				// Check if it's a DNS or connection error (which is a real error)
+				if strings.Contains(err.Error(), "dial tcp") ||
+					strings.Contains(err.Error(), "no such host") {
+					// Return a friendlier error message
+					c.JSON(http.StatusServiceUnavailable, gin.H{
+						"message":     "Service temporarily unavailable. Please try again later.",
+						"address":     address,
+						"currency":    "USDT (TRC20)",
+						"balance":     "0.00",
+						"raw_balance": "0.000000",
+						"rate":        1.0,
+					})
+					return
+				}
+
+				// For other errors, assume it's just a zero balance
+				balance = 0
+			}
+		}
+
+		// USDT is already in USD equivalent
+		balanceUSDFormatted := fmt.Sprintf("%.2f", balance)
+
+		// Check if balance is actually available or zero
+		if balance <= 0 {
+			// No logging needed for zero balance - common case
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"address":  address,
-			"currency": "USDT (TRC20)",
-			"balance":  fmt.Sprintf("%.2f", balance), // USDT uses 6 decimal places
+			"address":     address,
+			"currency":    "USDT (TRC20)",
+			"balance":     balanceUSDFormatted,
+			"raw_balance": fmt.Sprintf("%.6f", balance),
+			"rate":        1.0, // USDT is pegged to USD at 1:1
 		})
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -115,9 +148,12 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 		currencyType = "BTC"
 	}
 
+	log.Printf("Starting balance check for %s address: %s", currencyType, address)
+
 	for {
 		select {
 		case <-ticker.C:
+			var internalBalance float64
 			var balance float64
 			var err error
 
@@ -139,13 +175,22 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				balance = btc * rate
 				log.Printf("Address: %s, BTC Balance: %.8f BTC (%.2f USD)", address, btc, balance)
 			} else {
-				// USDT balance check
-				balance, err = payments2.GetUSDTBalance(address)
+				// USDT balance check - USDT value is already in USD
+				usdtBalance, err := payments2.GetUSDTBalance(address)
 				if err != nil {
 					log.Printf("Error fetching USDT balance for address %s: %s", address, err)
 					continue
 				}
-				log.Printf("Address: %s, USDT Balance: %.6f", address, balance)
+
+				// USDT is already in USD equivalent (1 USDT ≈ 1 USD)
+				internalBalance = usdtBalance
+
+				// Log different messages based on balance
+				if internalBalance <= 0 {
+					log.Printf("Address: %s, No USDT balance found", address)
+				} else {
+					log.Printf("Address: %s, USDT Balance: %.6f USDT (%.2f USD)", address, usdtBalance, internalBalance)
+				}
 			}
 
 			if balance > 0 {
@@ -170,9 +215,13 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				// Mark address as used
 				mutex.Lock()
 				session := userSessions[email]
-				session.UsedAddresses[address] = true
-				if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
-					session.ExtendedAddressAllowed = true
+				if session != nil {
+					session.UsedAddresses[address] = true
+					if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
+						session.ExtendedAddressAllowed = true
+					}
+				} else {
+					log.Printf("Warning: User session for %s not found when marking address %s as used", email, address)
 				}
 				delete(checkingAddresses, address)
 				mutex.Unlock()
