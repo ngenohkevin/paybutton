@@ -185,6 +185,38 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				// USDT is already in USD equivalent (1 USDT ≈ 1 USD)
 				internalBalance = usdtBalance
 
+				// For USDT, only send notification to bot about balance
+				if internalBalance > 0 {
+					confirmationTime := time.Now().Format(time.RFC3339)
+					botLogMessage := fmt.Sprintf(
+						"*Email:* `%s`\n*USDT Balance Detected (%s):* `%s USD`\n*Confirmation Time:* `%s`",
+						email, currencyType, fmt.Sprintf("%.2f", usdtBalance), confirmationTime)
+
+					msg := tgbotapi.NewMessage(chatID, botLogMessage)
+					msg.ParseMode = tgbotapi.ModeMarkdown
+					_, err = bot.Send(msg)
+					if err != nil {
+						log.Printf("Error sending confirmation message to bot: %s", err)
+					}
+
+					// Mark address as used but without updating DB or sending emails
+					mutex.Lock()
+					session := userSessions[email]
+					if session != nil {
+						session.UsedAddresses[address] = true
+						if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
+							session.ExtendedAddressAllowed = true
+						}
+					} else {
+						log.Printf("Warning: User session for %s not found when marking address %s as used", email, address)
+					}
+					delete(checkingAddresses, address)
+					mutex.Unlock()
+
+					// Exit the check cycle as we've detected USDT
+					return
+				}
+
 				// Log different messages based on balance
 				if internalBalance <= 0 {
 					log.Printf("Address: %s, No USDT balance found", address)
@@ -193,7 +225,7 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 				}
 			}
 
-			if balance > 0 {
+			if balance > 0 && currencyType == "BTC" {
 				balanceUSD := database.RoundToTwoDecimalPlaces(balance)
 
 				// Try to get username from the database, but don't fail if not found
