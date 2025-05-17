@@ -21,7 +21,7 @@ var (
 	checkingAddresses = make(map[string]bool)
 	db                *sql.DB
 	staticBTCAddress  = "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms"
-	staticUSDTAddress = "TJecnsMey1oj1wfSuV7FAaduuje4T3W3AE"
+	staticUSDTAddress = "TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK"
 )
 
 // GetChatID returns the chat ID for Telegram notifications
@@ -182,6 +182,13 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 
 			if !addressLimitReached {
 				address = utils.RandomUSDTAddress()
+
+				// Verify the USDT address format
+				if !usdtRegex.MatchString(address) {
+					log.Printf("WARNING: Generated USDT address does not match the expected format: %s", address)
+					// Still continue, but with a warning
+				}
+
 				session.GeneratedAddresses[address] = time.Now()
 				log.Printf("Generated new USDT address: %s for email: %s", address, email)
 				if !checkingAddresses[address] {
@@ -245,6 +252,10 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		if err == nil {
 			responseData["priceInBTC"] = priceBTC
 		}
+	} else if generateUsdtAddress {
+		// For USDT, the price in USDT is the same as USD (1:1 peg)
+		responseData["priceInUSDT"] = priceUSD
+		responseData["currency"] = "USDT (TRC20)"
 	}
 
 	c.JSON(http.StatusOK, responseData)
