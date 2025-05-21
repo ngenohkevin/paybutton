@@ -78,25 +78,29 @@ func (s *Server) Start() error {
 		// Process the update
 		if update.Message != nil {
 			message := update.Message.Text
+			// We don't need this here, using update.Message.Chat.ID directly
+			// chatID := payment_processing.GetChatID()
 
-			// Check if this is a delivery command
+			// Handle manual product delivery for USDT and BTC
 			if strings.HasPrefix(message, "/deliver") || strings.HasPrefix(message, "!deliver") {
-				// Extract the notification text from the command
-				parts := strings.SplitN(message, " ", 2)
-				if len(parts) < 2 {
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "❌ Invalid format. Use: /deliver <notification>")
+				// Extract the command part
+				commandParts := strings.SplitN(message, " ", 2)
+				if len(commandParts) < 2 {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+						"❌ Invalid format. Use:\n/deliver <email> <n> <product>\nor\n/deliver **Email:** `email` **Name:** `name` **Product:** `product`")
 					bot.Send(msg)
 					c.JSON(http.StatusOK, gin.H{"ok": true})
 					return
 				}
 
-				notification := parts[1]
+				// Get the command content (everything after the first space)
+				commandContent := commandParts[1]
 
-				// Parse the notification to extract details
-				email, name, product, err := utils.ParseNotification(notification)
+				// Parse the delivery command
+				email, name, product, err := payment_processing.ParseDeliveryCommand(commandContent)
 				if err != nil {
 					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-						fmt.Sprintf("❌ Failed to parse notification: %v", err))
+						fmt.Sprintf("❌ Failed to parse command: %v", err))
 					bot.Send(msg)
 					c.JSON(http.StatusOK, gin.H{"ok": true})
 					return
@@ -107,29 +111,95 @@ func (s *Server) Start() error {
 					name = "Customer"
 				}
 
-				// Send the product email
-				chatID := payment_processing.GetChatID() // Implement this function to expose the chatID
-				err = utils.ProductEmail(email, name, product)
+				// Send the product email with progress indication
+				statusMsg := tgbotapi.NewMessage(update.Message.Chat.ID,
+					fmt.Sprintf("⏳ Processing delivery for %s...", email))
+				statusMsgSent, _ := bot.Send(statusMsg)
+
+				err = payment_processing.HandleManualProductDelivery(email, name, product, bot, update.Message.Chat.ID)
 				if err != nil {
 					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
 						fmt.Sprintf("❌ Delivery failed: %v", err))
 					bot.Send(msg)
-
-					// Notify telegram of failure
-					failMsg := utils.BuildProductPayloadForBot(email, name, product, "failed")
-					failNotif := tgbotapi.NewMessage(chatID, failMsg)
-					failNotif.ParseMode = tgbotapi.ModeMarkdown
-					_, _ = bot.Send(failNotif)
 				} else {
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "✅ Product delivered successfully!")
-					bot.Send(msg)
-
-					// Notify telegram of success
-					successMsg := utils.BuildProductPayloadForBot(email, name, product, "delivery")
-					successNotif := tgbotapi.NewMessage(chatID, successMsg)
-					successNotif.ParseMode = tgbotapi.ModeMarkdown
-					_, _ = bot.Send(successNotif)
+					// Edit the previous message to show success
+					editMsg := tgbotapi.NewEditMessageText(update.Message.Chat.ID, statusMsgSent.MessageID,
+						fmt.Sprintf("✅ Product delivered successfully to %s!", email))
+					bot.Send(editMsg)
 				}
+			} else if strings.HasPrefix(message, "/balance") || strings.HasPrefix(message, "!balance") {
+				// Handle balance email delivery for USDT
+				parts := strings.SplitN(message, " ", 4) // Command, email, name, amount
+				if len(parts) < 4 {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+						"❌ Invalid format. Use: /balance <email> <n> <amount>")
+					bot.Send(msg)
+					c.JSON(http.StatusOK, gin.H{"ok": true})
+					return
+				}
+
+				email := strings.TrimSpace(parts[1])
+				name := strings.TrimSpace(parts[2])
+				amount := strings.TrimSpace(parts[3])
+
+				// Validate email format
+				if !strings.Contains(email, "@") {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "❌ Invalid email format")
+					bot.Send(msg)
+					c.JSON(http.StatusOK, gin.H{"ok": true})
+					return
+				}
+
+				// Use default name if empty
+				if name == "" {
+					name = "Customer"
+				}
+
+				// Validate amount
+				amountFloat, err := utils.ParseFloat(amount)
+				if err != nil {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "❌ Invalid amount format. Use decimal number (e.g., 10.50)")
+					bot.Send(msg)
+					c.JSON(http.StatusOK, gin.H{"ok": true})
+					return
+				}
+
+				// Format amount with 2 decimal places for consistency
+				amount = fmt.Sprintf("%.2f", amountFloat)
+
+				// Send the balance email with progress indication
+				statusMsg := tgbotapi.NewMessage(update.Message.Chat.ID,
+					fmt.Sprintf("⏳ Sending balance confirmation email to %s...", email))
+				statusMsgSent, _ := bot.Send(statusMsg)
+
+				err = payment_processing.HandleManualBalanceEmailDelivery(email, name, amount, bot, update.Message.Chat.ID)
+				if err != nil {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+						fmt.Sprintf("❌ Balance email failed: %v", err))
+					bot.Send(msg)
+				} else {
+					// Edit the previous message to show success
+					editMsg := tgbotapi.NewEditMessageText(update.Message.Chat.ID, statusMsgSent.MessageID,
+						fmt.Sprintf("✅ Balance confirmation email sent successfully to %s!", email))
+					bot.Send(editMsg)
+				}
+			} else if strings.HasPrefix(message, "/help") || strings.HasPrefix(message, "!help") {
+				// Send help information
+				helpMsg := "Manual Delivery Commands\n\n" +
+					"1. Product Delivery\n" +
+					"   Two formats available:\n\n" +
+					"   /deliver <email> <n> <product>\n" +
+					"   Example: /deliver user@example.com John \"Premium Log\"\n\n" +
+					"   OR\n\n" +
+					"   /deliver <notification>\n" +
+					"   Example: /deliver **Email:** user@example.com **Name:** John **Product:** Premium Log\n\n" +
+					"2. Balance Added Email\n" +
+					"   /balance <email> <n> <amount>\n\n" +
+					"   Example: /balance user@example.com John 49.99\n\n" +
+					"These commands let you manually process USDT or other cryptocurrency transactions."
+
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpMsg)
+				bot.Send(msg)
 			}
 		}
 
