@@ -109,7 +109,12 @@ func GetUSDTBalance(address string) (float64, error) {
 		// validate response
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			logger.Error("Bad response code", "Status", resp.Status, "url", url)
+			// 404 Not Found is common for addresses with no tokens - log as debug instead of error
+			if resp.StatusCode == http.StatusNotFound {
+				logger.Debug("Address has no tokens (404)", "Status", resp.Status, "url", url)
+			} else {
+				logger.Error("Bad response code", "Status", resp.Status, "url", url)
+			}
 			lastErr = fmt.Errorf("bad response code: %s", resp.Status)
 			continue
 		}
