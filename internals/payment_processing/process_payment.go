@@ -342,19 +342,6 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 
 	priceUSD := req.Price
 
-	// Log the request to bot immediately
-	logMessage := fmt.Sprintf(
-		"💰 *New Fast Payment Request*\n*Email:* `%s`\n*Name:* `%s`\n*Price:* `$%.2f`\n*Description:* `%s`\n*Site:* `%s`\n*IP:* `%s` (%s, %s, %s)\n*Mode:* Fast Polling (15s)",
-		req.Email, req.Name, priceUSD, req.Description, req.Site,
-		clientIP, ipAPIData.Location.City, ipAPIData.Location.State, ipAPIData.Location.Country)
-
-	msg := tgbotapi.NewMessage(chatID, logMessage)
-	msg.ParseMode = tgbotapi.ModeMarkdown
-	_, err = bot.Send(msg)
-	if err != nil {
-		log.Printf("Error sending log message to bot: %s", err)
-	}
-
 	responseData := gin.H{
 		"message":     "Payment request processed with fast polling",
 		"email":       req.Email,
@@ -408,6 +395,46 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
 		if err == nil {
 			responseData["priceInBTC"] = priceBTC
+		}
+
+		// Log the complete request with address to bot
+		locationStr := ipAPIData.Location.City
+		if ipAPIData.Location.State != "" && ipAPIData.Location.State != ipAPIData.Location.City {
+			locationStr = fmt.Sprintf("%s, %s", ipAPIData.Location.City, ipAPIData.Location.State)
+		}
+		if ipAPIData.Location.Country != "" {
+			locationStr = fmt.Sprintf("%s, %s", locationStr, ipAPIData.Location.Country)
+		}
+
+		// Get proper local time for the notification
+		localTime, err := ipAPIData.ParseLocalTime()
+		if err != nil {
+			log.Printf("Error parsing local time: %s", err)
+			localTime = "00:00"
+		}
+
+		logMessage := fmt.Sprintf(
+			"💰 *Fast Payment Request*\n\n"+
+				"**Site:** %s\n"+
+				"**Email:** %s\n"+
+				"**Address:** %s\n"+
+				"**Amount:** $%.2f\n"+
+				"**Name:** %s\n"+
+				"**Product:** %s\n"+
+				"**IP Address:** %s\n"+
+				"**Country:** %s\n"+
+				"**State:** %s\n"+
+				"**City:** %s\n"+
+				"**Local Time:** %s\n\n"+
+				"*Mode: Fast Polling (15s)*",
+			req.Site, req.Email, address, priceUSD, req.Name, req.Description,
+			clientIP, ipAPIData.Location.Country, ipAPIData.Location.State, ipAPIData.Location.City, localTime)
+
+		msg := tgbotapi.NewMessage(chatID, logMessage)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		_, err = bot.Send(msg)
+		if err != nil {
+			log.Printf("Error sending log message to bot: %s", err)
 		}
 	}
 
