@@ -132,9 +132,20 @@ func GetProductFromDescription(description string) string {
 	return description
 }
 
+// Original function - kept for backward compatibility
 func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI) {
+	checkBalanceWithInterval(address, email, token, bot, 60*time.Second)
+}
+
+// Enhanced function with configurable polling interval
+func CheckBalanceFast(address, email, token string, bot *tgbotapi.BotAPI) {
+	checkBalanceWithInterval(address, email, token, bot, 15*time.Second)
+}
+
+// Enhanced function with configurable polling interval
+func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI, interval time.Duration) {
 	checkDuration := 30 * time.Minute
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	timeout := time.After(checkDuration)
 
@@ -157,9 +168,10 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 			var balance float64
 			var err error
 
+			var satoshis int64 // Declare satoshis in function scope
 			if currencyType == "BTC" {
 				// BTC balance check
-				satoshis, err := GetBitcoinAddressBalanceWithFallback(address, token)
+				satoshis, err = GetBitcoinAddressBalanceWithFallback(address, token)
 				if err != nil {
 					log.Printf("Error fetching BTC balance for address %s: %s", address, err)
 					continue
@@ -227,6 +239,12 @@ func checkBalancePeriodically(address, email, token string, bot *tgbotapi.BotAPI
 
 			if balance > 0 && currencyType == "BTC" {
 				balanceUSD := database.RoundToTwoDecimalPlaces(balance)
+
+				// Calculate BTC amount for WebSocket notification
+				btcAmount := float64(satoshis) / 100000000 // Convert satoshis back to BTC
+
+				// Send WebSocket notification immediately
+				BroadcastBalanceUpdate(address, "confirmed", balanceUSD, btcAmount, email)
 
 				// Try to get username from the database, but don't fail if not found
 				var userName string
