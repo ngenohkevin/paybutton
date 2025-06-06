@@ -415,17 +415,17 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 
 		logMessage := fmt.Sprintf(
 			"💰 *Fast Payment Request*\n\n"+
-				"**Site:** %s\n"+
-				"**Email:** %s\n"+
-				"**Address:** %s\n"+
-				"**Amount:** $%.2f\n"+
-				"**Name:** %s\n"+
-				"**Product:** %s\n"+
-				"**IP Address:** %s\n"+
-				"**Country:** %s\n"+
-				"**State:** %s\n"+
-				"**City:** %s\n"+
-				"**Local Time:** %s\n\n"+
+				"*Site:* `%s`\n"+
+				"*Email:* `%s`\n"+
+				"*Address:* `%s`\n"+
+				"*Amount:* `$%.2f`\n"+
+				"*Name:* `%s`\n"+
+				"*Product:* `%s`\n"+
+				"*IP Address:* `%s`\n"+
+				"*Country:* `%s`\n"+
+				"*State:* `%s`\n"+
+				"*City:* `%s`\n"+
+				"*Local Time:* `%s`\n\n"+
 				"*Mode: Fast Polling (15s)*",
 			req.Site, req.Email, address, priceUSD, req.Name, req.Description,
 			clientIP, ipAPIData.Location.Country, ipAPIData.Location.State, ipAPIData.Location.City, localTime)
