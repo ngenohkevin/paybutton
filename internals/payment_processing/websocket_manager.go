@@ -15,8 +15,11 @@ import (
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		// Allow connections from any origin (configure appropriately for production)
+		origin := r.Header.Get("Origin")
+		log.Printf("WebSocket connection attempt from origin: %s", origin)
 		return true
 	},
+	EnableCompression: true,
 }
 
 // WebSocket connection management
