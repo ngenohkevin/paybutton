@@ -14,15 +14,27 @@ import (
 )
 
 var (
-	chatID            int64 = 7933331471
-	addressLimit            = 6
-	addressExpiry           = 72 * time.Hour // Set address expiry time to 72 hours
-	blockCypherToken  string
-	checkingAddresses = make(map[string]bool)
-	db                *sql.DB
-	staticBTCAddress  = "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms"
-	staticUSDTAddress = "TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK"
+	chatID             int64 = 7933331471
+	addressLimit             = 6
+	addressExpiry            = 72 * time.Hour // Set address expiry time to 72 hours
+	blockCypherToken   string
+	blockonomicsAPIKey string
+	checkingAddresses  = make(map[string]bool)
+	db                 *sql.DB
+	staticBTCAddress   = "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms"
+	staticUSDTAddress  = "TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK"
 )
+
+// InitializeAPIKeys loads API keys from config
+func InitializeAPIKeys() error {
+	config, err := utils.LoadConfig()
+	if err != nil {
+		return err
+	}
+	blockCypherToken = config.BlockCypherToken
+	blockonomicsAPIKey = config.BlockonomicsAPI
+	return nil
+}
 
 // GetChatID returns the chat ID for Telegram notifications
 func GetChatID() int64 {
@@ -256,6 +268,147 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		// For USDT, the price in USDT is the same as USD (1:1 peg)
 		responseData["priceInUSDT"] = priceUSD
 		responseData["currency"] = "USDT (TRC20)"
+	}
+
+	c.JSON(http.StatusOK, responseData)
+}
+
+// ProcessFastPaymentRequest - Enhanced version with 15-second polling for faster notifications
+func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddress bool, generateUsdtAddress bool) {
+	clientIP := c.ClientIP()
+	ipAPIData, err := utils.GetIpLocation(clientIP)
+	if err != nil {
+		log.Printf("Error getting IP location: %s", err)
+
+		// Proceed with default or partial data
+		ipAPIData = &utils.IPAPIData{
+			Location: utils.IPAPILocation{
+				City:      "Unknown",
+				State:     "Unknown",
+				Country:   "Unknown",
+				Continent: "Unknown",
+			},
+		}
+	}
+
+	log.Printf("Request IP: %s, Location: %s, %s, %s", clientIP, ipAPIData.Location.City, ipAPIData.Location.State, ipAPIData.Location.Country)
+
+	var req struct {
+		Email       string  `json:"email" binding:"required"`
+		Price       float64 `json:"price" binding:"required"`
+		Description string  `json:"description" binding:"required"`
+		Name        string  `json:"name" binding:"required"`
+		Site        string  `json:"site"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid request data",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	if req.Price <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Price must be greater than zero",
+		})
+		return
+	}
+
+	mutex.Lock()
+	session := userSessions[req.Email]
+	if session == nil {
+		session = &UserSession{
+			Email:                  req.Email,
+			GeneratedAddresses:     make(map[string]time.Time),
+			UsedAddresses:          make(map[string]bool),
+			ExtendedAddressAllowed: false,
+			PaymentInfo:            []PaymentInfo{},
+		}
+		userSessions[req.Email] = session
+	}
+
+	// Store payment information for automatic delivery
+	paymentInfo := PaymentInfo{
+		Price:       req.Price,
+		Description: req.Description,
+		Name:        req.Name,
+		Site:        req.Site,
+		CreatedAt:   time.Now(),
+	}
+	session.PaymentInfo = append(session.PaymentInfo, paymentInfo)
+	mutex.Unlock()
+
+	priceUSD := req.Price
+
+	// Log the request to bot immediately
+	logMessage := fmt.Sprintf(
+		"💰 *New Fast Payment Request*\n*Email:* `%s`\n*Name:* `%s`\n*Price:* `$%.2f`\n*Description:* `%s`\n*Site:* `%s`\n*IP:* `%s` (%s, %s, %s)\n*Mode:* Fast Polling (15s)",
+		req.Email, req.Name, priceUSD, req.Description, req.Site,
+		clientIP, ipAPIData.Location.City, ipAPIData.Location.State, ipAPIData.Location.Country)
+
+	msg := tgbotapi.NewMessage(chatID, logMessage)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	_, err = bot.Send(msg)
+	if err != nil {
+		log.Printf("Error sending log message to bot: %s", err)
+	}
+
+	responseData := gin.H{
+		"message":     "Payment request processed with fast polling",
+		"email":       req.Email,
+		"price":       req.Price,
+		"description": req.Description,
+		"name":        req.Name,
+		"site":        req.Site,
+		"currency":    "BTC",
+		"polling":     "15s",
+	}
+
+	var address string
+	if generateBtcAddress {
+		mutex.Lock()
+		reusableAddr, err := getReusableAddress(session, "BTC")
+		if err != nil {
+			if len(session.GeneratedAddresses) < addressLimit || session.ExtendedAddressAllowed {
+				address, err = payments2.GenerateBitcoinAddress(req.Email, priceUSD)
+				if err != nil {
+					mutex.Unlock()
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"message": "Error generating Bitcoin address",
+						"error":   err.Error(),
+					})
+					return
+				}
+				session.GeneratedAddresses[address] = time.Now()
+				log.Printf("Generated new BTC address: %s for email: %s (FAST MODE)", address, req.Email)
+				if !checkingAddresses[address] {
+					checkingAddresses[address] = true
+					go CheckBalanceFast(address, req.Email, blockCypherToken, bot)
+				}
+			} else {
+				log.Printf("Address generation limit reached for user %s. Using static BTC address. (FAST MODE)", req.Email)
+				address = staticBTCAddress
+			}
+		} else {
+			address = reusableAddr
+			log.Printf("Reused BTC address: %s for email: %s (FAST MODE)", address, req.Email)
+			if !checkingAddresses[address] {
+				checkingAddresses[address] = true
+				go CheckBalanceFast(address, req.Email, blockCypherToken, bot)
+			}
+		}
+		mutex.Unlock()
+
+		responseData["address"] = address
+		// Generate QR code (we don't need the filename for response)
+		responseData["qr_code"] = fmt.Sprintf("bitcoin:%s", address)
+
+		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
+		if err == nil {
+			responseData["priceInBTC"] = priceBTC
+		}
 	}
 
 	c.JSON(http.StatusOK, responseData)
