@@ -36,9 +36,15 @@ func (s *Server) Start() error {
 		s.logger.Error("Error loading config:", err)
 	}
 
+	// Initialize API keys for payment processing
+	if err := payment_processing.InitializeAPIKeys(); err != nil {
+		s.logger.Error("Error initializing API keys:", err)
+	}
+
 	bot, err := tgbotapi.NewBotAPI(botToken.BotApiKey)
 	if err != nil {
 		s.logger.Error("Error initializing bot:", err)
+		return fmt.Errorf("failed to initialize Telegram bot: %w", err)
 	}
 
 	// Initialize bot delivery commands for manual and automatic delivery
@@ -55,6 +61,10 @@ func (s *Server) Start() error {
 	r.POST("/cards", handlePayment(bot))
 	r.POST("/usdt", handleUsdtPayment(bot))
 	r.POST("/payment", handlePayment(bot))
+	r.POST("/payment-fast", handleFastPayment(bot))                                                       // New endpoint for 15s polling
+	r.GET("/ws/balance/:address", payment_processing.HandleWebSocket)                                     // WebSocket endpoint for real-time updates
+	r.GET("/events/balance/:address", payment_processing.HandleSSE)                                       // SSE endpoint for real-time updates (lightweight)
+	r.POST("/webhook/btc", func(c *gin.Context) { payment_processing.HandleBlockonomicsWebhook(c, bot) }) // Blockonomics webhook
 	r.GET("/balance/:address", payment_processing.GetBalance)
 
 	// Add the webhook endpoint for Telegram
@@ -223,5 +233,11 @@ func handlePayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 func handleUsdtPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		payment_processing.ProcessPaymentRequest(c, bot, false, true)
+	}
+}
+
+func handleFastPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		payment_processing.ProcessFastPaymentRequest(c, bot, true, false)
 	}
 }
