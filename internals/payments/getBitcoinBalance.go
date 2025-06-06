@@ -81,8 +81,16 @@ func GetBitcoinAddressBalanceWithBlockChain(address string) (int64, error) {
 	url := fmt.Sprintf("https://blockchain.info/rawaddr/%s", address)
 
 	// Create an HTTP client with a timeout to prevent hanging
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Create request with User-Agent to avoid blocking
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "PayButton/1.0 (Bitcoin Balance Checker)")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch balance: %w", err)
 	}
