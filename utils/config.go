@@ -39,9 +39,9 @@ func LoadConfig() (config Config, err error) {
 	mailGunAPI := os.Getenv("MAILGUN_API_KEY")
 	mailGunPass := os.Getenv("MAILGUN_PASSWORD")
 	tronScanAPI := os.Getenv("TRONSCAN_API")
-	smtpServer := os.Getenv("PROTON_SMTP_SERVER")
-	smtpUser := os.Getenv("SMTP_USER")
-	smtpPassword := os.Getenv("SMTP_PASSWORD")
+	smtpServer := "smtp.zoho.com"
+	smtpUser := os.Getenv("ZOHO_MAIL")
+	smtpPassword := os.Getenv("ZOHO_MAIL_PASSWORD")
 
 	config = Config{
 		PostgresUser:     user,
