@@ -118,22 +118,21 @@ func ConvertToBitcoinUSD(priceInUSD float64) (float64, error) {
 func RandomUSDTAddress() string {
 	// List of USDT addresses
 	addresses := []string{
-		"TWZT22ddFy5GjmQ7i26BJxwB88hp9u1ZXF",
-		"TVLsfnessfyCxrtSvYgEb9s9exScXz4epS",
-		"TY39T4Xx7SUCw2iTZQPcVFHZqCs6hvhcdQ",
-		"TGcRztjFEBHyhvxtavJVJEwGJo6JtGAHXq",
-		"THxuDaeVQUYZDcm2TnP6MVjthgA3CvSuQJ",
-		"TSNBdAVF3ERMPKz2nkKCEUHxq2z2yexYP6",
 		"TKQEwi15GtqWG1qHHESm7eFqt9b5qtyW6Z",
 		"TJwLnEYFNRPgFQ3GBTEVEq7aZDcFM15eaH",
 		"THxoGNFakcgVpQinNtXhBiT5WRpTviwGmR",
 		"TC5PUugKrgPj63vQM2s1YubnDDu7CoEUjv",
+		"TX2npc6nmZis5jNsLEfSppiXEQCmyoZGhu",
+		"TGdZ4T4BkwGBkaWFRHMjrKqxEBEBZEyuA8",
+		"TB36N2GfmDWiuWCs1cTMJq9ytenz8PHe8w",
+		"TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK",
+		"TPg34ZwyjTeyguqYMedLe5pfkhrGDvZp1G",
+		"TVdgysNmtGHSifXJqfqoCeZovP9Ez5gpqH",
+		"TWMtviX1jZqzFZxh3mJHvLGv48d1qYLWwu",
+		"TT7wKXWk29kGTi6gC1jN6fXbx59Ve8exYf",
 	}
 
-	// Seed the random number generator
-	rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// Select a random address
+	// Use modern Go random generator (automatically seeded)
 	randomIndex := rand.Intn(len(addresses))
 
 	return addresses[randomIndex]
