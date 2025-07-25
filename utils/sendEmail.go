@@ -32,11 +32,8 @@ func SendEmail(userEmail string, userName string, amount string) error {
         <p style="font-size: 16px; color: #555;">We appreciate your trust and look forward to serving you. Explore our platform to make the most of your balance.</p>
     </div>
     <div style="text-align: center; margin-bottom: 20px;">
-        <img src="https://i.ibb.co/c6m0syN/cardshaven.png" width="120" height="120" alt="Carders Haven Logo" style="border-radius: 50%; margin-top: 10px;">
-    </div>
-    <div style="text-align: center; margin-bottom: 20px;">
         <p style="font-size: 16px;">
-            <a href="https://t.me/stardyl" style="color: #007BFF; text-decoration: none;"><strong>Contact Us on Telegram</strong></a>
+            <strong>Contact Us:</strong> <a href="mailto:cardershaven@proton.me" style="color: #007BFF; text-decoration: none;">cardershaven@proton.me</a>
         </p>
         <p style="font-size: 14px; color: #777;">Thank you for your support!</p>
     </div>
