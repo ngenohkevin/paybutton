@@ -345,7 +345,14 @@ func GenerateProductFilename(productName string) string {
 		// Remove spaces and format the filename
 		productType = strings.Replace(productType, " ", "", -1)
 
-		filename := fmt.Sprintf("%s%sLog.rpsx", amount, productType)
+		// Check if productType already ends with "log" to avoid duplication
+		var filename string
+		productTypeLower := strings.ToLower(productType)
+		if strings.HasSuffix(productTypeLower, "log") {
+			filename = fmt.Sprintf("%s%s.rpsx", amount, productType)
+		} else {
+			filename = fmt.Sprintf("%s%sLog.rpsx", amount, productType)
+		}
 		log.Printf("Generated filename with dollar amount: %s", filename)
 		return filename
 	}
@@ -353,7 +360,15 @@ func GenerateProductFilename(productName string) string {
 	// Handle other products
 	// Default case: just use the product name without spaces
 	cleanName := strings.Replace(productName, " ", "", -1)
-	filename := fmt.Sprintf("%sLog.rpsx", cleanName)
+
+	// Check if cleanName already ends with "log" to avoid duplication
+	var filename string
+	cleanNameLower := strings.ToLower(cleanName)
+	if strings.HasSuffix(cleanNameLower, "log") {
+		filename = fmt.Sprintf("%s.rpsx", cleanName)
+	} else {
+		filename = fmt.Sprintf("%sLog.rpsx", cleanName)
+	}
 	log.Printf("Generated generic filename: %s", filename)
 	return filename
 }
