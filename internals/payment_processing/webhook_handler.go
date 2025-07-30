@@ -86,8 +86,8 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 	balanceUSD := btcAmount * rate
 	balanceUSDRounded := database.RoundToTwoDecimalPlaces(balanceUSD)
 
-	// Send instant WebSocket notification
-	BroadcastBalanceUpdate(payload.Address, "confirmed", balanceUSDRounded, btcAmount, email)
+	// Send instant WebSocket and SSE notification
+	BroadcastBalanceUpdateAll(payload.Address, "confirmed", balanceUSDRounded, btcAmount, email)
 
 	// Send Telegram notification
 	confirmationTime := getCurrentTimestamp()
@@ -110,17 +110,20 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 		userName = "User" // Set default name
 	}
 
-	// Try to update balance if possible
-	err = database.UpdateUserBalance(email, balanceUSDRounded)
-	if err != nil {
-		log.Printf("Could not update balance for email %s: %s", email, err)
-	} else {
-		log.Printf("✅ Balance updated via webhook for user %s", email)
+	// Extract product information first
+	productName := ""
+	site := ""
+	mutex.Lock()
+	session := userSessions[email]
+	if session != nil && len(session.PaymentInfo) > 0 {
+		latestPayment := session.PaymentInfo[len(session.PaymentInfo)-1]
+		productName = latestPayment.Description
+		site = latestPayment.Site
 	}
+	mutex.Unlock()
 
 	// Mark address as used and clean up tracking
 	mutex.Lock()
-	session := userSessions[email]
 	if session != nil {
 		session.UsedAddresses[payload.Address] = true
 		if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
@@ -130,36 +133,45 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 	delete(checkingAddresses, payload.Address) // Stop polling since webhook received
 	mutex.Unlock()
 
-	// Extract product information for automatic delivery
-	productName := ""
-	site := ""
-	mutex.Lock()
-	if session != nil && len(session.PaymentInfo) > 0 {
-		latestPayment := session.PaymentInfo[len(session.PaymentInfo)-1]
-		productName = latestPayment.Description
-		site = latestPayment.Site
-	}
-	mutex.Unlock()
-
-	// Handle automatic product delivery
-	if productName != "" {
-		log.Printf("🚀 Attempting instant webhook delivery for %s: %s (site: %s)", email, productName, site)
-		err = HandleAutomaticDelivery(email, userName, productName, site, bot)
-		if err != nil {
-			log.Printf("Error in webhook product delivery: %s", err)
+	// Site-based conditional logic (same as balance_ops.go)
+	if site == "Dwebstore" || site == "dwebstore" {
+		// DWEBSTORE: Product delivery flow
+		log.Printf("🚀 Webhook: Dwebstore payment detected - processing product delivery for %s: %s", email, productName)
+		
+		if productName != "" {
+			err = HandleAutomaticDelivery(email, userName, productName, site, bot)
+			if err != nil {
+				log.Printf("Error in webhook product delivery: %s", err)
+			} else {
+				log.Printf("✅ Instant webhook product delivery successful for %s", email)
+			}
 		} else {
-			log.Printf("✅ Instant webhook product delivery successful for %s", email)
+			log.Printf("Skipping webhook product delivery for %s as product not found in session", email)
 		}
-	}
 
-	// Send balance confirmation email
-	if userName != "User" {
-		log.Println("📧 Sending webhook confirmation email to user:", email)
-		err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSDRounded))
+	} else {
+		// CARDERSHAVEN or other sites: Balance update flow
+		log.Printf("🚀 Webhook: Cardershaven/other payment detected - processing balance update for %s", email)
+		
+		// Update database balance
+		err = database.UpdateUserBalance(email, balanceUSDRounded)
 		if err != nil {
-			log.Printf("Error sending webhook email to user %s: %s", email, err)
+			log.Printf("Could not update balance for email %s: %s", email, err)
 		} else {
-			log.Println("✅ Webhook confirmation email sent successfully to user:", email)
+			log.Printf("✅ Balance updated via webhook for user %s", email)
+		}
+
+		// Send balance confirmation email
+		if userName != "User" {
+			log.Println("📧 Sending webhook confirmation email to user:", email)
+			err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSDRounded))
+			if err != nil {
+				log.Printf("Error sending webhook email to user %s: %s", email, err)
+			} else {
+				log.Println("✅ Webhook confirmation email sent successfully to user:", email)
+			}
+		} else {
+			log.Printf("Skipping webhook email send for %s as user not found in database", email)
 		}
 	}
 

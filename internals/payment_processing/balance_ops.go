@@ -243,8 +243,8 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				// Calculate BTC amount for WebSocket notification
 				btcAmount := float64(satoshis) / 100000000 // Convert satoshis back to BTC
 
-				// Send WebSocket notification immediately
-				BroadcastBalanceUpdate(address, "confirmed", balanceUSD, btcAmount, email)
+				// Send WebSocket and SSE notification immediately
+				BroadcastBalanceUpdateAll(address, "confirmed", balanceUSD, btcAmount, email)
 
 				// Try to get username from the database, but don't fail if not found
 				var userName string
@@ -254,41 +254,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					userName = "User" // Set default name
 				}
 
-				// Try to update balance if possible, but don't block on failure
-				err = database.UpdateUserBalance(email, balanceUSD)
-				if err != nil {
-					log.Printf("Could not update balance for email %s (may not exist in database): %s", email, err)
-				} else {
-					log.Printf("Balance updated successfully for user %s", email)
-				}
-
-				// Mark address as used
-				mutex.Lock()
-				session := userSessions[email]
-				if session != nil {
-					session.UsedAddresses[address] = true
-					if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
-						session.ExtendedAddressAllowed = true
-					}
-				} else {
-					log.Printf("Warning: User session for %s not found when marking address %s as used", email, address)
-				}
-				delete(checkingAddresses, address)
-				mutex.Unlock()
-
-				confirmationTime := time.Now().Format(time.RFC3339)
-				botLogMessage := fmt.Sprintf(
-					"*Email:* `%s`\n*New Balance Added (%s):* `%s USD`\n*Confirmation Time:* `%s`",
-					email, currencyType, fmt.Sprintf("%.2f", balanceUSD), confirmationTime)
-
-				msg := tgbotapi.NewMessage(chatID, botLogMessage)
-				msg.ParseMode = tgbotapi.ModeMarkdown
-				_, err = bot.Send(msg)
-				if err != nil {
-					log.Printf("Error sending confirmation message to bot: %s", err)
-				}
-
-				// Extract product information from the session data
+				// Extract site information from the session data first
 				productName := ""
 				site := ""
 				mutex.Lock()
@@ -301,31 +267,85 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				}
 				mutex.Unlock()
 
-				// If we have a product name, proceed with delivery
-				if productName != "" {
-					log.Printf("Attempting automatic product delivery for %s: %s (site: %s)", email, productName, site)
-					// Use the proper function to handle delivery
-					err = HandleAutomaticDelivery(email, userName, productName, site, bot)
-					if err != nil {
-						log.Printf("Error in automatic product delivery: %s", err)
-					} else {
-						log.Printf("Automatic product delivery successful for %s", email)
+				// Mark address as used
+				mutex.Lock()
+				if session != nil {
+					session.UsedAddresses[address] = true
+					if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
+						session.ExtendedAddressAllowed = true
 					}
 				} else {
-					log.Printf("Skipping product delivery for %s as product not found in session", email)
+					log.Printf("Warning: User session for %s not found when marking address %s as used", email, address)
 				}
+				delete(checkingAddresses, address)
+				mutex.Unlock()
 
-				// Send balance confirmation email
-				if userName != "User" {
-					log.Println("Sending confirmation email to user:", email)
-					err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSD))
-					if err != nil {
-						log.Printf("Error sending email to user %s: %s", email, err)
+				confirmationTime := time.Now().Format(time.RFC3339)
+				
+				// Site-based conditional logic
+				if site == "Dwebstore" || site == "dwebstore" {
+					// DWEBSTORE: Product delivery flow
+					log.Printf("Dwebstore payment detected - processing product delivery for %s: %s", email, productName)
+					
+					if productName != "" {
+						err = HandleAutomaticDelivery(email, userName, productName, site, bot)
+						if err != nil {
+							log.Printf("Error in automatic product delivery: %s", err)
+						} else {
+							log.Printf("Automatic product delivery successful for %s", email)
+						}
 					} else {
-						log.Println("Confirmation email sent successfully to user:", email)
+						log.Printf("Skipping product delivery for %s as product not found in session", email)
 					}
+
+					// Telegram notification for product delivery
+					botLogMessage := fmt.Sprintf(
+						"*Email:* `%s`\n*Product Delivered (%s):* `%s`\n*Amount:* `%s USD`\n*Site:* `%s`\n*Confirmation Time:* `%s`",
+						email, currencyType, productName, fmt.Sprintf("%.2f", balanceUSD), site, confirmationTime)
+					
+					msg := tgbotapi.NewMessage(chatID, botLogMessage)
+					msg.ParseMode = tgbotapi.ModeMarkdown
+					_, err = bot.Send(msg)
+					if err != nil {
+						log.Printf("Error sending product delivery confirmation to bot: %s", err)
+					}
+
 				} else {
-					log.Printf("Skipping email send for %s as user not found in database", email)
+					// CARDERSHAVEN or other sites: Balance update flow
+					log.Printf("Cardershaven/other payment detected - processing balance update for %s", email)
+					
+					// Update database balance
+					err = database.UpdateUserBalance(email, balanceUSD)
+					if err != nil {
+						log.Printf("Could not update balance for email %s (may not exist in database): %s", email, err)
+					} else {
+						log.Printf("Balance updated successfully for user %s", email)
+					}
+
+					// Send balance confirmation email
+					if userName != "User" {
+						log.Println("Sending confirmation email to user:", email)
+						err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSD))
+						if err != nil {
+							log.Printf("Error sending email to user %s: %s", email, err)
+						} else {
+							log.Println("Confirmation email sent successfully to user:", email)
+						}
+					} else {
+						log.Printf("Skipping email send for %s as user not found in database", email)
+					}
+
+					// Telegram notification for balance update
+					botLogMessage := fmt.Sprintf(
+						"*Email:* `%s`\n*New Balance Added (%s):* `%s USD`\n*Site:* `%s`\n*Confirmation Time:* `%s`",
+						email, currencyType, fmt.Sprintf("%.2f", balanceUSD), site, confirmationTime)
+					
+					msg := tgbotapi.NewMessage(chatID, botLogMessage)
+					msg.ParseMode = tgbotapi.ModeMarkdown
+					_, err = bot.Send(msg)
+					if err != nil {
+						log.Printf("Error sending balance confirmation to bot: %s", err)
+					}
 				}
 
 				return

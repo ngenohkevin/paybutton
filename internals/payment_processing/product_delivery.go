@@ -3,6 +3,7 @@ package payment_processing
 import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/ngenohkevin/paybutton/internals/database"
 	"github.com/ngenohkevin/paybutton/utils"
 	"log"
 	"strings"
@@ -118,19 +119,43 @@ func HandleManualProductDelivery(email, userName, productName string, bot *tgbot
 	return nil
 }
 
-// HandleManualBalanceEmailDelivery sends a balance confirmation email manually for USDT payments
+// HandleManualBalanceEmailDelivery sends a balance confirmation email manually and updates database balance
 func HandleManualBalanceEmailDelivery(email, userName, amountStr string, bot *tgbotapi.BotAPI, chatID int64) error {
 	log.Printf("Handling manual balance email request for %s: $%s", email, amountStr)
 
+	// Parse amount to float for database update
+	amountFloat, err := utils.ParseFloat(amountStr)
+	if err != nil {
+		log.Printf("Error parsing amount %s: %s", amountStr, err)
+		if bot != nil {
+			failMsg := tgbotapi.NewMessage(chatID,
+				fmt.Sprintf("❌ *Invalid Amount*\n\n*Email:* `%s`\n*Amount:* `$%s`\n*Error:* `Invalid amount format`",
+					email, amountStr))
+			failMsg.ParseMode = tgbotapi.ModeMarkdown
+			_, _ = bot.Send(failMsg)
+		}
+		return fmt.Errorf("invalid amount format: %w", err)
+	}
+
+	// Update database balance first
+	balanceUSD := database.RoundToTwoDecimalPlaces(amountFloat)
+	err = database.UpdateUserBalance(email, balanceUSD)
+	if err != nil {
+		log.Printf("Could not update balance for email %s (may not exist in database): %s", email, err)
+		// Continue with email sending even if database update fails
+	} else {
+		log.Printf("Manual balance updated successfully for user %s: $%.2f", email, balanceUSD)
+	}
+
 	// Send the balance confirmation email
-	err := utils.SendEmail(email, userName, amountStr)
+	err = utils.SendEmail(email, userName, amountStr)
 	if err != nil {
 		log.Printf("Error in manual balance email delivery: %s", err)
 
 		// Notify the bot of failure
 		if bot != nil {
 			failMsg := tgbotapi.NewMessage(chatID,
-				fmt.Sprintf("❌ *Balance Email Failed*\n\n*Email:* `%s`\n*Amount:* `$%s`\n*Error:* `%s`",
+				fmt.Sprintf("❌ *Balance Email Failed*\n\n*Email:* `%s`\n*Amount:* `$%s`\n*Database:* `Updated`\n*Error:* `%s`",
 					email, amountStr, err.Error()))
 			failMsg.ParseMode = tgbotapi.ModeMarkdown
 			_, _ = bot.Send(failMsg)
@@ -142,13 +167,13 @@ func HandleManualBalanceEmailDelivery(email, userName, amountStr string, bot *tg
 	// Notify the bot of success
 	if bot != nil {
 		successMsg := tgbotapi.NewMessage(chatID,
-			fmt.Sprintf("✅ *Balance Email Sent*\n\n*Email:* `%s`\n*Amount:* `$%s`\n*Status:* `Delivered`",
+			fmt.Sprintf("✅ *Manual Balance Added*\n\n*Email:* `%s`\n*Amount:* `$%s`\n*Database:* `Updated`\n*Email:* `Sent`\n*Status:* `Complete`",
 				email, amountStr))
 		successMsg.ParseMode = tgbotapi.ModeMarkdown
 		_, _ = bot.Send(successMsg)
 	}
 
-	log.Printf("Manual balance email delivery successful for %s", email)
+	log.Printf("Manual balance email delivery and database update successful for %s", email)
 	return nil
 }
 
