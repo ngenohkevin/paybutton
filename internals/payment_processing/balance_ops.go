@@ -362,18 +362,62 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 }
 
 func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) {
-	balance, err := payments2.GetBitcoinAddressBalanceWithBlockChain(address)
-	if err != nil {
-		log.Printf("Error with Blockchain, trying Blockonomics: %s", err)
-		balance, err = payments2.GetBitcoinAddressBalanceWithBlockonomics(address)
-		if err != nil {
-			log.Printf("Error with Blockonomics, trying BlockCypher: %s", err)
-			balance, err = payments2.GetBitcoinAddressBalanceWithBlockCypher(address, token)
-		}
-		if err != nil {
-			log.Printf("Error with BlockCypher, using static address: %s", err)
-			balance, err = payments2.GetBitcoinAddressBalanceWithBlockChain(staticBTCAddress)
-		}
+	// Check cache first
+	cache := payments2.GetBalanceCache()
+	if cachedBalance, found := cache.Get(address); found {
+		log.Printf("Using cached balance for address %s: %d satoshis", address, cachedBalance)
+		return cachedBalance, nil
 	}
-	return balance, err
+
+	circuitManager := payments2.GetCircuitBreakerManager()
+	
+	// Try providers in order with circuit breaker protection
+	// Ordered by speed: fastest first for optimal detection time
+	providers := []struct {
+		name string
+		call func() (int64, error)
+	}{
+		{"mempoolspace", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithMempoolSpace(address) }},    // Fastest - optimized for real-time
+		{"blockstream", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockStream(address) }},     // Very fast - Blockstream's infrastructure
+		{"trezor", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithTrezor(address) }},               // Fast BlockBook API
+		{"blockchain", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockChain(address) }},       // Original, decent speed
+		{"blockcypher", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockCypher(address, token) }}, // Fast but rate limited
+		{"blockonomics", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockonomics(address) }},   // Slower, more restricted
+	}
+
+	var lastErr error
+	
+	for _, provider := range providers {
+		// Check circuit breaker
+		if err := circuitManager.CanCall(provider.name); err != nil {
+			log.Printf("Circuit breaker prevents call to %s: %s", provider.name, err)
+			lastErr = err
+			continue
+		}
+
+		// Make the API call
+		balance, err := provider.call()
+		if err != nil {
+			log.Printf("Error with %s: %s", provider.name, err)
+			circuitManager.OnFailure(provider.name)
+			lastErr = err
+			continue
+		}
+
+		// Success - record it, cache it, and return
+		circuitManager.OnSuccess(provider.name)
+		cache.Set(address, balance)
+		log.Printf("Successfully fetched balance from %s and cached for address %s: %d satoshis", provider.name, address, balance)
+		return balance, nil
+	}
+
+	// All providers failed, try static address as last resort
+	log.Printf("All providers failed, using static address as fallback")
+	balance, err := payments2.GetBitcoinAddressBalanceWithBlockChain(staticBTCAddress)
+	if err != nil {
+		log.Printf("Error with static address fallback: %s", err)
+		return 0, fmt.Errorf("all blockchain providers failed, last error: %v", lastErr)
+	}
+	
+	return balance, nil
 }
