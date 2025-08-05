@@ -360,16 +360,13 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		if err != nil {
 			if len(session.GeneratedAddresses) < addressLimit || session.ExtendedAddressAllowed {
 				address, err = payments2.GenerateBitcoinAddress(req.Email, priceUSD)
-				if err != nil {
-					mutex.Unlock()
-					c.JSON(http.StatusInternalServerError, gin.H{
-						"message": "Error generating Bitcoin address",
-						"error":   err.Error(),
-					})
-					return
+				if err != nil || address == "" {
+					log.Printf("Error generating Bitcoin address, attempting fallback to static address: %s", err)
+					address = staticBTCAddress
+				} else {
+					session.GeneratedAddresses[address] = time.Now()
+					log.Printf("Generated new BTC address: %s for email: %s (FAST MODE)", address, req.Email)
 				}
-				session.GeneratedAddresses[address] = time.Now()
-				log.Printf("Generated new BTC address: %s for email: %s (FAST MODE)", address, req.Email)
 				if !checkingAddresses[address] {
 					checkingAddresses[address] = true
 					go CheckBalanceFast(address, req.Email, blockCypherToken, bot)
