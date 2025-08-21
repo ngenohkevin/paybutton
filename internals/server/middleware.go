@@ -74,15 +74,20 @@ func (s *Server) rateLimitMiddleware() gin.HandlerFunc {
 // websocketLimitMiddleware limits WebSocket connections per IP
 func (s *Server) websocketLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Only apply to WebSocket endpoints
-		if c.Request.URL.Path[:4] != "/ws/" && c.Request.URL.Path[:8] != "/events/" {
+		path := c.Request.URL.Path
+		
+		// Only apply to WebSocket endpoints - check path length first
+		isWebSocket := len(path) >= 4 && path[:4] == "/ws/"
+		isSSE := len(path) >= 8 && path[:8] == "/events/"
+		
+		if !isWebSocket && !isSSE {
 			c.Next()
 			return
 		}
 
 		ip := c.ClientIP()
 
-		if c.Request.URL.Path[:4] == "/ws/" {
+		if isWebSocket {
 			wsMu.RLock()
 			count := wsConnections[ip]
 			wsMu.RUnlock()
@@ -96,7 +101,7 @@ func (s *Server) websocketLimitMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		if c.Request.URL.Path[:8] == "/events/" {
+		if isSSE {
 			sseMu.RLock()
 			count := sseConnections[ip]
 			sseMu.RUnlock()
