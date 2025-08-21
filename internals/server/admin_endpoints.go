@@ -14,6 +14,7 @@ import (
 	"github.com/ngenohkevin/paybutton/internals/config"
 	"github.com/ngenohkevin/paybutton/internals/monitoring"
 	"github.com/ngenohkevin/paybutton/internals/payment_processing"
+	"github.com/ngenohkevin/paybutton/utils"
 )
 
 // Global admin auth instance for template access
@@ -2403,6 +2404,13 @@ func getSessionStats(c *gin.Context) {
 	sessionStoreMutex.RLock()
 	defer sessionStoreMutex.RUnlock()
 
+	// Get current BTC to USD rate
+	rate, err := utils.GetBlockonomicsRate()
+	if err != nil {
+		log.Printf("Error fetching BTC rate for admin stats: %s", err)
+		rate = 0 // Default to 0 if rate fetch fails
+	}
+
 	// Active session stats
 	activeCount := len(activeSessionsStore)
 	webSocketCount := 0
@@ -2412,7 +2420,9 @@ func getSessionStats(c *gin.Context) {
 		if session.IsWebSocket {
 			webSocketCount++
 		}
-		activeAmountTotal += session.Amount
+		// Convert BTC amount to USD
+		amountUSD := session.Amount * rate
+		activeAmountTotal += amountUSD
 	}
 
 	// Historical stats
@@ -2431,7 +2441,9 @@ func getSessionStats(c *gin.Context) {
 		case "terminated":
 			terminatedCount++
 		}
-		historicalAmountTotal += session.Amount
+		// Convert BTC amount to USD
+		amountUSD := session.Amount * rate
+		historicalAmountTotal += amountUSD
 	}
 
 	// Success rate calculation

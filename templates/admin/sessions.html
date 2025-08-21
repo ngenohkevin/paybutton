@@ -78,7 +78,7 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Amount</p>
-                        <p class="text-lg font-bold text-gray-900 dark:text-white" id="total-amount">0 BTC</p>
+                        <p class="text-lg font-bold text-gray-900 dark:text-white" id="total-amount">$0</p>
                     </div>
                 </div>
             </div>
@@ -474,7 +474,7 @@ function loadSessionStats() {
             document.getElementById('active-count').textContent = data.active_sessions.count;
             document.getElementById('websocket-count').textContent = data.active_sessions.websocket_count;
             document.getElementById('success-rate').textContent = data.metrics.success_rate.toFixed(1) + '%';
-            document.getElementById('total-amount').textContent = data.active_sessions.total_amount.toFixed(8) + ' BTC';
+            document.getElementById('total-amount').textContent = '$' + data.active_sessions.total_amount.toFixed(2);
             
             // Update badges
             document.getElementById('active-badge').textContent = data.active_sessions.count;
