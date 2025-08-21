@@ -30,18 +30,18 @@ const (
 
 // Alert represents a system alert
 type Alert struct {
-	ID          string        `json:"id"`
-	Title       string        `json:"title"`
-	Message     string        `json:"message"`
-	Severity    AlertSeverity `json:"severity"`
-	Status      AlertStatus   `json:"status"`
-	Component   string        `json:"component"`
-	CreatedAt   time.Time     `json:"created_at"`
-	UpdatedAt   time.Time     `json:"updated_at"`
-	ResolvedAt  *time.Time    `json:"resolved_at,omitempty"`
-	AckedBy     string        `json:"acked_by,omitempty"`
-	AckedAt     *time.Time    `json:"acked_at,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	ID         string                 `json:"id"`
+	Title      string                 `json:"title"`
+	Message    string                 `json:"message"`
+	Severity   AlertSeverity          `json:"severity"`
+	Status     AlertStatus            `json:"status"`
+	Component  string                 `json:"component"`
+	CreatedAt  time.Time              `json:"created_at"`
+	UpdatedAt  time.Time              `json:"updated_at"`
+	ResolvedAt *time.Time             `json:"resolved_at,omitempty"`
+	AckedBy    string                 `json:"acked_by,omitempty"`
+	AckedAt    *time.Time             `json:"acked_at,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // AlertRule defines when to trigger an alert
@@ -98,16 +98,16 @@ func NewAlertManager() *AlertManager {
 		lastMetrics:         make(map[string]float64),
 		ruleViolationCounts: make(map[string]int),
 	}
-	
+
 	// Initialize default rules
 	am.initializeDefaultRules()
-	
+
 	// Initialize default notification channels
 	am.initializeDefaultChannels()
-	
+
 	// Start evaluation ticker
 	am.startEvaluation()
-	
+
 	return am
 }
 
@@ -185,7 +185,7 @@ func (am *AlertManager) initializeDefaultRules() {
 			UpdatedAt:   time.Now(),
 		},
 	}
-	
+
 	for _, rule := range defaultRules {
 		am.rules[rule.ID] = rule
 	}
@@ -227,7 +227,7 @@ func (am *AlertManager) initializeDefaultChannels() {
 			Enabled: false,
 		},
 	}
-	
+
 	for _, channel := range defaultChannels {
 		am.channels[channel.ID] = channel
 	}
@@ -247,7 +247,7 @@ func (am *AlertManager) startEvaluation() {
 func (am *AlertManager) TriggerAlert(title, message, component string, severity AlertSeverity, metadata map[string]interface{}) string {
 	am.mu.Lock()
 	defer am.mu.Unlock()
-	
+
 	alertID := fmt.Sprintf("alert_%d", time.Now().UnixNano())
 	alert := &Alert{
 		ID:        alertID,
@@ -260,13 +260,13 @@ func (am *AlertManager) TriggerAlert(title, message, component string, severity 
 		UpdatedAt: time.Now(),
 		Metadata:  metadata,
 	}
-	
+
 	am.alerts[alertID] = alert
 	am.addToHistory(alert)
-	
+
 	// Send notifications
 	go am.sendNotifications(alert)
-	
+
 	return alertID
 }
 
@@ -274,22 +274,22 @@ func (am *AlertManager) TriggerAlert(title, message, component string, severity 
 func (am *AlertManager) AcknowledgeAlert(alertID, ackedBy string) error {
 	am.mu.Lock()
 	defer am.mu.Unlock()
-	
+
 	alert, exists := am.alerts[alertID]
 	if !exists {
 		return fmt.Errorf("alert not found: %s", alertID)
 	}
-	
+
 	if alert.Status == StatusResolved {
 		return fmt.Errorf("cannot acknowledge resolved alert")
 	}
-	
+
 	now := time.Now()
 	alert.Status = StatusAcknowledged
 	alert.AckedBy = ackedBy
 	alert.AckedAt = &now
 	alert.UpdatedAt = now
-	
+
 	return nil
 }
 
@@ -297,20 +297,20 @@ func (am *AlertManager) AcknowledgeAlert(alertID, ackedBy string) error {
 func (am *AlertManager) ResolveAlert(alertID string) error {
 	am.mu.Lock()
 	defer am.mu.Unlock()
-	
+
 	alert, exists := am.alerts[alertID]
 	if !exists {
 		return fmt.Errorf("alert not found: %s", alertID)
 	}
-	
+
 	now := time.Now()
 	alert.Status = StatusResolved
 	alert.ResolvedAt = &now
 	alert.UpdatedAt = now
-	
+
 	// Remove from active alerts
 	delete(am.alerts, alertID)
-	
+
 	return nil
 }
 
@@ -318,12 +318,12 @@ func (am *AlertManager) ResolveAlert(alertID string) error {
 func (am *AlertManager) GetActiveAlerts() []*Alert {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
-	
+
 	alerts := make([]*Alert, 0, len(am.alerts))
 	for _, alert := range am.alerts {
 		alerts = append(alerts, alert)
 	}
-	
+
 	return alerts
 }
 
@@ -331,17 +331,17 @@ func (am *AlertManager) GetActiveAlerts() []*Alert {
 func (am *AlertManager) GetAlertHistory(limit int) []*Alert {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
-	
+
 	if limit <= 0 || limit > len(am.alertHistory) {
 		limit = len(am.alertHistory)
 	}
-	
+
 	// Return most recent alerts first
 	result := make([]*Alert, limit)
 	for i := 0; i < limit; i++ {
 		result[i] = am.alertHistory[len(am.alertHistory)-1-i]
 	}
-	
+
 	return result
 }
 
@@ -349,12 +349,12 @@ func (am *AlertManager) GetAlertHistory(limit int) []*Alert {
 func (am *AlertManager) GetRules() []*AlertRule {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
-	
+
 	rules := make([]*AlertRule, 0, len(am.rules))
 	for _, rule := range am.rules {
 		rules = append(rules, rule)
 	}
-	
+
 	return rules
 }
 
@@ -362,12 +362,12 @@ func (am *AlertManager) GetRules() []*AlertRule {
 func (am *AlertManager) GetChannels() []*NotificationChannel {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
-	
+
 	channels := make([]*NotificationChannel, 0, len(am.channels))
 	for _, channel := range am.channels {
 		channels = append(channels, channel)
 	}
-	
+
 	return channels
 }
 
@@ -375,10 +375,10 @@ func (am *AlertManager) GetChannels() []*NotificationChannel {
 func (am *AlertManager) UpdateRule(rule *AlertRule) error {
 	am.mu.Lock()
 	defer am.mu.Unlock()
-	
+
 	rule.UpdatedAt = time.Now()
 	am.rules[rule.ID] = rule
-	
+
 	return nil
 }
 
@@ -386,9 +386,9 @@ func (am *AlertManager) UpdateRule(rule *AlertRule) error {
 func (am *AlertManager) UpdateChannel(channel *NotificationChannel) error {
 	am.mu.Lock()
 	defer am.mu.Unlock()
-	
+
 	am.channels[channel.ID] = channel
-	
+
 	return nil
 }
 
@@ -397,11 +397,11 @@ func (am *AlertManager) TestChannel(channelID string) error {
 	am.mu.RLock()
 	channel, exists := am.channels[channelID]
 	am.mu.RUnlock()
-	
+
 	if !exists {
 		return fmt.Errorf("channel not found: %s", channelID)
 	}
-	
+
 	testAlert := &Alert{
 		ID:        "test_alert",
 		Title:     "Test Alert",
@@ -412,7 +412,7 @@ func (am *AlertManager) TestChannel(channelID string) error {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	
+
 	return am.sendToChannel(testAlert, channel)
 }
 
@@ -420,37 +420,37 @@ func (am *AlertManager) TestChannel(channelID string) error {
 func (am *AlertManager) GetStats() map[string]interface{} {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
-	
+
 	activeByStatus := make(map[string]int)
 	activeBySeverity := make(map[string]int)
-	
+
 	for _, alert := range am.alerts {
 		activeByStatus[string(alert.Status)]++
 		activeBySeverity[string(alert.Severity)]++
 	}
-	
+
 	enabledRules := 0
 	for _, rule := range am.rules {
 		if rule.Enabled {
 			enabledRules++
 		}
 	}
-	
+
 	enabledChannels := 0
 	for _, channel := range am.channels {
 		if channel.Enabled {
 			enabledChannels++
 		}
 	}
-	
+
 	return map[string]interface{}{
-		"active_alerts":     len(am.alerts),
-		"total_rules":       len(am.rules),
-		"enabled_rules":     enabledRules,
-		"enabled_channels":  enabledChannels,
-		"alerts_by_status":  activeByStatus,
+		"active_alerts":      len(am.alerts),
+		"total_rules":        len(am.rules),
+		"enabled_rules":      enabledRules,
+		"enabled_channels":   enabledChannels,
+		"alerts_by_status":   activeByStatus,
 		"alerts_by_severity": activeBySeverity,
-		"history_size":      len(am.alertHistory),
+		"history_size":       len(am.alertHistory),
 	}
 }
 
@@ -458,7 +458,7 @@ func (am *AlertManager) GetStats() map[string]interface{} {
 func (am *AlertManager) evaluateRules() {
 	// This would be called periodically to check metrics against rules
 	// For now, we'll implement basic checks
-	
+
 	// Note: In a real implementation, you'd get actual metrics from your monitoring system
 	// For this example, we'll use placeholder logic
 }
@@ -466,7 +466,7 @@ func (am *AlertManager) evaluateRules() {
 // addToHistory adds an alert to the history
 func (am *AlertManager) addToHistory(alert *Alert) {
 	am.alertHistory = append(am.alertHistory, alert)
-	
+
 	// Trim history if it gets too large
 	if len(am.alertHistory) > am.maxHistorySize {
 		am.alertHistory = am.alertHistory[len(am.alertHistory)-am.maxHistorySize:]
@@ -483,7 +483,7 @@ func (am *AlertManager) sendNotifications(alert *Alert) {
 		}
 	}
 	am.mu.RUnlock()
-	
+
 	for _, channel := range channels {
 		if err := am.sendToChannel(alert, channel); err != nil {
 			log.Printf("Failed to send alert to channel %s: %v", channel.Name, err)
@@ -517,43 +517,43 @@ func (am *AlertManager) sendToWebhook(alert *Alert, channel *NotificationChannel
 	if !ok || url == "" {
 		return fmt.Errorf("webhook URL not configured")
 	}
-	
+
 	payload := map[string]interface{}{
 		"alert":     alert,
 		"timestamp": time.Now().Unix(),
 		"source":    "paybutton-admin",
 	}
-	
+
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal webhook payload: %v", err)
 	}
-	
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create webhook request: %v", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Add custom headers if configured
 	if headers, ok := channel.Config["headers"].(map[string]string); ok {
 		for key, value := range headers {
 			req.Header.Set(key, value)
 		}
 	}
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send webhook: %v", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("webhook returned status %d", resp.StatusCode)
 	}
-	
+
 	return nil
 }
 

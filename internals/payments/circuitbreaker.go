@@ -46,12 +46,12 @@ func GetCircuitBreakerManager() *CircuitBreakerManager {
 		}
 
 		// Initialize circuit breakers for each provider
-		globalCircuitManager.AddProvider("blockchain", 5, 2*time.Minute)      // Allow 5 failures, reset after 2 minutes
-		globalCircuitManager.AddProvider("blockonomics", 3, 3*time.Minute)   // Allow 3 failures, reset after 3 minutes  
-		globalCircuitManager.AddProvider("blockcypher", 5, 5*time.Minute)    // Allow 5 failures, reset after 5 minutes
-		globalCircuitManager.AddProvider("blockstream", 4, 1*time.Minute)    // Allow 4 failures, reset after 1 minute (reliable)
-		globalCircuitManager.AddProvider("mempoolspace", 4, 1*time.Minute)   // Allow 4 failures, reset after 1 minute (reliable)
-		globalCircuitManager.AddProvider("trezor", 3, 2*time.Minute)         // Allow 3 failures, reset after 2 minutes
+		globalCircuitManager.AddProvider("blockchain", 5, 2*time.Minute)   // Allow 5 failures, reset after 2 minutes
+		globalCircuitManager.AddProvider("blockonomics", 3, 3*time.Minute) // Allow 3 failures, reset after 3 minutes
+		globalCircuitManager.AddProvider("blockcypher", 5, 5*time.Minute)  // Allow 5 failures, reset after 5 minutes
+		globalCircuitManager.AddProvider("blockstream", 4, 1*time.Minute)  // Allow 4 failures, reset after 1 minute (reliable)
+		globalCircuitManager.AddProvider("mempoolspace", 4, 1*time.Minute) // Allow 4 failures, reset after 1 minute (reliable)
+		globalCircuitManager.AddProvider("trezor", 3, 2*time.Minute)       // Allow 3 failures, reset after 2 minutes
 	})
 	return globalCircuitManager
 }
@@ -117,7 +117,7 @@ func (cbm *CircuitBreakerManager) GetProviderState(provider string) (CircuitStat
 
 	breaker.mu.RLock()
 	defer breaker.mu.RUnlock()
-	
+
 	return breaker.state, breaker.failureCount, breaker.lastFailureTime
 }
 
@@ -135,7 +135,7 @@ func (cb *CircuitBreaker) canCall() error {
 			cb.state = StateHalfOpen
 			return nil
 		}
-		return fmt.Errorf("circuit breaker for %s is OPEN (failed %d times, last failure: %v ago)", 
+		return fmt.Errorf("circuit breaker for %s is OPEN (failed %d times, last failure: %v ago)",
 			cb.name, cb.failureCount, time.Since(cb.lastFailureTime).Round(time.Second))
 	case StateHalfOpen:
 		return nil

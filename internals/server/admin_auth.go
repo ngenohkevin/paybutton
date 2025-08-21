@@ -50,7 +50,7 @@ func NewAdminAuth() *AdminAuth {
 // loadTemplates loads all admin templates
 func (a *AdminAuth) loadTemplates() {
 	templateDir := "templates/admin"
-	
+
 	// Load login template
 	loginTmpl, err := template.ParseFiles(filepath.Join(templateDir, "login.html"))
 	if err != nil {
@@ -99,7 +99,7 @@ func (a *AdminAuth) AdminMiddleware() gin.HandlerFunc {
 		}
 
 		session, _ := a.store.Get(c.Request, "admin-session")
-		
+
 		// Check if user is authenticated
 		if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
 			c.Redirect(http.StatusFound, "/admin/login")
@@ -116,7 +116,7 @@ func (a *AdminAuth) LoginHandler(c *gin.Context) {
 	if c.Request.Method == "GET" {
 		// Show login form
 		data := gin.H{}
-		
+
 		// Check for error messages
 		session, _ := a.store.Get(c.Request, "admin-session")
 		if flashes := session.Flashes("error"); len(flashes) > 0 {
@@ -136,7 +136,7 @@ func (a *AdminAuth) LoginHandler(c *gin.Context) {
 	// Simple authentication - in production, use proper password hashing
 	adminUser := os.Getenv("ADMIN_USERNAME")
 	adminPass := os.Getenv("ADMIN_PASSWORD")
-	
+
 	// Default credentials if not set in environment
 	if adminUser == "" {
 		adminUser = "admin"
@@ -192,9 +192,9 @@ func (a *AdminAuth) DashboardHandler(c *gin.Context) {
 // GetFlashMessages retrieves and clears flash messages from session
 func (a *AdminAuth) GetFlashMessages(c *gin.Context) ([]string, []string) {
 	session, _ := a.store.Get(c.Request, "admin-session")
-	
+
 	var flash, errors []string
-	
+
 	if flashes := session.Flashes("success"); len(flashes) > 0 {
 		for _, f := range flashes {
 			if str, ok := f.(string); ok {
@@ -202,7 +202,7 @@ func (a *AdminAuth) GetFlashMessages(c *gin.Context) ([]string, []string) {
 			}
 		}
 	}
-	
+
 	if errs := session.Flashes("error"); len(errs) > 0 {
 		for _, e := range errs {
 			if str, ok := e.(string); ok {
@@ -210,7 +210,7 @@ func (a *AdminAuth) GetFlashMessages(c *gin.Context) ([]string, []string) {
 			}
 		}
 	}
-	
+
 	session.Save(c.Request, c.Writer)
 	return flash, errors
 }

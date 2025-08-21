@@ -10,12 +10,12 @@ import (
 
 // ResourceMonitor tracks and limits resource usage
 type ResourceMonitor struct {
-	mu              sync.RWMutex
+	mu               sync.RWMutex
 	activeGoroutines int
 	maxGoroutines    int
 	maxMemoryMB      int
 	cleanupInterval  time.Duration
-	stopChan        chan struct{}
+	stopChan         chan struct{}
 }
 
 var (
@@ -57,12 +57,12 @@ func (rm *ResourceMonitor) CanStartGoroutine() bool {
 func (rm *ResourceMonitor) StartGoroutine() bool {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	if rm.activeGoroutines >= rm.maxGoroutines {
 		log.Printf("Warning: Maximum goroutines limit reached (%d/%d)", rm.activeGoroutines, rm.maxGoroutines)
 		return false
 	}
-	
+
 	rm.activeGoroutines++
 	return true
 }
@@ -71,7 +71,7 @@ func (rm *ResourceMonitor) StartGoroutine() bool {
 func (rm *ResourceMonitor) EndGoroutine() {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	if rm.activeGoroutines > 0 {
 		rm.activeGoroutines--
 	}
@@ -82,12 +82,12 @@ func (rm *ResourceMonitor) RunWithLimit(fn func()) bool {
 	if !rm.StartGoroutine() {
 		return false
 	}
-	
+
 	go func() {
 		defer rm.EndGoroutine()
 		fn()
 	}()
-	
+
 	return true
 }
 
@@ -95,7 +95,7 @@ func (rm *ResourceMonitor) RunWithLimit(fn func()) bool {
 func (rm *ResourceMonitor) runCleanup() {
 	ticker := time.NewTicker(rm.cleanupInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -111,17 +111,17 @@ func (rm *ResourceMonitor) performCleanup() {
 	// Force garbage collection
 	runtime.GC()
 	runtime.Gosched()
-	
+
 	// Get memory stats
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	allocMB := m.Alloc / 1024 / 1024
 	sysMB := m.Sys / 1024 / 1024
-	
-	log.Printf("Resource Monitor - Memory: Alloc=%dMB, Sys=%dMB, Goroutines=%d/%d", 
+
+	log.Printf("Resource Monitor - Memory: Alloc=%dMB, Sys=%dMB, Goroutines=%d/%d",
 		allocMB, sysMB, runtime.NumGoroutine(), rm.maxGoroutines)
-	
+
 	// If memory usage is too high, force more aggressive GC
 	if allocMB > uint64(rm.maxMemoryMB) {
 		log.Printf("Warning: Memory usage exceeds limit (%dMB > %dMB), forcing aggressive GC", allocMB, rm.maxMemoryMB)
@@ -134,10 +134,10 @@ func (rm *ResourceMonitor) performCleanup() {
 func (rm *ResourceMonitor) GetStats() map[string]interface{} {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	return map[string]interface{}{
 		"active_goroutines": rm.activeGoroutines,
 		"max_goroutines":    rm.maxGoroutines,
@@ -145,7 +145,7 @@ func (rm *ResourceMonitor) GetStats() map[string]interface{} {
 		"memory_alloc_mb":   m.Alloc / 1024 / 1024,
 		"memory_sys_mb":     m.Sys / 1024 / 1024,
 		"memory_limit_mb":   rm.maxMemoryMB,
-		"gc_runs":          m.NumGC,
+		"gc_runs":           m.NumGC,
 	}
 }
 
@@ -158,12 +158,12 @@ func (rm *ResourceMonitor) Shutdown() {
 func WithTimeout(ctx context.Context, timeout time.Duration, fn func(context.Context) error) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	
+
 	done := make(chan error, 1)
 	go func() {
 		done <- fn(ctx)
 	}()
-	
+
 	select {
 	case err := <-done:
 		return err

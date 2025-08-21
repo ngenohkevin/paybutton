@@ -34,15 +34,15 @@ func GetRateLimiter() *APIRateLimiter {
 		globalRateLimiter = &APIRateLimiter{
 			providers: make(map[string]*ProviderLimiter),
 		}
-		
+
 		// Initialize rate limiters for each provider
 		// Fastest providers get most aggressive rate limits for speed
-		globalRateLimiter.AddProvider("mempoolspace", 60, time.Minute, 1*time.Second)  // 60 req/min, min 1s between calls (fastest)
-		globalRateLimiter.AddProvider("blockstream", 50, time.Minute, 1*time.Second)   // 50 req/min, min 1s between calls (very fast)
-		globalRateLimiter.AddProvider("trezor", 30, time.Minute, 2*time.Second)        // 30 req/min, min 2s between calls (fast)
-		globalRateLimiter.AddProvider("blockchain", 10, time.Minute, 6*time.Second)     // 10 req/min, min 6s between calls
-		globalRateLimiter.AddProvider("blockcypher", 20, time.Hour, 3*time.Minute)     // 20 req/hour, min 3m between calls
-		globalRateLimiter.AddProvider("blockonomics", 5, time.Minute, 12*time.Second)  // 5 req/min, min 12s between calls (slowest)
+		globalRateLimiter.AddProvider("mempoolspace", 60, time.Minute, 1*time.Second) // 60 req/min, min 1s between calls (fastest)
+		globalRateLimiter.AddProvider("blockstream", 50, time.Minute, 1*time.Second)  // 50 req/min, min 1s between calls (very fast)
+		globalRateLimiter.AddProvider("trezor", 30, time.Minute, 2*time.Second)       // 30 req/min, min 2s between calls (fast)
+		globalRateLimiter.AddProvider("blockchain", 10, time.Minute, 6*time.Second)   // 10 req/min, min 6s between calls
+		globalRateLimiter.AddProvider("blockcypher", 20, time.Hour, 3*time.Minute)    // 20 req/hour, min 3m between calls
+		globalRateLimiter.AddProvider("blockonomics", 5, time.Minute, 12*time.Second) // 5 req/min, min 12s between calls (slowest)
 	})
 	return globalRateLimiter
 }
@@ -91,7 +91,7 @@ func (pl *ProviderLimiter) waitForPermission(ctx context.Context) error {
 	if timeSinceLastRequest < pl.minInterval {
 		waitTime := pl.minInterval - timeSinceLastRequest
 		pl.mu.Unlock()
-		
+
 		// Wait for the minimum interval
 		select {
 		case <-ctx.Done():

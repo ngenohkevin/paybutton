@@ -15,6 +15,11 @@ var (
 )
 
 func InitDB() error {
+	// Use default configuration
+	return InitDBWithConfig(5, 10, 5*time.Minute)
+}
+
+func InitDBWithConfig(maxIdleConns, maxOpenConns int, connMaxLifetime time.Duration) error {
 
 	config, err := utils.LoadConfig()
 	if err != nil {
@@ -41,10 +46,10 @@ func InitDB() error {
 		return fmt.Errorf("error opening database connection: %w", dbErr)
 	}
 
-	// Configure connection pool
-	DB.SetMaxOpenConns(25)
-	DB.SetMaxIdleConns(5)
-	DB.SetConnMaxLifetime(5 * time.Minute)
+	// Configure connection pool with provided settings
+	DB.SetMaxOpenConns(maxOpenConns)
+	DB.SetMaxIdleConns(maxIdleConns)
+	DB.SetConnMaxLifetime(connMaxLifetime)
 	DB.SetConnMaxIdleTime(10 * time.Minute)
 
 	pingErr := DB.Ping()

@@ -19,13 +19,13 @@ type ConfigManager struct {
 
 // SystemConfig represents the complete system configuration
 type SystemConfig struct {
-	Timestamp       time.Time       `json:"timestamp"`
-	Version         string          `json:"version"`
-	AddressPool     PoolConfig      `json:"address_pool"`
-	GapMonitor      GapConfig       `json:"gap_monitor"`
-	RateLimiter     RateLimitConfig `json:"rate_limiter"`
-	WebSocket       WebSocketConfig `json:"websocket"`
-	AdminDashboard  AdminConfig     `json:"admin_dashboard"`
+	Timestamp      time.Time       `json:"timestamp"`
+	Version        string          `json:"version"`
+	AddressPool    PoolConfig      `json:"address_pool"`
+	GapMonitor     GapConfig       `json:"gap_monitor"`
+	RateLimiter    RateLimitConfig `json:"rate_limiter"`
+	WebSocket      WebSocketConfig `json:"websocket"`
+	AdminDashboard AdminConfig     `json:"admin_dashboard"`
 }
 
 // PoolConfig represents address pool configuration
@@ -39,54 +39,54 @@ type PoolConfig struct {
 
 // GapConfig represents gap monitor configuration
 type GapConfig struct {
-	MaxGapLimit       int     `json:"max_gap_limit" validate:"min=10,max=100"`
-	WarningThreshold  float64 `json:"warning_threshold" validate:"min=0,max=1"`
-	CriticalThreshold float64 `json:"critical_threshold" validate:"min=0,max=1"`
-	ConsecutiveFailThreshold int `json:"consecutive_fail_threshold" validate:"min=1,max=20"`
-	ErrorHistorySize  int     `json:"error_history_size" validate:"min=10,max=1000"`
+	MaxGapLimit              int     `json:"max_gap_limit" validate:"min=10,max=100"`
+	WarningThreshold         float64 `json:"warning_threshold" validate:"min=0,max=1"`
+	CriticalThreshold        float64 `json:"critical_threshold" validate:"min=0,max=1"`
+	ConsecutiveFailThreshold int     `json:"consecutive_fail_threshold" validate:"min=1,max=20"`
+	ErrorHistorySize         int     `json:"error_history_size" validate:"min=10,max=1000"`
 }
 
 // RateLimitConfig represents rate limiter configuration
 type RateLimitConfig struct {
-	GlobalMaxTokens    int `json:"global_max_tokens" validate:"min=50,max=1000"`
-	GlobalRefillRate   int `json:"global_refill_rate" validate:"min=1,max=100"`
-	IPMaxTokens        int `json:"ip_max_tokens" validate:"min=1,max=50"`
-	IPRefillRate       int `json:"ip_refill_rate" validate:"min=1,max=20"`
-	EmailMaxTokens     int `json:"email_max_tokens" validate:"min=1,max=20"`
-	EmailRefillRate    int `json:"email_refill_rate" validate:"min=1,max=10"`
-	CleanupInterval    int `json:"cleanup_interval_minutes" validate:"min=5,max=1440"`
+	GlobalMaxTokens  int `json:"global_max_tokens" validate:"min=50,max=1000"`
+	GlobalRefillRate int `json:"global_refill_rate" validate:"min=1,max=100"`
+	IPMaxTokens      int `json:"ip_max_tokens" validate:"min=1,max=50"`
+	IPRefillRate     int `json:"ip_refill_rate" validate:"min=1,max=20"`
+	EmailMaxTokens   int `json:"email_max_tokens" validate:"min=1,max=20"`
+	EmailRefillRate  int `json:"email_refill_rate" validate:"min=1,max=10"`
+	CleanupInterval  int `json:"cleanup_interval_minutes" validate:"min=5,max=1440"`
 }
 
 // WebSocketConfig represents WebSocket configuration
 type WebSocketConfig struct {
-	ReadBufferSize    int `json:"read_buffer_size" validate:"min=512,max=8192"`
-	WriteBufferSize   int `json:"write_buffer_size" validate:"min=512,max=8192"`
-	PingInterval      int `json:"ping_interval_seconds" validate:"min=10,max=300"`
-	PongTimeout       int `json:"pong_timeout_seconds" validate:"min=5,max=120"`
-	MaxConnections    int `json:"max_connections" validate:"min=10,max=10000"`
+	ReadBufferSize  int `json:"read_buffer_size" validate:"min=512,max=8192"`
+	WriteBufferSize int `json:"write_buffer_size" validate:"min=512,max=8192"`
+	PingInterval    int `json:"ping_interval_seconds" validate:"min=10,max=300"`
+	PongTimeout     int `json:"pong_timeout_seconds" validate:"min=5,max=120"`
+	MaxConnections  int `json:"max_connections" validate:"min=10,max=10000"`
 }
 
 // AdminConfig represents admin dashboard configuration
 type AdminConfig struct {
-	SessionTimeout     int  `json:"session_timeout_hours" validate:"min=1,max=168"`
-	RefreshInterval    int  `json:"refresh_interval_seconds" validate:"min=5,max=300"`
-	MaxLogEntries      int  `json:"max_log_entries" validate:"min=100,max=10000"`
-	EnableMetrics      bool `json:"enable_metrics"`
-	EnableAlerts       bool `json:"enable_alerts"`
-	MetricsRetention   int  `json:"metrics_retention_hours" validate:"min=1,max=8760"`
+	SessionTimeout   int  `json:"session_timeout_hours" validate:"min=1,max=168"`
+	RefreshInterval  int  `json:"refresh_interval_seconds" validate:"min=5,max=300"`
+	MaxLogEntries    int  `json:"max_log_entries" validate:"min=100,max=10000"`
+	EnableMetrics    bool `json:"enable_metrics"`
+	EnableAlerts     bool `json:"enable_alerts"`
+	MetricsRetention int  `json:"metrics_retention_hours" validate:"min=1,max=8760"`
 }
 
 // ConfigChange represents a configuration change entry
 type ConfigChange struct {
-	ID          string       `json:"id"`
-	Timestamp   time.Time    `json:"timestamp"`
-	ChangedBy   string       `json:"changed_by"`
-	Section     string       `json:"section"`
+	ID          string        `json:"id"`
+	Timestamp   time.Time     `json:"timestamp"`
+	ChangedBy   string        `json:"changed_by"`
+	Section     string        `json:"section"`
 	Changes     []FieldChange `json:"changes"`
 	PrevConfig  *SystemConfig `json:"prev_config,omitempty"`
-	Description string       `json:"description"`
-	Success     bool         `json:"success"`
-	ErrorMsg    string       `json:"error_msg,omitempty"`
+	Description string        `json:"description"`
+	Success     bool          `json:"success"`
+	ErrorMsg    string        `json:"error_msg,omitempty"`
 }
 
 // FieldChange represents a single field change
@@ -106,8 +106,8 @@ func GetConfigManager() *ConfigManager {
 	configManagerOnce.Do(func() {
 		configManager = &ConfigManager{
 			currentConfig:   getDefaultConfig(),
-			history:        []ConfigChange{},
-			maxHistorySize: 100,
+			history:         []ConfigChange{},
+			maxHistorySize:  100,
 			changeListeners: make(map[string]func(*SystemConfig)),
 		}
 		log.Printf("Configuration manager initialized with default settings")
@@ -128,11 +128,11 @@ func getDefaultConfig() *SystemConfig {
 			CleanupInterval: 60,
 		},
 		GapMonitor: GapConfig{
-			MaxGapLimit:       20,
-			WarningThreshold:  0.7,
-			CriticalThreshold: 0.9,
+			MaxGapLimit:              20,
+			WarningThreshold:         0.7,
+			CriticalThreshold:        0.9,
 			ConsecutiveFailThreshold: 5,
-			ErrorHistorySize:  100,
+			ErrorHistorySize:         100,
 		},
 		RateLimiter: RateLimitConfig{
 			GlobalMaxTokens:  500,
@@ -165,12 +165,12 @@ func getDefaultConfig() *SystemConfig {
 func (cm *ConfigManager) GetCurrentConfig() *SystemConfig {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	
+
 	// Return a deep copy to prevent external modifications
 	configJSON, _ := json.Marshal(cm.currentConfig)
 	var configCopy SystemConfig
 	json.Unmarshal(configJSON, &configCopy)
-	
+
 	return &configCopy
 }
 
@@ -178,24 +178,24 @@ func (cm *ConfigManager) GetCurrentConfig() *SystemConfig {
 func (cm *ConfigManager) UpdateConfig(newConfig *SystemConfig, changedBy, description string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	// Validate the new configuration
 	if err := cm.validateConfig(newConfig); err != nil {
 		cm.recordFailedChange(changedBy, "all", description, err)
 		return fmt.Errorf("validation failed: %w", err)
 	}
-	
+
 	// Record the change
 	changes := cm.detectChanges(cm.currentConfig, newConfig)
 	changeID := fmt.Sprintf("change_%d", time.Now().Unix())
-	
+
 	// Store previous config for rollback
 	prevConfig := cm.currentConfig
-	
+
 	// Apply the new configuration
 	newConfig.Timestamp = time.Now()
 	cm.currentConfig = newConfig
-	
+
 	// Record successful change
 	change := ConfigChange{
 		ID:          changeID,
@@ -207,12 +207,12 @@ func (cm *ConfigManager) UpdateConfig(newConfig *SystemConfig, changedBy, descri
 		Description: description,
 		Success:     true,
 	}
-	
+
 	cm.addToHistory(change)
-	
+
 	// Notify listeners
 	cm.notifyListeners()
-	
+
 	log.Printf("Configuration updated successfully by %s: %s", changedBy, description)
 	return nil
 }
@@ -221,13 +221,13 @@ func (cm *ConfigManager) UpdateConfig(newConfig *SystemConfig, changedBy, descri
 func (cm *ConfigManager) UpdateSection(section string, sectionConfig interface{}, changedBy, description string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	// Create a copy of current config
 	newConfig := cm.currentConfig
 	configJSON, _ := json.Marshal(newConfig)
 	var updatedConfig SystemConfig
 	json.Unmarshal(configJSON, &updatedConfig)
-	
+
 	// Update the specific section
 	switch section {
 	case "address_pool":
@@ -263,24 +263,24 @@ func (cm *ConfigManager) UpdateSection(section string, sectionConfig interface{}
 	default:
 		return fmt.Errorf("unknown configuration section: %s", section)
 	}
-	
+
 	// Validate the updated configuration
 	if err := cm.validateConfig(&updatedConfig); err != nil {
 		cm.recordFailedChange(changedBy, section, description, err)
 		return fmt.Errorf("validation failed: %w", err)
 	}
-	
+
 	// Record the change
 	changes := cm.detectChanges(cm.currentConfig, &updatedConfig)
 	changeID := fmt.Sprintf("change_%d", time.Now().Unix())
-	
+
 	// Store previous config for rollback
 	prevConfig := cm.currentConfig
-	
+
 	// Apply the new configuration
 	updatedConfig.Timestamp = time.Now()
 	cm.currentConfig = &updatedConfig
-	
+
 	// Record successful change
 	change := ConfigChange{
 		ID:          changeID,
@@ -292,12 +292,12 @@ func (cm *ConfigManager) UpdateSection(section string, sectionConfig interface{}
 		Description: description,
 		Success:     true,
 	}
-	
+
 	cm.addToHistory(change)
-	
+
 	// Notify listeners
 	cm.notifyListeners()
-	
+
 	log.Printf("Configuration section '%s' updated successfully by %s: %s", section, changedBy, description)
 	return nil
 }
@@ -306,7 +306,7 @@ func (cm *ConfigManager) UpdateSection(section string, sectionConfig interface{}
 func (cm *ConfigManager) RollbackToChange(changeID, rolledBackBy string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	// Find the change in history
 	var targetChange *ConfigChange
 	for i := range cm.history {
@@ -315,28 +315,28 @@ func (cm *ConfigManager) RollbackToChange(changeID, rolledBackBy string) error {
 			break
 		}
 	}
-	
+
 	if targetChange == nil {
 		return fmt.Errorf("change ID %s not found in history", changeID)
 	}
-	
+
 	if targetChange.PrevConfig == nil {
 		return fmt.Errorf("previous configuration not available for change %s", changeID)
 	}
-	
+
 	// Validate the rollback configuration
 	if err := cm.validateConfig(targetChange.PrevConfig); err != nil {
 		return fmt.Errorf("rollback validation failed: %w", err)
 	}
-	
+
 	// Store current config before rollback
 	prevConfig := cm.currentConfig
-	
+
 	// Apply the rollback
 	rollbackConfig := targetChange.PrevConfig
 	rollbackConfig.Timestamp = time.Now()
 	cm.currentConfig = rollbackConfig
-	
+
 	// Record the rollback as a new change
 	rollbackChange := ConfigChange{
 		ID:          fmt.Sprintf("rollback_%d", time.Now().Unix()),
@@ -348,12 +348,12 @@ func (cm *ConfigManager) RollbackToChange(changeID, rolledBackBy string) error {
 		Description: fmt.Sprintf("Rollback to change %s", changeID),
 		Success:     true,
 	}
-	
+
 	cm.addToHistory(rollbackChange)
-	
+
 	// Notify listeners
 	cm.notifyListeners()
-	
+
 	log.Printf("Configuration rolled back to change %s by %s", changeID, rolledBackBy)
 	return nil
 }
@@ -362,11 +362,11 @@ func (cm *ConfigManager) RollbackToChange(changeID, rolledBackBy string) error {
 func (cm *ConfigManager) GetHistory() []ConfigChange {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	
+
 	// Return a copy of the history
 	historyCopy := make([]ConfigChange, len(cm.history))
 	copy(historyCopy, cm.history)
-	
+
 	return historyCopy
 }
 
@@ -374,7 +374,7 @@ func (cm *ConfigManager) GetHistory() []ConfigChange {
 func (cm *ConfigManager) RegisterChangeListener(name string, callback func(*SystemConfig)) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	cm.changeListeners[name] = callback
 	log.Printf("Configuration change listener '%s' registered", name)
 }
@@ -383,7 +383,7 @@ func (cm *ConfigManager) RegisterChangeListener(name string, callback func(*Syst
 func (cm *ConfigManager) UnregisterChangeListener(name string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	delete(cm.changeListeners, name)
 	log.Printf("Configuration change listener '%s' unregistered", name)
 }
@@ -400,7 +400,7 @@ func (cm *ConfigManager) validateConfig(config *SystemConfig) error {
 	if config.AddressPool.RefillThreshold < 1 || config.AddressPool.RefillThreshold > config.AddressPool.MinPoolSize {
 		return fmt.Errorf("refill_threshold must be between 1 and min_pool_size")
 	}
-	
+
 	// Validate gap monitor config
 	if config.GapMonitor.MaxGapLimit < 10 || config.GapMonitor.MaxGapLimit > 100 {
 		return fmt.Errorf("max_gap_limit must be between 10 and 100")
@@ -414,7 +414,7 @@ func (cm *ConfigManager) validateConfig(config *SystemConfig) error {
 	if config.GapMonitor.WarningThreshold >= config.GapMonitor.CriticalThreshold {
 		return fmt.Errorf("warning_threshold must be less than critical_threshold")
 	}
-	
+
 	// Validate rate limiter config
 	if config.RateLimiter.GlobalMaxTokens < 50 || config.RateLimiter.GlobalMaxTokens > 1000 {
 		return fmt.Errorf("global_max_tokens must be between 50 and 1000")
@@ -425,7 +425,7 @@ func (cm *ConfigManager) validateConfig(config *SystemConfig) error {
 	if config.RateLimiter.EmailMaxTokens < 1 || config.RateLimiter.EmailMaxTokens > 20 {
 		return fmt.Errorf("email_max_tokens must be between 1 and 20")
 	}
-	
+
 	// Validate WebSocket config
 	if config.WebSocket.ReadBufferSize < 512 || config.WebSocket.ReadBufferSize > 8192 {
 		return fmt.Errorf("read_buffer_size must be between 512 and 8192")
@@ -433,14 +433,14 @@ func (cm *ConfigManager) validateConfig(config *SystemConfig) error {
 	if config.WebSocket.WriteBufferSize < 512 || config.WebSocket.WriteBufferSize > 8192 {
 		return fmt.Errorf("write_buffer_size must be between 512 and 8192")
 	}
-	
+
 	return nil
 }
 
 // detectChanges compares two configurations and returns the differences
 func (cm *ConfigManager) detectChanges(oldConfig, newConfig *SystemConfig) []FieldChange {
 	changes := []FieldChange{}
-	
+
 	// Compare address pool config
 	if oldConfig.AddressPool != newConfig.AddressPool {
 		if oldConfig.AddressPool.MinPoolSize != newConfig.AddressPool.MinPoolSize {
@@ -465,7 +465,7 @@ func (cm *ConfigManager) detectChanges(oldConfig, newConfig *SystemConfig) []Fie
 			})
 		}
 	}
-	
+
 	// Compare gap monitor config
 	if oldConfig.GapMonitor != newConfig.GapMonitor {
 		if oldConfig.GapMonitor.MaxGapLimit != newConfig.GapMonitor.MaxGapLimit {
@@ -490,7 +490,7 @@ func (cm *ConfigManager) detectChanges(oldConfig, newConfig *SystemConfig) []Fie
 			})
 		}
 	}
-	
+
 	// Compare rate limiter config (simplified)
 	if oldConfig.RateLimiter != newConfig.RateLimiter {
 		if oldConfig.RateLimiter.GlobalMaxTokens != newConfig.RateLimiter.GlobalMaxTokens {
@@ -501,14 +501,14 @@ func (cm *ConfigManager) detectChanges(oldConfig, newConfig *SystemConfig) []Fie
 			})
 		}
 	}
-	
+
 	return changes
 }
 
 // addToHistory adds a change to the history, maintaining size limits
 func (cm *ConfigManager) addToHistory(change ConfigChange) {
 	cm.history = append(cm.history, change)
-	
+
 	// Maintain history size limit
 	if len(cm.history) > cm.maxHistorySize {
 		cm.history = cm.history[1:] // Remove oldest entry
@@ -527,7 +527,7 @@ func (cm *ConfigManager) recordFailedChange(changedBy, section, description stri
 		Success:     false,
 		ErrorMsg:    err.Error(),
 	}
-	
+
 	cm.addToHistory(change)
 	log.Printf("Failed configuration change by %s: %s - %v", changedBy, description, err)
 }
@@ -557,11 +557,11 @@ func (cm *ConfigManager) GetValidationRules() map[string]interface{} {
 			"cleanup_interval":  map[string]int{"min": 5, "max": 1440},
 		},
 		"gap_monitor": map[string]interface{}{
-			"max_gap_limit":       map[string]int{"min": 10, "max": 100},
-			"warning_threshold":   map[string]float64{"min": 0.0, "max": 1.0},
-			"critical_threshold":  map[string]float64{"min": 0.0, "max": 1.0},
+			"max_gap_limit":              map[string]int{"min": 10, "max": 100},
+			"warning_threshold":          map[string]float64{"min": 0.0, "max": 1.0},
+			"critical_threshold":         map[string]float64{"min": 0.0, "max": 1.0},
 			"consecutive_fail_threshold": map[string]int{"min": 1, "max": 20},
-			"error_history_size":  map[string]int{"min": 10, "max": 1000},
+			"error_history_size":         map[string]int{"min": 10, "max": 1000},
 		},
 		"rate_limiter": map[string]interface{}{
 			"global_max_tokens":  map[string]int{"min": 50, "max": 1000},
@@ -573,17 +573,17 @@ func (cm *ConfigManager) GetValidationRules() map[string]interface{} {
 			"cleanup_interval":   map[string]int{"min": 5, "max": 1440},
 		},
 		"websocket": map[string]interface{}{
-			"read_buffer_size":   map[string]int{"min": 512, "max": 8192},
-			"write_buffer_size":  map[string]int{"min": 512, "max": 8192},
-			"ping_interval":      map[string]int{"min": 10, "max": 300},
-			"pong_timeout":       map[string]int{"min": 5, "max": 120},
-			"max_connections":    map[string]int{"min": 10, "max": 10000},
+			"read_buffer_size":  map[string]int{"min": 512, "max": 8192},
+			"write_buffer_size": map[string]int{"min": 512, "max": 8192},
+			"ping_interval":     map[string]int{"min": 10, "max": 300},
+			"pong_timeout":      map[string]int{"min": 5, "max": 120},
+			"max_connections":   map[string]int{"min": 10, "max": 10000},
 		},
 		"admin_dashboard": map[string]interface{}{
-			"session_timeout":    map[string]int{"min": 1, "max": 168},
-			"refresh_interval":   map[string]int{"min": 5, "max": 300},
-			"max_log_entries":    map[string]int{"min": 100, "max": 10000},
-			"metrics_retention":  map[string]int{"min": 1, "max": 8760},
+			"session_timeout":   map[string]int{"min": 1, "max": 168},
+			"refresh_interval":  map[string]int{"min": 5, "max": 300},
+			"max_log_entries":   map[string]int{"min": 100, "max": 10000},
+			"metrics_retention": map[string]int{"min": 1, "max": 8760},
 		},
 	}
 }

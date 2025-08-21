@@ -1,0 +1,91 @@
+services:
+  - type: web
+    name: paybutton
+    env: docker
+    plan: free # Use Render's free tier
+    dockerfilePath: ./Dockerfile
+    
+    # Health check configuration
+    healthCheckPath: /
+    
+    # Environment variables for optimization
+    envVars:
+      # Server configuration
+      - key: PORT
+        value: 8080
+      - key: ENVIRONMENT
+        value: production
+        
+      # Resource limits for free tier (512MB RAM, 0.1 CPU)
+      - key: MAX_MEMORY_MB
+        value: 400
+      - key: MAX_GOROUTINES
+        value: 50
+      - key: MAX_WEBSOCKETS
+        value: 50
+      - key: MAX_SSE_CONNECTIONS
+        value: 50
+        
+      # Database connection pooling
+      - key: MAX_IDLE_CONNS
+        value: 5
+      - key: MAX_OPEN_CONNS
+        value: 10
+      - key: CONN_MAX_LIFETIME
+        value: 5m
+        
+      # Polling intervals
+      - key: DEFAULT_POLL_INTERVAL
+        value: 60s
+      - key: FAST_POLL_INTERVAL
+        value: 15s
+        
+      # Rate limiting
+      - key: REQUESTS_PER_MINUTE
+        value: 60
+      - key: BURST_SIZE
+        value: 10
+        
+      # Cleanup and timeouts
+      - key: CLEANUP_INTERVAL
+        value: 5m
+      - key: SESSION_TIMEOUT
+        value: 35m
+      - key: READ_TIMEOUT
+        value: 30s
+      - key: WRITE_TIMEOUT
+        value: 30s
+      - key: IDLE_TIMEOUT
+        value: 120s
+      - key: SHUTDOWN_TIMEOUT
+        value: 10s
+        
+      # Go runtime optimization
+      - key: GOMAXPROCS
+        value: 2
+      - key: GOGC
+        value: 20
+        
+      # Your secret environment variables (add these in Render dashboard)
+      # - key: POSTGRES_USER
+      #   sync: false
+      # - key: POSTGRES_PASSWORD
+      #   sync: false
+      # - key: POSTGRES_HOST
+      #   sync: false
+      # - key: POSTGRES_DB
+      #   sync: false
+      # - key: BOT_API_KEY
+      #   sync: false
+      # - key: BLOCKCYPHER_TOKEN
+      #   sync: false
+      # - key: BLOCKONOMICS_API
+      #   sync: false
+      # - key: SMTP_HOST
+      #   sync: false
+      # - key: SMTP_PORT
+      #   sync: false
+      # - key: SMTP_USERNAME
+      #   sync: false
+      # - key: SMTP_PASSWORD
+      #   sync: false

@@ -44,7 +44,7 @@ func InitializeGapMonitor() *GapLimitMonitor {
 			alertCooldown:     15 * time.Minute,
 			maxGapLimit:       20, // Blockonomics default
 		}
-		
+
 		// Start monitoring goroutine
 		go gapMonitor.monitor()
 	})
@@ -63,19 +63,19 @@ func GetGapMonitor() *GapLimitMonitor {
 func (m *GapLimitMonitor) RecordAddressGeneration() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.totalAddresses++
 	m.unpaidAddresses++
 	m.consecutiveFailures = 0 // Reset failure counter on success
-	
+
 	// Check if we're approaching the limit
 	gapRatio := float64(m.unpaidAddresses) / float64(m.maxGapLimit)
-	
+
 	if gapRatio >= m.criticalThreshold {
-		m.sendAlert("CRITICAL", fmt.Sprintf("Gap limit critical: %d/%d unpaid addresses (%.0f%%)", 
+		m.sendAlert("CRITICAL", fmt.Sprintf("Gap limit critical: %d/%d unpaid addresses (%.0f%%)",
 			m.unpaidAddresses, m.maxGapLimit, gapRatio*100))
 	} else if gapRatio >= m.warningThreshold {
-		m.sendAlert("WARNING", fmt.Sprintf("Gap limit warning: %d/%d unpaid addresses (%.0f%%)", 
+		m.sendAlert("WARNING", fmt.Sprintf("Gap limit warning: %d/%d unpaid addresses (%.0f%%)",
 			m.unpaidAddresses, m.maxGapLimit, gapRatio*100))
 	}
 }
@@ -84,13 +84,13 @@ func (m *GapLimitMonitor) RecordAddressGeneration() {
 func (m *GapLimitMonitor) RecordPayment(address string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.paidAddresses++
 	if m.unpaidAddresses > 0 {
 		m.unpaidAddresses--
 	}
-	
-	log.Printf("Payment recorded for %s. Gap status: %d unpaid, %d paid", 
+
+	log.Printf("Payment recorded for %s. Gap status: %d unpaid, %d paid",
 		address, m.unpaidAddresses, m.paidAddresses)
 }
 
@@ -98,21 +98,21 @@ func (m *GapLimitMonitor) RecordPayment(address string) {
 func (m *GapLimitMonitor) RecordGapLimitError(email, errorMsg string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.consecutiveFailures++
-	
+
 	// Add to recent errors
 	m.recentErrors = append(m.recentErrors, GapLimitError{
 		Timestamp: time.Now(),
 		Email:     email,
 		Message:   errorMsg,
 	})
-	
+
 	// Keep only last 100 errors
 	if len(m.recentErrors) > 100 {
 		m.recentErrors = m.recentErrors[len(m.recentErrors)-100:]
 	}
-	
+
 	// Send alert based on consecutive failures
 	alertMsg := ""
 	if m.consecutiveFailures >= 5 {
@@ -120,7 +120,7 @@ func (m *GapLimitMonitor) RecordGapLimitError(email, errorMsg string) {
 	} else if m.consecutiveFailures >= 3 {
 		alertMsg = fmt.Sprintf("WARNING: %d consecutive gap limit errors", m.consecutiveFailures)
 	}
-	
+
 	if alertMsg != "" {
 		m.sendAlert("GAP_LIMIT", alertMsg)
 	}
@@ -130,19 +130,19 @@ func (m *GapLimitMonitor) RecordGapLimitError(email, errorMsg string) {
 func (m *GapLimitMonitor) ShouldUseFallback() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	// Use fallback if:
 	// 1. Too many consecutive failures
 	if m.consecutiveFailures >= 3 {
 		return true
 	}
-	
+
 	// 2. Gap ratio is critical
 	gapRatio := float64(m.unpaidAddresses) / float64(m.maxGapLimit)
 	if gapRatio >= m.criticalThreshold {
 		return true
 	}
-	
+
 	// 3. Recent error rate is high
 	now := time.Now()
 	recentErrorCount := 0
@@ -154,7 +154,7 @@ func (m *GapLimitMonitor) ShouldUseFallback() bool {
 	if recentErrorCount >= 5 {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -162,9 +162,9 @@ func (m *GapLimitMonitor) ShouldUseFallback() bool {
 func (m *GapLimitMonitor) GetStats() map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	gapRatio := float64(m.unpaidAddresses) / float64(m.maxGapLimit)
-	
+
 	return map[string]interface{}{
 		"total_addresses":      m.totalAddresses,
 		"paid_addresses":       m.paidAddresses,
@@ -183,13 +183,13 @@ func (m *GapLimitMonitor) sendAlert(level, message string) {
 	if now.Sub(m.lastAlert) < m.alertCooldown {
 		return // Skip if in cooldown
 	}
-	
+
 	m.lastAlert = now
-	
+
 	// Log the alert
 	alertMsg := fmt.Sprintf("🚨 [%s ALERT] %s", level, message)
 	log.Printf(alertMsg)
-	
+
 	// Note: To send to Telegram, pass the bot instance from your main server
 	// or implement a global bot getter function
 }
@@ -198,15 +198,15 @@ func (m *GapLimitMonitor) sendAlert(level, message string) {
 func (m *GapLimitMonitor) monitor() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		m.mu.RLock()
 		stats := m.GetStats()
 		m.mu.RUnlock()
-		
+
 		// Log current status
 		log.Printf("Gap Monitor Status: %v", stats)
-		
+
 		// Auto-recover from fallback mode if conditions improve
 		if m.consecutiveFailures > 0 && m.unpaidAddresses < int(float64(m.maxGapLimit)*0.5) {
 			m.mu.Lock()
@@ -221,8 +221,61 @@ func (m *GapLimitMonitor) monitor() {
 func (m *GapLimitMonitor) ResetUnpaidCount(count int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.unpaidAddresses = count
 	m.consecutiveFailures = 0
 	log.Printf("Manually reset unpaid count to %d", count)
+}
+
+// GetRecentErrors returns the recent error history
+func (m *GapLimitMonitor) GetRecentErrors() []GapLimitError {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Return a copy to avoid concurrent access issues
+	errors := make([]GapLimitError, len(m.recentErrors))
+	copy(errors, m.recentErrors)
+	return errors
+}
+
+// ClearRecentErrors clears the recent error history (for admin use)
+func (m *GapLimitMonitor) ClearRecentErrors() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.recentErrors = make([]GapLimitError, 0)
+	log.Printf("Recent error history cleared")
+}
+
+// UpdateThresholds updates the warning and critical thresholds (for admin use)
+func (m *GapLimitMonitor) UpdateThresholds(warning, critical float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if warning >= 0 && warning <= 1 {
+		m.warningThreshold = warning
+	}
+	if critical >= 0 && critical <= 1 {
+		m.criticalThreshold = critical
+	}
+
+	log.Printf("Updated thresholds: warning=%.2f, critical=%.2f", m.warningThreshold, m.criticalThreshold)
+}
+
+// UpdateMaxGapLimit updates the maximum gap limit (for admin use)
+func (m *GapLimitMonitor) UpdateMaxGapLimit(limit int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if limit > 0 && limit <= 100 {
+		m.maxGapLimit = limit
+		log.Printf("Updated max gap limit to %d", limit)
+	}
+}
+
+// GetThresholds returns current warning and critical thresholds
+func (m *GapLimitMonitor) GetThresholds() (float64, float64) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.warningThreshold, m.criticalThreshold
 }

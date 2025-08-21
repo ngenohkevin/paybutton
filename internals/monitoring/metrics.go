@@ -9,15 +9,15 @@ import (
 
 // MetricsCollector handles historical data collection and analytics
 type MetricsCollector struct {
-	mu                  sync.RWMutex
-	addressGeneration   []MetricPoint
-	paymentSuccess      []MetricPoint
-	gapLimitEvents      []MetricPoint
-	rateLimitEvents     []MetricPoint
-	systemPerformance   []MetricPoint
-	errorRates          []MetricPoint
-	maxDataPoints       int
-	started             time.Time
+	mu                sync.RWMutex
+	addressGeneration []MetricPoint
+	paymentSuccess    []MetricPoint
+	gapLimitEvents    []MetricPoint
+	rateLimitEvents   []MetricPoint
+	systemPerformance []MetricPoint
+	errorRates        []MetricPoint
+	maxDataPoints     int
+	started           time.Time
 }
 
 // MetricPoint represents a single data point in time
@@ -29,13 +29,13 @@ type MetricPoint struct {
 
 // PerformanceMetrics aggregated performance data
 type PerformanceMetrics struct {
-	AvgResponseTime     float64 `json:"avg_response_time"`
-	AddressGenRate      float64 `json:"address_gen_rate"`
-	PaymentSuccessRate  float64 `json:"payment_success_rate"`
-	ErrorRate           float64 `json:"error_rate"`
-	UptimePercentage    float64 `json:"uptime_percentage"`
-	MemoryUsageMB       float64 `json:"memory_usage_mb"`
-	CPUUsagePercent     float64 `json:"cpu_usage_percent"`
+	AvgResponseTime    float64 `json:"avg_response_time"`
+	AddressGenRate     float64 `json:"address_gen_rate"`
+	PaymentSuccessRate float64 `json:"payment_success_rate"`
+	ErrorRate          float64 `json:"error_rate"`
+	UptimePercentage   float64 `json:"uptime_percentage"`
+	MemoryUsageMB      float64 `json:"memory_usage_mb"`
+	CPUUsagePercent    float64 `json:"cpu_usage_percent"`
 }
 
 // TrendAnalysis trend data for charts
@@ -49,11 +49,11 @@ type TrendAnalysis struct {
 
 // AnalyticsData comprehensive analytics response
 type AnalyticsData struct {
-	Summary      PerformanceMetrics `json:"summary"`
-	Trends       TrendAnalysis      `json:"trends"`
-	Insights     []string           `json:"insights"`
-	LastUpdated  time.Time          `json:"last_updated"`
-	DataRange    string             `json:"data_range"`
+	Summary     PerformanceMetrics `json:"summary"`
+	Trends      TrendAnalysis      `json:"trends"`
+	Insights    []string           `json:"insights"`
+	LastUpdated time.Time          `json:"last_updated"`
+	DataRange   string             `json:"data_range"`
 }
 
 var (
@@ -74,7 +74,7 @@ func GetMetricsCollector() *MetricsCollector {
 			maxDataPoints:     1000, // Keep last 1000 data points
 			started:           time.Now(),
 		}
-		
+
 		// Start background collection
 		go globalMetricsCollector.startCollection()
 	})
@@ -85,7 +85,7 @@ func GetMetricsCollector() *MetricsCollector {
 func (m *MetricsCollector) startCollection() {
 	ticker := time.NewTicker(30 * time.Second) // Collect every 30 seconds
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		m.collectSystemMetrics()
 	}
@@ -94,10 +94,10 @@ func (m *MetricsCollector) startCollection() {
 // collectSystemMetrics gathers current system metrics
 func (m *MetricsCollector) collectSystemMetrics() {
 	now := time.Now()
-	
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Simulate metrics collection - in real implementation, you'd gather actual data
 	// Address generation rate (addresses per minute)
 	addressGenRate := float64(time.Now().Unix()%10 + 5) // 5-14 addresses/min
@@ -106,7 +106,7 @@ func (m *MetricsCollector) collectSystemMetrics() {
 		Value:     addressGenRate,
 		Metadata:  map[string]interface{}{"unit": "addresses/min"},
 	})
-	
+
 	// Payment success rate (percentage)
 	successRate := 95.0 + float64(time.Now().Unix()%10)/2 // 95-100%
 	m.addMetricPoint(&m.paymentSuccess, MetricPoint{
@@ -114,15 +114,15 @@ func (m *MetricsCollector) collectSystemMetrics() {
 		Value:     successRate,
 		Metadata:  map[string]interface{}{"unit": "percentage"},
 	})
-	
+
 	// Error rate (errors per hour)
-	errorRate := float64(time.Now().Unix()%5) // 0-4 errors/hour
+	errorRate := float64(time.Now().Unix() % 5) // 0-4 errors/hour
 	m.addMetricPoint(&m.errorRates, MetricPoint{
 		Timestamp: now,
 		Value:     errorRate,
 		Metadata:  map[string]interface{}{"unit": "errors/hour"},
 	})
-	
+
 	// System performance score (0-100)
 	performance := 85.0 + float64(time.Now().Unix()%15) // 85-100
 	m.addMetricPoint(&m.systemPerformance, MetricPoint{
@@ -144,13 +144,13 @@ func (m *MetricsCollector) addMetricPoint(slice *[]MetricPoint, point MetricPoin
 func (m *MetricsCollector) RecordAddressGeneration(count int, processingTime time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.addMetricPoint(&m.addressGeneration, MetricPoint{
 		Timestamp: time.Now(),
 		Value:     float64(count),
 		Metadata: map[string]interface{}{
 			"processing_time_ms": processingTime.Milliseconds(),
-			"type":              "generation",
+			"type":               "generation",
 		},
 	})
 }
@@ -159,13 +159,13 @@ func (m *MetricsCollector) RecordAddressGeneration(count int, processingTime tim
 func (m *MetricsCollector) RecordPaymentSuccess(amount float64, confirmationTime time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.addMetricPoint(&m.paymentSuccess, MetricPoint{
 		Timestamp: time.Now(),
 		Value:     amount,
 		Metadata: map[string]interface{}{
 			"confirmation_time_ms": confirmationTime.Milliseconds(),
-			"type":                "success",
+			"type":                 "success",
 		},
 	})
 }
@@ -174,7 +174,7 @@ func (m *MetricsCollector) RecordPaymentSuccess(amount float64, confirmationTime
 func (m *MetricsCollector) RecordGapLimitEvent(gapRatio float64, eventType string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.addMetricPoint(&m.gapLimitEvents, MetricPoint{
 		Timestamp: time.Now(),
 		Value:     gapRatio,
@@ -189,7 +189,7 @@ func (m *MetricsCollector) RecordGapLimitEvent(gapRatio float64, eventType strin
 func (m *MetricsCollector) RecordRateLimitEvent(identifier string, eventType string, tokens int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.addMetricPoint(&m.rateLimitEvents, MetricPoint{
 		Timestamp: time.Now(),
 		Value:     float64(tokens),
@@ -204,7 +204,7 @@ func (m *MetricsCollector) RecordRateLimitEvent(identifier string, eventType str
 func (m *MetricsCollector) RecordError(component string, errorType string, severity string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.addMetricPoint(&m.errorRates, MetricPoint{
 		Timestamp: time.Now(),
 		Value:     1, // Error count
@@ -220,10 +220,10 @@ func (m *MetricsCollector) RecordError(component string, errorType string, sever
 func (m *MetricsCollector) GetAnalyticsData(period string) AnalyticsData {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	now := time.Now()
 	var since time.Time
-	
+
 	switch period {
 	case "1h":
 		since = now.Add(-1 * time.Hour)
@@ -237,7 +237,7 @@ func (m *MetricsCollector) GetAnalyticsData(period string) AnalyticsData {
 		since = now.Add(-1 * time.Hour)
 		period = "1h"
 	}
-	
+
 	return AnalyticsData{
 		Summary:     m.calculateSummaryMetrics(since),
 		Trends:      m.calculateTrends(since, period),
@@ -254,13 +254,13 @@ func (m *MetricsCollector) calculateSummaryMetrics(since time.Time) PerformanceM
 	paymentPoints := m.filterMetricPoints(m.paymentSuccess, since)
 	errorPoints := m.filterMetricPoints(m.errorRates, since)
 	performancePoints := m.filterMetricPoints(m.systemPerformance, since)
-	
+
 	// Calculate averages
 	avgAddressGen := m.calculateAverage(addressGenPoints)
 	avgPaymentSuccess := m.calculateAverage(paymentPoints)
 	avgErrors := m.calculateAverage(errorPoints)
 	_ = m.calculateAverage(performancePoints) // Performance average for future use
-	
+
 	// Calculate uptime (simplified - in real implementation, track actual downtime)
 	uptime := 99.9
 	if avgErrors > 5 {
@@ -268,7 +268,7 @@ func (m *MetricsCollector) calculateSummaryMetrics(since time.Time) PerformanceM
 	} else if avgErrors > 2 {
 		uptime = 99.5
 	}
-	
+
 	return PerformanceMetrics{
 		AvgResponseTime:    float64(50 + time.Now().Unix()%50), // 50-100ms
 		AddressGenRate:     avgAddressGen,
@@ -287,7 +287,7 @@ func (m *MetricsCollector) calculateTrends(since time.Time, period string) Trend
 	if period == "7d" {
 		sampleSize = 50
 	}
-	
+
 	return TrendAnalysis{
 		Period:           period,
 		AddressGenTrend:  m.sampleMetricPoints(m.filterMetricPoints(m.addressGeneration, since), sampleSize),
@@ -300,7 +300,7 @@ func (m *MetricsCollector) calculateTrends(since time.Time, period string) Trend
 // generateInsights creates actionable insights from the data
 func (m *MetricsCollector) generateInsights(since time.Time) []string {
 	insights := []string{}
-	
+
 	// Analyze error trends
 	errorPoints := m.filterMetricPoints(m.errorRates, since)
 	if len(errorPoints) > 0 {
@@ -311,7 +311,7 @@ func (m *MetricsCollector) generateInsights(since time.Time) []string {
 			insights = append(insights, "System running with minimal errors. Performance is optimal.")
 		}
 	}
-	
+
 	// Analyze address generation
 	addressPoints := m.filterMetricPoints(m.addressGeneration, since)
 	if len(addressPoints) > 0 {
@@ -322,7 +322,7 @@ func (m *MetricsCollector) generateInsights(since time.Time) []string {
 			insights = append(insights, "High address generation activity. Monitor pool capacity.")
 		}
 	}
-	
+
 	// Analyze payment success
 	paymentPoints := m.filterMetricPoints(m.paymentSuccess, since)
 	if len(paymentPoints) > 0 {
@@ -333,17 +333,17 @@ func (m *MetricsCollector) generateInsights(since time.Time) []string {
 			insights = append(insights, "Excellent payment success rate. System performing well.")
 		}
 	}
-	
+
 	// System uptime insight
 	uptime := time.Since(m.started)
 	if uptime > 24*time.Hour {
 		insights = append(insights, fmt.Sprintf("System uptime: %.1f hours. Stable operation.", uptime.Hours()))
 	}
-	
+
 	if len(insights) == 0 {
 		insights = append(insights, "All metrics within normal ranges. System operating optimally.")
 	}
-	
+
 	return insights
 }
 
@@ -363,7 +363,7 @@ func (m *MetricsCollector) calculateAverage(points []MetricPoint) float64 {
 	if len(points) == 0 {
 		return 0
 	}
-	
+
 	sum := 0.0
 	for _, point := range points {
 		sum += point.Value
@@ -375,15 +375,15 @@ func (m *MetricsCollector) sampleMetricPoints(points []MetricPoint, maxSamples i
 	if len(points) <= maxSamples {
 		return points
 	}
-	
+
 	// Sample evenly across the dataset
 	step := len(points) / maxSamples
 	sampled := make([]MetricPoint, 0, maxSamples)
-	
+
 	for i := 0; i < len(points); i += step {
 		sampled = append(sampled, points[i])
 	}
-	
+
 	return sampled
 }
 
@@ -400,23 +400,23 @@ func (m *MetricsCollector) getGapSeverity(gapRatio float64) string {
 func (m *MetricsCollector) GetSystemHealth() map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	now := time.Now()
 	recentWindow := now.Add(-5 * time.Minute)
-	
+
 	recentErrors := m.filterMetricPoints(m.errorRates, recentWindow)
 	recentPerformance := m.filterMetricPoints(m.systemPerformance, recentWindow)
-	
+
 	errorCount := len(recentErrors)
 	avgPerformance := m.calculateAverage(recentPerformance)
-	
+
 	health := "healthy"
 	if errorCount > 5 || avgPerformance < 70 {
 		health = "degraded"
 	} else if errorCount > 10 || avgPerformance < 50 {
 		health = "unhealthy"
 	}
-	
+
 	return map[string]interface{}{
 		"status":            health,
 		"recent_errors":     errorCount,
@@ -431,7 +431,7 @@ func (m *MetricsCollector) GetSystemHealth() map[string]interface{} {
 func (m *MetricsCollector) ExportMetrics() ([]byte, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	export := map[string]interface{}{
 		"address_generation": m.addressGeneration,
 		"payment_success":    m.paymentSuccess,
@@ -442,7 +442,6 @@ func (m *MetricsCollector) ExportMetrics() ([]byte, error) {
 		"collection_started": m.started,
 		"exported_at":        time.Now(),
 	}
-	
+
 	return json.Marshal(export)
 }
-

@@ -224,11 +224,11 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					}
 					delete(checkingAddresses, address)
 					mutex.Unlock()
-					
+
 					// Update gap monitor for USDT payment
 					gapMonitor := GetGapMonitor()
 					gapMonitor.RecordPayment(address)
-					
+
 					// Update address pool if applicable
 					addressPool := GetAddressPool()
 					addressPool.MarkAddressUsed(address, email)
@@ -249,30 +249,30 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				// Check if this is a static/shared address - if so, only log but don't process
 				if isStaticOrSharedAddress(address) {
 					log.Printf("ALERT: Payment detected on static/shared address %s for email %s, amount: %.2f USD", address, email, balance)
-					
+
 					// Send alert to Telegram but don't process
 					alertMsg := fmt.Sprintf(
-						"⚠️ *STATIC ADDRESS PAYMENT DETECTED*\n\n" +
-						"*Email:* `%s`\n" +
-						"*Address:* `%s`\n" +
-						"*Amount:* `%.2f USD`\n\n" +
-						"❌ *No automatic processing* - Manual intervention required",
+						"⚠️ *STATIC ADDRESS PAYMENT DETECTED*\n\n"+
+							"*Email:* `%s`\n"+
+							"*Address:* `%s`\n"+
+							"*Amount:* `%.2f USD`\n\n"+
+							"❌ *No automatic processing* - Manual intervention required",
 						email, address, balance)
-					
+
 					msg := tgbotapi.NewMessage(chatID, alertMsg)
 					msg.ParseMode = tgbotapi.ModeMarkdown
 					if _, err := bot.Send(msg); err != nil {
 						log.Printf("Error sending static address alert: %s", err)
 					}
-					
+
 					// Stop monitoring this address
 					mutex.Lock()
 					delete(checkingAddresses, address)
 					mutex.Unlock()
-					
+
 					return // Exit without processing
 				}
-				
+
 				balanceUSD := database.RoundToTwoDecimalPlaces(balance)
 
 				// Calculate BTC amount for WebSocket notification
@@ -314,22 +314,22 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				}
 				delete(checkingAddresses, address)
 				mutex.Unlock()
-				
+
 				// Update gap monitor - payment received reduces unpaid count
 				gapMonitor := GetGapMonitor()
 				gapMonitor.RecordPayment(address)
-				
+
 				// Update address pool if this was a pooled address
 				addressPool := GetAddressPool()
 				addressPool.MarkAddressUsed(address, email)
 
 				confirmationTime := time.Now().Format(time.RFC3339)
-				
+
 				// Site-based conditional logic
 				if site == "Dwebstore" || site == "dwebstore" {
 					// DWEBSTORE: Product delivery flow
 					log.Printf("Dwebstore payment detected - processing product delivery for %s: %s", email, productName)
-					
+
 					if productName != "" {
 						err = HandleAutomaticDelivery(email, userName, productName, site, bot)
 						if err != nil {
@@ -345,7 +345,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					botLogMessage := fmt.Sprintf(
 						"*Email:* `%s`\n*Product Delivered (%s):* `%s`\n*Amount:* `%s USD`\n*Site:* `%s`\n*Confirmation Time:* `%s`",
 						email, currencyType, productName, fmt.Sprintf("%.2f", balanceUSD), site, confirmationTime)
-					
+
 					msg := tgbotapi.NewMessage(chatID, botLogMessage)
 					msg.ParseMode = tgbotapi.ModeMarkdown
 					_, err = bot.Send(msg)
@@ -356,7 +356,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				} else {
 					// CARDERSHAVEN or other sites: Balance update flow
 					log.Printf("Cardershaven/other payment detected - processing balance update for %s", email)
-					
+
 					// Update database balance
 					err = database.UpdateUserBalance(email, balanceUSD)
 					if err != nil {
@@ -382,7 +382,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					botLogMessage := fmt.Sprintf(
 						"*Email:* `%s`\n*New Balance Added (%s):* `%s USD`\n*Site:* `%s`\n*Confirmation Time:* `%s`",
 						email, currencyType, fmt.Sprintf("%.2f", balanceUSD), site, confirmationTime)
-					
+
 					msg := tgbotapi.NewMessage(chatID, botLogMessage)
 					msg.ParseMode = tgbotapi.ModeMarkdown
 					_, err = bot.Send(msg)
@@ -413,23 +413,23 @@ func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 	}
 
 	circuitManager := payments2.GetCircuitBreakerManager()
-	
+
 	// Try providers in order with circuit breaker protection
 	// Ordered by speed: fastest first for optimal detection time
 	providers := []struct {
 		name string
 		call func() (int64, error)
 	}{
-		{"mempoolspace", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithMempoolSpace(address) }},    // Fastest - optimized for real-time
-		{"blockstream", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockStream(address) }},     // Very fast - Blockstream's infrastructure
-		{"trezor", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithTrezor(address) }},               // Fast BlockBook API
-		{"blockchain", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockChain(address) }},       // Original, decent speed
+		{"mempoolspace", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithMempoolSpace(address) }},      // Fastest - optimized for real-time
+		{"blockstream", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockStream(address) }},        // Very fast - Blockstream's infrastructure
+		{"trezor", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithTrezor(address) }},                  // Fast BlockBook API
+		{"blockchain", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockChain(address) }},          // Original, decent speed
 		{"blockcypher", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockCypher(address, token) }}, // Fast but rate limited
-		{"blockonomics", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockonomics(address) }},   // Slower, more restricted
+		{"blockonomics", func() (int64, error) { return payments2.GetBitcoinAddressBalanceWithBlockonomics(address) }},      // Slower, more restricted
 	}
 
 	var lastErr error
-	
+
 	for _, provider := range providers {
 		// Check circuit breaker
 		if err := circuitManager.CanCall(provider.name); err != nil {
@@ -461,7 +461,7 @@ func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 		log.Printf("Error with static address fallback: %s", err)
 		return 0, fmt.Errorf("all blockchain providers failed, last error: %v", lastErr)
 	}
-	
+
 	return balance, nil
 }
 
@@ -471,13 +471,13 @@ func isStaticOrSharedAddress(address string) bool {
 	if address == staticBTCAddress || address == staticUSDTAddress {
 		return true
 	}
-	
+
 	// Check if it's one of the shared tier addresses
 	for _, sharedAddr := range sharedBTCAddresses {
 		if address == sharedAddr {
 			return true
 		}
 	}
-	
+
 	return false
 }

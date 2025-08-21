@@ -92,7 +92,7 @@ func (s *Server) Start() error {
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "version": "1.0.0"})
 	})
-	
+
 	// Add no-cache middleware for development (prevents caching issues with Air)
 	r.Use(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/static/") || strings.HasPrefix(c.Request.URL.Path, "/admin/") {
@@ -102,7 +102,7 @@ func (s *Server) Start() error {
 		}
 		c.Next()
 	})
-	
+
 	// Serve static files for admin UI
 	r.Static("/static", "./static")
 
@@ -114,10 +114,10 @@ func (s *Server) Start() error {
 	r.GET("/events/balance/:address", payment_processing.HandleSSE)                                       // SSE endpoint for real-time updates (lightweight)
 	r.POST("/webhook/btc", func(c *gin.Context) { payment_processing.HandleBlockonomicsWebhook(c, bot) }) // Blockonomics webhook
 	r.GET("/balance/:address", payment_processing.GetBalance)
-	
+
 	// Initialize admin authentication and UI
 	adminAuth := NewAdminAuth()
-	
+
 	// Register admin endpoints for monitoring and management
 	RegisterAdminEndpoints(r, adminAuth)
 
@@ -278,7 +278,7 @@ func (s *Server) Start() error {
 		WriteTimeout: s.config.WriteTimeout,
 		IdleTimeout:  s.config.IdleTimeout,
 	}
-	
+
 	err = s.httpServer.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to run server: %v", err)
@@ -328,17 +328,17 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 	//define the router
 	r := gin.Default()
 	r.Use(cors.Default())
-	
+
 	// Add rate limiting middleware
 	r.Use(s.rateLimitMiddleware())
-	
+
 	// Add WebSocket connection limiting
 	r.Use(s.websocketLimitMiddleware())
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "version": "1.0.0"})
 	})
-	
+
 	// Add no-cache middleware for development (prevents caching issues with Air)
 	r.Use(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/static/") || strings.HasPrefix(c.Request.URL.Path, "/admin/") {
@@ -348,7 +348,7 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 		}
 		c.Next()
 	})
-	
+
 	// Serve static files for admin UI
 	r.Static("/static", "./static")
 
@@ -360,10 +360,10 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 	r.GET("/events/balance/:address", s.handleSSEWithLimit)
 	r.POST("/webhook/btc", func(c *gin.Context) { payment_processing.HandleBlockonomicsWebhook(c, bot) })
 	r.GET("/balance/:address", payment_processing.GetBalance)
-	
+
 	// Initialize admin authentication and UI
 	adminAuth := NewAdminAuth()
-	
+
 	// Register admin endpoints for monitoring and management
 	RegisterAdminEndpoints(r, adminAuth)
 
@@ -522,31 +522,31 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 		WriteTimeout: s.config.WriteTimeout,
 		IdleTimeout:  s.config.IdleTimeout,
 	}
-	
+
 	// Start server in goroutine
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			s.logger.Error("Server error:", slog.String("error", err.Error()))
 		}
 	}()
-	
+
 	// Wait for context cancellation
 	<-ctx.Done()
-	
+
 	return s.Shutdown(context.Background())
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("Shutting down server...")
-	
+
 	if s.httpServer == nil {
 		return nil
 	}
-	
+
 	// Give outstanding requests time to complete
 	shutdownCtx, cancel := context.WithTimeout(ctx, s.config.ShutdownTimeout)
 	defer cancel()
-	
+
 	return s.httpServer.Shutdown(shutdownCtx)
 }
 

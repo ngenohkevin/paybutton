@@ -30,7 +30,7 @@ func GetBalanceCache() *BalanceCache {
 			entries: make(map[string]*CacheEntry),
 			ttl:     15 * time.Second, // Cache for 15 seconds - faster detection
 		}
-		
+
 		// Start cleanup goroutine
 		go globalBalanceCache.cleanup()
 	})
@@ -89,7 +89,7 @@ func (bc *BalanceCache) GetStats() (total int, expired int) {
 
 	total = len(bc.entries)
 	now := time.Now()
-	
+
 	for _, entry := range bc.entries {
 		if now.Sub(entry.Timestamp) > bc.ttl {
 			expired++

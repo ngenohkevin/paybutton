@@ -22,7 +22,7 @@ func GetBitcoinAddressBalanceWithBlockonomics(address string) (int64, error) {
 	// Wait for rate limiter permission
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rateLimiter := GetRateLimiter()
 	if err := rateLimiter.WaitForPermission(ctx, "blockonomics"); err != nil {
 		return 0, fmt.Errorf("rate limiter timeout: %w", err)

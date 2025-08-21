@@ -1,18 +1,50 @@
 package main
 
 import (
-	"github.com/ngenohkevin/paybutton/internals/database"
-	"github.com/ngenohkevin/paybutton/internals/server"
+	"context"
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
+	"runtime"
+	"runtime/debug"
+	"syscall"
+
+	"github.com/ngenohkevin/paybutton/internals/config"
+	"github.com/ngenohkevin/paybutton/internals/database"
+	"github.com/ngenohkevin/paybutton/internals/monitoring"
+	"github.com/ngenohkevin/paybutton/internals/server"
 )
 
 func main() {
+	// Load configuration
+	cfg := config.Load()
+
+	// Set up memory limits for Render.com free tier
+	debug.SetMemoryLimit(int64(cfg.MaxMemoryMB) * 1024 * 1024)
+
+	// Optimize Go runtime for low memory
+	runtime.GOMAXPROCS(2)  // Limit CPU cores for free tier
+	debug.SetGCPercent(20) // More aggressive GC for lower memory usage
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	//Init the DB
-	err := database.InitDB()
+	// Initialize resource monitor
+	monitor := monitoring.InitResourceMonitor(
+		cfg.MaxGoroutines,
+		cfg.MaxMemoryMB,
+		cfg.CleanupInterval,
+	)
+	defer monitor.Shutdown()
+
+	logger.Info("Starting PayButton service with resource limits",
+		slog.Int("max_goroutines", cfg.MaxGoroutines),
+		slog.Int("max_memory_mb", cfg.MaxMemoryMB),
+		slog.String("environment", cfg.Environment),
+	)
+
+	//Init the DB with connection pooling
+	err := database.InitDBWithConfig(cfg.MaxIdleConns, cfg.MaxOpenConns, cfg.ConnMaxLifetime)
 	if err != nil {
 		logger.Error("Error initializing database:", slog.String("error", err.Error()))
 		os.Exit(1)
@@ -21,16 +53,32 @@ func main() {
 	//closing the db when the app exits
 	defer database.CloseDB()
 
-	srv, err := server.NewServer(logger)
+	srv, err := server.NewServerWithConfig(logger, cfg)
 	if err != nil {
 		logger.Error("Error creating server:", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+
+	// Set up graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		logger.Info("Shutdown signal received, gracefully stopping...")
+		cancel()
+		srv.Shutdown(context.Background())
+	}()
+
 	//start the server
-	if err := srv.Start(); err != nil {
+	if err := srv.StartWithContext(ctx); err != nil {
 		logger.Error("Error starting server:", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
-	log.Printf("server is live")
+	log.Printf("server is live on port %s", cfg.Port)
 }

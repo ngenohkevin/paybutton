@@ -26,7 +26,7 @@ type BlockChainBalanceResponse struct {
 }
 
 type BlockStreamResponse struct {
-	Address string `json:"address"`
+	Address    string `json:"address"`
 	ChainStats struct {
 		FundedTxoSum int64 `json:"funded_txo_sum"`
 		SpentTxoSum  int64 `json:"spent_txo_sum"`
@@ -38,7 +38,7 @@ type BlockStreamResponse struct {
 }
 
 type MempoolSpaceResponse struct {
-	Address string `json:"address"`
+	Address    string `json:"address"`
 	ChainStats struct {
 		FundedTxoSum int64 `json:"funded_txo_sum"`
 		SpentTxoSum  int64 `json:"spent_txo_sum"`
@@ -50,8 +50,8 @@ type MempoolSpaceResponse struct {
 }
 
 type BlockBookResponse struct {
-	Address     string `json:"address"`
-	Balance     string `json:"balance"`
+	Address       string `json:"address"`
+	Balance       string `json:"balance"`
 	TotalReceived string `json:"totalReceived"`
 }
 
@@ -61,7 +61,7 @@ func GetBitcoinAddressBalanceWithBlockCypher(address, token string) (int64, erro
 	// Wait for rate limiter permission
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rateLimiter := GetRateLimiter()
 	if err := rateLimiter.WaitForPermission(ctx, "blockcypher"); err != nil {
 		return 0, fmt.Errorf("rate limiter timeout: %w", err)
@@ -124,7 +124,7 @@ func GetBitcoinAddressBalanceWithBlockChain(address string) (int64, error) {
 	// Wait for rate limiter permission
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rateLimiter := GetRateLimiter()
 	if err := rateLimiter.WaitForPermission(ctx, "blockchain"); err != nil {
 		return 0, fmt.Errorf("rate limiter timeout: %w", err)
@@ -196,7 +196,7 @@ func GetBitcoinAddressBalanceWithBlockStream(address string) (int64, error) {
 	// Wait for rate limiter permission
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rateLimiter := GetRateLimiter()
 	if err := rateLimiter.WaitForPermission(ctx, "blockstream"); err != nil {
 		return 0, fmt.Errorf("rate limiter timeout: %w", err)
@@ -265,7 +265,7 @@ func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
 	// Wait for rate limiter permission
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rateLimiter := GetRateLimiter()
 	if err := rateLimiter.WaitForPermission(ctx, "mempoolspace"); err != nil {
 		return 0, fmt.Errorf("rate limiter timeout: %w", err)
@@ -334,7 +334,7 @@ func GetBitcoinAddressBalanceWithTrezor(address string) (int64, error) {
 	// Wait for rate limiter permission
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rateLimiter := GetRateLimiter()
 	if err := rateLimiter.WaitForPermission(ctx, "trezor"); err != nil {
 		return 0, fmt.Errorf("rate limiter timeout: %w", err)

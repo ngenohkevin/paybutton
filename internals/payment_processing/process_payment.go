@@ -16,16 +16,17 @@ import (
 )
 
 var (
-	chatID             int64 = 7933331471
-	addressLimit             = 6
-	addressExpiry            = 72 * time.Hour // Set address expiry time to 72 hours
-	blockCypherToken   string
-	blockonomicsAPIKey string
-	checkingAddresses  = make(map[string]bool)
-	db                 *sql.DB
-	staticBTCAddress   = "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms"
-	staticUSDTAddress  = "TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK"
-	
+	chatID                int64 = 7933331471
+	addressLimit                = 6
+	addressExpiry               = 72 * time.Hour // Set address expiry time to 72 hours
+	blockCypherToken      string
+	blockonomicsAPIKey    string
+	checkingAddresses     = make(map[string]bool)
+	checkingAddressesTime = make(map[string]time.Time) // Track when monitoring started
+	db                    *sql.DB
+	staticBTCAddress      = "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms"
+	staticUSDTAddress     = "TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK"
+
 	// Shared addresses for high-volume periods (different amounts)
 	sharedBTCAddresses = map[string]string{
 		"tier1": "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms", // $0-50
@@ -42,12 +43,12 @@ func InitializeAPIKeys() error {
 	}
 	blockCypherToken = config.BlockCypherToken
 	blockonomicsAPIKey = config.BlockonomicsAPI
-	
+
 	// Initialize subsystems
 	InitializeAddressPool()
 	InitializeRateLimiter()
 	InitializeGapMonitor()
-	
+
 	return nil
 }
 
@@ -70,6 +71,7 @@ type UserSession struct {
 	UsedAddresses          map[string]bool
 	ExtendedAddressAllowed bool
 	PaymentInfo            []PaymentInfo // Store payment information for automatic delivery
+	LastActivity           time.Time     // Track last activity for cleanup
 }
 
 var userSessions = make(map[string]*UserSession)
@@ -128,6 +130,7 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 			GeneratedAddresses: make(map[string]time.Time),
 			UsedAddresses:      make(map[string]bool),
 			PaymentInfo:        []PaymentInfo{},
+			LastActivity:       time.Now(),
 		}
 		userSessions[email] = session
 	}
@@ -179,7 +182,8 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 				log.Printf("Generated new USDT address: %s for email: %s", address, email)
 				if !checkingAddresses[address] {
 					checkingAddresses[address] = true
-					go checkBalancePeriodically(address, email, blockCypherToken, bot)
+					checkingAddressesTime[address] = time.Now()
+					StartBalanceCheckWithResourceLimit(address, email, blockCypherToken, bot, 60*time.Second)
 				}
 			} else {
 				log.Printf("Address generation limit reached for user %s. Using static USDT address.", email)
@@ -189,7 +193,8 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 			log.Printf("Reused USDT address: %s for email: %s", address, email)
 			if !checkingAddresses[address] {
 				checkingAddresses[address] = true
-				go checkBalancePeriodically(address, email, blockCypherToken, bot)
+				checkingAddressesTime[address] = time.Now()
+				StartBalanceCheckWithResourceLimit(address, email, blockCypherToken, bot, 60*time.Second)
 			}
 		}
 	} else {
@@ -299,6 +304,7 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 			UsedAddresses:          make(map[string]bool),
 			ExtendedAddressAllowed: false,
 			PaymentInfo:            []PaymentInfo{},
+			LastActivity:           time.Now(),
 		}
 		userSessions[req.Email] = session
 	}
@@ -333,12 +339,13 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		// Use the enhanced address generation logic for fast mode too
 		address = generateBTCAddressWithEnhancedLogic(req.Email, priceUSD, session, bot, clientIP)
 		mutex.Unlock()
-		
+
 		// For fast mode, always use fast polling if we got a unique address
 		if address != staticBTCAddress && !strings.HasPrefix(address, "bc1q7ss2m46955") {
 			if !checkingAddresses[address] {
 				checkingAddresses[address] = true
-				go CheckBalanceFast(address, req.Email, blockCypherToken, bot)
+				checkingAddressesTime[address] = time.Now()
+				StartBalanceCheckWithResourceLimit(address, req.Email, blockCypherToken, bot, 15*time.Second)
 			}
 		}
 
@@ -400,30 +407,31 @@ func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session
 	gapMonitor := GetGapMonitor()
 	rateLimiter := GetRateLimiter()
 	addressPool := GetAddressPool()
-	
+
 	// Step 1: Check if we should use fallback due to gap limit issues
 	if gapMonitor.ShouldUseFallback() {
 		log.Printf("Using shared address due to gap limit threshold for %s", email)
 		return getSharedAddressForAmount(priceUSD)
 	}
-	
+
 	// Step 2: Check rate limiting
 	allowed, err := rateLimiter.AllowAddressGeneration(clientIP, email)
 	if !allowed {
 		log.Printf("Rate limit exceeded for %s: %v", email, err)
 		return getSharedAddressForAmount(priceUSD)
 	}
-	
+
 	// Step 3: Try to get a reusable address first
 	if addr, err := getReusableAddress(session, "BTC"); err == nil && addr != "" {
 		log.Printf("Reusing existing address %s for %s", addr, email)
 		if !checkingAddresses[addr] {
 			checkingAddresses[addr] = true
-			go checkBalancePeriodically(addr, email, blockCypherToken, bot)
+			checkingAddressesTime[addr] = time.Now()
+			StartBalanceCheckWithResourceLimit(addr, email, blockCypherToken, bot, 60*time.Second)
 		}
 		return addr
 	}
-	
+
 	// Step 4: Try to get address from pool
 	poolAddr, err := addressPool.ReserveAddress(email, priceUSD)
 	if err == nil && poolAddr != "" {
@@ -432,18 +440,19 @@ func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session
 		gapMonitor.RecordAddressGeneration()
 		if !checkingAddresses[poolAddr] {
 			checkingAddresses[poolAddr] = true
-			go checkBalancePeriodically(poolAddr, email, blockCypherToken, bot)
+			checkingAddressesTime[poolAddr] = time.Now()
+			StartBalanceCheckWithResourceLimit(poolAddr, email, blockCypherToken, bot, 60*time.Second)
 		}
 		return poolAddr
 	}
-	
+
 	// Step 5: Try to generate new address if within limits
 	if len(session.GeneratedAddresses) < addressLimit || session.ExtendedAddressAllowed {
 		addr, err := payments2.GenerateBitcoinAddress(email, priceUSD)
 		if err != nil || addr == "" {
 			if err != nil {
 				log.Printf("Error generating Bitcoin address: %s", err)
-				
+
 				// Check if it's a gap limit error
 				if isGapLimitError(err) {
 					gapMonitor.RecordGapLimitError(email, err.Error())
@@ -451,21 +460,22 @@ func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session
 			} else {
 				log.Printf("Error generating Bitcoin address: empty address returned")
 			}
-			
+
 			return getSharedAddressForAmount(priceUSD)
 		}
-		
+
 		session.GeneratedAddresses[addr] = time.Now()
 		gapMonitor.RecordAddressGeneration()
 		log.Printf("Generated new BTC address: %s for email: %s", addr, email)
-		
+
 		if !checkingAddresses[addr] {
 			checkingAddresses[addr] = true
-			go checkBalancePeriodically(addr, email, blockCypherToken, bot)
+			checkingAddressesTime[addr] = time.Now()
+			StartBalanceCheckWithResourceLimit(addr, email, blockCypherToken, bot, 60*time.Second)
 		}
 		return addr
 	}
-	
+
 	// Step 6: Fallback to shared address
 	log.Printf("All address generation methods exhausted for %s, using shared address", email)
 	return getSharedAddressForAmount(priceUSD)
@@ -487,10 +497,10 @@ func isGapLimitError(err error) bool {
 		return false
 	}
 	errStr := err.Error()
-	return strings.Contains(errStr, "Gap Limit") || 
-	       strings.Contains(errStr, "gap limit") ||
-	       strings.Contains(errStr, "code: 1008") ||
-	       strings.Contains(errStr, "too many addresses")
+	return strings.Contains(errStr, "Gap Limit") ||
+		strings.Contains(errStr, "gap limit") ||
+		strings.Contains(errStr, "code: 1008") ||
+		strings.Contains(errStr, "too many addresses")
 }
 
 func getReusableAddress(session *UserSession, currencyType string) (string, error) {

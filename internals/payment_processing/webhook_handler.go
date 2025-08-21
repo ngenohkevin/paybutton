@@ -137,7 +137,7 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 	if site == "Dwebstore" || site == "dwebstore" {
 		// DWEBSTORE: Product delivery flow
 		log.Printf("🚀 Webhook: Dwebstore payment detected - processing product delivery for %s: %s", email, productName)
-		
+
 		if productName != "" {
 			err = HandleAutomaticDelivery(email, userName, productName, site, bot)
 			if err != nil {
@@ -152,7 +152,7 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 	} else {
 		// CARDERSHAVEN or other sites: Balance update flow
 		log.Printf("🚀 Webhook: Cardershaven/other payment detected - processing balance update for %s", email)
-		
+
 		// Update database balance
 		err = database.UpdateUserBalance(email, balanceUSDRounded)
 		if err != nil {
