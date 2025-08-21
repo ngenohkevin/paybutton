@@ -137,16 +137,28 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 
 // getSystemStatus returns overall system health and statistics
 func getSystemStatus(c *gin.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in getSystemStatus: %v", r)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status": "error",
+				"error":  fmt.Sprintf("Internal error: %v", r),
+			})
+		}
+	}()
+
 	pool := payment_processing.GetAddressPool()
 	gap := payment_processing.GetGapMonitor()
 	limiter := payment_processing.GetRateLimiter()
+	resourceMonitor := monitoring.GetResourceMonitor()
 
 	status := gin.H{
 		"status": "healthy",
 		"components": gin.H{
-			"address_pool": pool.GetStats(),
-			"gap_monitor":  gap.GetStats(),
-			"rate_limiter": limiter.GetStats(),
+			"address_pool":     pool.GetStats(),
+			"gap_monitor":      gap.GetStats(),
+			"rate_limiter":     limiter.GetStats(),
+			"resource_monitor": resourceMonitor.GetStats(),
 		},
 		"recommendations": getSystemRecommendations(pool, gap),
 	}

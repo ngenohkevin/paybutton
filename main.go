@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -75,10 +75,16 @@ func main() {
 	}()
 
 	//start the server
-	if err := srv.StartWithContext(ctx); err != nil {
-		logger.Error("Error starting server:", slog.String("error", err.Error()))
-		os.Exit(1)
-	}
+	go func() {
+		if err := srv.StartWithContext(ctx); err != nil && err != http.ErrServerClosed {
+			logger.Error("Error starting server:", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+	}()
 
-	log.Printf("server is live on port %s", cfg.Port)
+	logger.Info("server is starting on port " + cfg.Port)
+	
+	// Wait for shutdown signal
+	<-ctx.Done()
+	logger.Info("Shutting down gracefully...")
 }
