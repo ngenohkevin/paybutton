@@ -8,3 +8,8 @@ tmp
 
 CLAUDE.md
 GAP_LIMIT_SOLUTION.md
+.claude
+.mcp.json
+.playwright-mcp
+.playwright
+DEPLOYMENT.md

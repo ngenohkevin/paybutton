@@ -1,0 +1,653 @@
+{{define "content"}}
+<!-- Page header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Gap Monitor</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Monitor and manage Blockonomics gap limit status and fallback systems
+            </p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <!-- Quick Actions -->
+            <button id="refresh-data" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
+            <button id="reset-failures" 
+                    class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                    onclick="showResetDialog()">
+                <i class="fas fa-redo mr-2"></i>Reset Failures
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Status Overview Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <!-- Gap Ratio Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Gap Ratio</p>
+                <p id="gap-ratio" class="text-2xl font-bold text-gray-900 dark:text-white">{{.Stats.gap_ratio}}</p>
+            </div>
+            <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                <i class="fas fa-chart-line text-blue-600 dark:text-blue-400"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div id="gap-ratio-bar" 
+                     class="h-2 rounded-full transition-all duration-300 {{if gt .Stats.unpaid_addresses 17}}bg-red-500{{else if gt .Stats.unpaid_addresses 14}}bg-orange-500{{else}}bg-green-500{{end}}"
+                     style="width: {{.GapRatioPercentage}}%">
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {{.Stats.unpaid_addresses}}/{{.Stats.max_gap_limit}} unpaid addresses
+            </p>
+        </div>
+    </div>
+
+    <!-- Consecutive Failures Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Consecutive Failures</p>
+                <p id="consecutive-failures" class="text-2xl font-bold {{if gt .Stats.consecutive_failures 2}}text-red-600 dark:text-red-400{{else if gt .Stats.consecutive_failures 0}}text-orange-600 dark:text-orange-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                    {{.Stats.consecutive_failures}}
+                </p>
+            </div>
+            <div class="p-3 rounded-full {{if gt .Stats.consecutive_failures 2}}bg-red-100 dark:bg-red-900/20{{else if gt .Stats.consecutive_failures 0}}bg-orange-100 dark:bg-orange-900/20{{else}}bg-green-100 dark:bg-green-900/20{{end}}">
+                <i class="fas fa-exclamation-triangle {{if gt .Stats.consecutive_failures 2}}text-red-600 dark:text-red-400{{else if gt .Stats.consecutive_failures 0}}text-orange-600 dark:text-orange-400{{else}}text-green-600 dark:text-green-400{{end}}"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <p class="text-xs {{if gt .Stats.consecutive_failures 2}}text-red-600 dark:text-red-400{{else if gt .Stats.consecutive_failures 0}}text-orange-600 dark:text-orange-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                {{if gt .Stats.consecutive_failures 2}}Critical - Using fallback{{else if gt .Stats.consecutive_failures 0}}Warning level{{else}}All systems normal{{end}}
+            </p>
+        </div>
+    </div>
+
+    <!-- Fallback Status Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Fallback Mode</p>
+                <div class="flex items-center mt-2">
+                    <div class="w-3 h-3 rounded-full {{if .Stats.should_use_fallback}}bg-red-500{{else}}bg-green-500{{end}} mr-2"></div>
+                    <p id="fallback-status" class="text-lg font-semibold {{if .Stats.should_use_fallback}}text-red-600 dark:text-red-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                        {{if .Stats.should_use_fallback}}Active{{else}}Inactive{{end}}
+                    </p>
+                </div>
+            </div>
+            <div class="p-3 rounded-full {{if .Stats.should_use_fallback}}bg-red-100 dark:bg-red-900/20{{else}}bg-green-100 dark:bg-green-900/20{{end}}">
+                <i class="fas fa-shield-alt {{if .Stats.should_use_fallback}}text-red-600 dark:text-red-400{{else}}text-green-600 dark:text-green-400{{end}}"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <button id="toggle-fallback" 
+                    class="text-sm px-3 py-1 rounded-full {{if .Stats.should_use_fallback}}bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900/20 dark:text-green-400{{else}}bg-orange-100 hover:bg-orange-200 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400{{end}} transition-colors font-medium"
+                    onclick="toggleFallbackMode()">
+                {{if .Stats.should_use_fallback}}Disable{{else}}Enable{{end}}
+            </button>
+        </div>
+    </div>
+
+    <!-- Recent Errors Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Errors</p>
+                <p id="recent-errors-count" class="text-2xl font-bold text-gray-900 dark:text-white">{{.Stats.recent_errors}}</p>
+            </div>
+            <div class="p-3 rounded-full bg-gray-100 dark:bg-gray-700">
+                <i class="fas fa-exclamation-circle text-gray-600 dark:text-gray-400"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Last 24 hours
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Gap Ratio Visualization -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Gap Ratio Trend</h3>
+                <div class="flex gap-2">
+                    <button class="text-sm px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors" onclick="setChartTimeframe('1h')">1H</button>
+                    <button class="text-sm px-3 py-1 rounded-full bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors" onclick="setChartTimeframe('6h')">6H</button>
+                    <button class="text-sm px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors" onclick="setChartTimeframe('24h')">24H</button>
+                </div>
+            </div>
+            <div class="h-64 relative">
+                <canvas id="gap-ratio-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Gap Monitor Settings</h3>
+            <div class="space-y-4">
+                <!-- Max Gap Limit -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Maximum Gap Limit
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="max-gap-limit" 
+                               class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               value="{{.Stats.max_gap_limit}}" min="10" max="50">
+                        <button onclick="updateGapLimit()" 
+                                class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                            Update
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Blockonomics default is 20
+                    </p>
+                </div>
+
+                <!-- Warning Threshold -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Warning Threshold
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="range" id="warning-threshold" 
+                               class="flex-1" min="0" max="100" value="70" 
+                               oninput="updateThresholdDisplay('warning')">
+                        <span id="warning-display" class="text-sm font-medium text-gray-900 dark:text-white min-w-[40px]">70%</span>
+                    </div>
+                </div>
+
+                <!-- Critical Threshold -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Critical Threshold
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="range" id="critical-threshold" 
+                               class="flex-1" min="0" max="100" value="85"
+                               oninput="updateThresholdDisplay('critical')">
+                        <span id="critical-display" class="text-sm font-medium text-gray-900 dark:text-white min-w-[40px]">85%</span>
+                    </div>
+                </div>
+
+                <!-- Save Settings -->
+                <div class="pt-4">
+                    <button onclick="saveGapSettings()" 
+                            class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                        <i class="fas fa-save mr-2"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Errors Section -->
+<div class="mt-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Recent Gap Limit Errors</h3>
+                <button onclick="clearErrorHistory()" 
+                        class="text-sm px-3 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors">
+                    <i class="fas fa-trash mr-1"></i>Clear History
+                </button>
+            </div>
+            
+            <div class="overflow-hidden">
+                <div id="errors-container" class="space-y-3 max-h-96 overflow-y-auto">
+                    {{if .RecentErrors}}
+                        {{range .RecentErrors}}
+                        <div class="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                                        <span class="text-sm font-medium text-red-800 dark:text-red-300">Gap Limit Error</span>
+                                        <span class="text-xs text-red-600 dark:text-red-400">{{.Timestamp.Format "2006-01-02 15:04:05"}}</span>
+                                    </div>
+                                    <p class="text-sm text-red-700 dark:text-red-300 mb-1">{{.Message}}</p>
+                                    {{if .Email}}
+                                    <p class="text-xs text-red-600 dark:text-red-400">User: {{.Email}}</p>
+                                    {{end}}
+                                </div>
+                            </div>
+                        </div>
+                        {{end}}
+                    {{else}}
+                    <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-check-circle text-4xl mb-4 text-green-500"></i>
+                        <p>No recent gap limit errors</p>
+                        <p class="text-sm">System is operating normally</p>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Dialog Modal -->
+<div id="reset-dialog" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+        <div class="p-6">
+            <div class="flex items-center mb-4">
+                <div class="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-full mr-3">
+                    <i class="fas fa-redo text-orange-600 dark:text-orange-400"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Reset Failure Counter</h3>
+            </div>
+            
+            <p class="text-gray-600 dark:text-gray-400 mb-4">
+                This will reset the consecutive failure counter and clear recent error conditions. 
+                Are you sure you want to proceed?
+            </p>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Set unpaid address count (optional):
+                </label>
+                <input type="number" id="reset-unpaid-count" 
+                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                       value="{{.Stats.unpaid_addresses}}" min="0" max="{{.Stats.max_gap_limit}}">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Leave unchanged to only reset failure counter
+                </p>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="hideResetDialog()" 
+                        class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    Cancel
+                </button>
+                <button onclick="confirmReset()" 
+                        class="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
+                    Reset
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+let gapRatioChart = null;
+let gapMonitorData = {{.Stats}};
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    initializeGapRatioChart();
+    setupAutoRefresh();
+});
+
+// Initialize gap ratio chart
+function initializeGapRatioChart() {
+    const ctx = document.getElementById('gap-ratio-chart').getContext('2d');
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    // Mock historical data - in real implementation, fetch from API
+    const mockData = generateMockGapData();
+    
+    gapRatioChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: mockData.labels,
+            datasets: [{
+                label: 'Gap Ratio (%)',
+                data: mockData.ratios,
+                borderColor: '#3B82F6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+                pointHoverRadius: 5
+            }, {
+                label: 'Warning Threshold',
+                data: new Array(mockData.labels.length).fill(70),
+                borderColor: '#F59E0B',
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+            }, {
+                label: 'Critical Threshold',
+                data: new Array(mockData.labels.length).fill(85),
+                borderColor: '#EF4444',
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        color: isDark ? '#E5E7EB' : '#374151'
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Time',
+                        color: isDark ? '#9CA3AF' : '#6B7280'
+                    },
+                    grid: {
+                        color: isDark ? '#374151' : '#E5E7EB'
+                    },
+                    ticks: {
+                        color: isDark ? '#9CA3AF' : '#6B7280'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Gap Ratio (%)',
+                        color: isDark ? '#9CA3AF' : '#6B7280'
+                    },
+                    grid: {
+                        color: isDark ? '#374151' : '#E5E7EB'
+                    },
+                    ticks: {
+                        color: isDark ? '#9CA3AF' : '#6B7280'
+                    },
+                    min: 0,
+                    max: 100
+                }
+            }
+        }
+    });
+}
+
+// Generate mock gap ratio data
+function generateMockGapData() {
+    const now = new Date();
+    const labels = [];
+    const ratios = [];
+    
+    // Generate 24 hours of mock data
+    for (let i = 23; i >= 0; i--) {
+        const time = new Date(now.getTime() - (i * 60 * 60 * 1000));
+        labels.push(time.getHours().toString().padStart(2, '0') + ':00');
+        
+        // Generate some realistic gap ratio data
+        const baseRatio = 20 + Math.random() * 30;
+        ratios.push(Math.min(95, baseRatio + (Math.random() - 0.5) * 20));
+    }
+    
+    return { labels, ratios };
+}
+
+// Chart timeframe functions
+function setChartTimeframe(timeframe) {
+    // Update active button
+    document.querySelectorAll('[onclick*="setChartTimeframe"]').forEach(btn => {
+        btn.className = btn.className.replace(/bg-blue-\d+/g, 'bg-gray-100').replace(/text-blue-\d+/g, 'text-gray-700');
+    });
+    event.target.className = event.target.className.replace(/bg-gray-\d+/g, 'bg-blue-100').replace(/text-gray-\d+/g, 'text-blue-700');
+    
+    // In real implementation, fetch data for the selected timeframe
+    console.log('Setting chart timeframe to:', timeframe);
+}
+
+// Threshold display functions
+function updateThresholdDisplay(type) {
+    const input = document.getElementById(type + '-threshold');
+    const display = document.getElementById(type + '-display');
+    display.textContent = input.value + '%';
+}
+
+// Gap monitor management functions
+function updateGapLimit() {
+    const newLimit = document.getElementById('max-gap-limit').value;
+    
+    fetch('/admin/api/gap-monitor/update-limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max_gap_limit: parseInt(newLimit) })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Gap limit updated successfully');
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to update gap limit');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+function saveGapSettings() {
+    const settings = {
+        warning_threshold: parseInt(document.getElementById('warning-threshold').value),
+        critical_threshold: parseInt(document.getElementById('critical-threshold').value)
+    };
+    
+    fetch('/admin/api/gap-monitor/update-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Settings saved successfully');
+        } else {
+            showNotification('error', data.message || 'Failed to save settings');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+function toggleFallbackMode() {
+    const isCurrentlyActive = gapMonitorData.should_use_fallback;
+    
+    fetch('/admin/api/gap-monitor/toggle-fallback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable: !isCurrentlyActive })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Fallback mode toggled successfully');
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to toggle fallback mode');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+function clearErrorHistory() {
+    if (!confirm('Are you sure you want to clear all error history?')) return;
+    
+    fetch('/admin/api/gap-monitor/clear-errors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Error history cleared');
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to clear error history');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+// Reset dialog functions
+function showResetDialog() {
+    document.getElementById('reset-dialog').classList.remove('hidden');
+    document.getElementById('reset-dialog').classList.add('flex');
+}
+
+function hideResetDialog() {
+    document.getElementById('reset-dialog').classList.add('hidden');
+    document.getElementById('reset-dialog').classList.remove('flex');
+}
+
+function confirmReset() {
+    const unpaidCount = document.getElementById('reset-unpaid-count').value;
+    
+    fetch('/admin/api/gap-monitor/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unpaid_count: parseInt(unpaidCount) })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Gap monitor reset successfully');
+            hideResetDialog();
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to reset gap monitor');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+// Utility functions
+function refreshData() {
+    location.reload(); // Simple refresh - could be made more sophisticated with HTMX
+}
+
+function setupAutoRefresh() {
+    // Auto-refresh every 30 seconds
+    setInterval(refreshData, 30000);
+    
+    // Refresh button handler
+    document.getElementById('refresh-data').addEventListener('click', refreshData);
+}
+
+function showNotification(type, message) {
+    // Use the global notification system from admin.js
+    if (typeof window.showNotification === 'function' && window.showNotification !== arguments.callee) {
+        window.showNotification(type, message);
+    } else {
+        alert(message);
+    }
+}
+
+// Dark mode chart update
+document.addEventListener('themeChange', function() {
+    if (gapRatioChart) {
+        const isDark = document.documentElement.classList.contains('dark');
+        gapRatioChart.options.plugins.legend.labels.color = isDark ? '#E5E7EB' : '#374151';
+        gapRatioChart.options.scales.x.title.color = isDark ? '#9CA3AF' : '#6B7280';
+        gapRatioChart.options.scales.x.grid.color = isDark ? '#374151' : '#E5E7EB';
+        gapRatioChart.options.scales.x.ticks.color = isDark ? '#9CA3AF' : '#6B7280';
+        gapRatioChart.options.scales.y.title.color = isDark ? '#9CA3AF' : '#6B7280';
+        gapRatioChart.options.scales.y.grid.color = isDark ? '#374151' : '#E5E7EB';
+        gapRatioChart.options.scales.y.ticks.color = isDark ? '#9CA3AF' : '#6B7280';
+        gapRatioChart.update();
+    }
+});
+</script>
+
+<style>
+/* Custom styles for mobile responsiveness */
+@media (max-width: 640px) {
+    .grid-cols-1 {
+        grid-template-columns: 1fr;
+    }
+    
+    .gap-4 {
+        gap: 1rem;
+    }
+    
+    .text-2xl {
+        font-size: 1.5rem;
+    }
+    
+    .p-6 {
+        padding: 1rem;
+    }
+}
+
+/* Range input styling */
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    outline: none;
+}
+
+.dark input[type="range"] {
+    background: #4b5563;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #3b82f6;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #3b82f6;
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+}
+
+/* Animation for cards */
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+</style>
+{{end}}

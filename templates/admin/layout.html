@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - PayButton Admin</title>
+    
+    <!-- Stylesheets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/admin.css" rel="stylesheet">
+    <script>
+        // Early Tailwind CDN warning suppression - must run before Tailwind loads
+        (function() {
+            const originalConsoleWarn = console.warn;
+            const originalConsoleLog = console.log;
+            const originalConsoleError = console.error;
+            
+            const shouldSuppressMessage = (message) => {
+                const msgStr = String(message || '');
+                return msgStr.includes('cdn.tailwindcss.com') || 
+                       msgStr.includes('should not be used in production') ||
+                       msgStr.includes('Tailwind CSS') ||
+                       msgStr.includes('tailwindcss.com') ||
+                       msgStr.includes('tailwind');
+            };
+            
+            console.warn = function(...args) {
+                if (args.some(arg => shouldSuppressMessage(arg))) {
+                    return; // Suppress Tailwind CDN warnings
+                }
+                originalConsoleWarn.apply(console, args);
+            };
+            
+            console.log = function(...args) {
+                if (args.some(arg => shouldSuppressMessage(arg))) {
+                    return; // Suppress Tailwind CDN warnings
+                }
+                originalConsoleLog.apply(console, args);
+            };
+            
+            console.error = function(...args) {
+                if (args.some(arg => shouldSuppressMessage(arg))) {
+                    return; // Suppress Tailwind CDN warnings
+                }
+                originalConsoleError.apply(console, args);
+            };
+        })();
+    </script>
+    <!-- Load Tailwind after console suppression -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Additional CSS to suppress any visual warnings */
+        .tailwind-warning { display: none !important; }
+    </style>
+    
+    <!-- JavaScript -->
+    <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/admin.js"></script>
+    
+    <!-- Meta tags for better mobile experience -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="PayButton Admin">
+    
+    <!-- Tailwind configuration -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6B7280',
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'ui-sans-serif', 'system-ui'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.5s ease-out',
+                        'spin-slow': 'spin 3s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Dark mode initialization -->
+    <script>
+        // Initialize theme before page load to prevent flash
+        (function() {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <nav class="nav-container">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fas fa-cog text-2xl mr-3 text-blue-600"></i>
+                        <span class="nav-brand">PayButton Admin</span>
+                    </div>
+                    <div class="hidden md:ml-8 md:flex md:space-x-2 nav-links">
+                        <a href="/admin/dashboard" class="nav-icon-item {{if eq .ActivePage "dashboard"}}active{{end}}" title="Dashboard">
+                            <i class="fas fa-tachometer-alt"></i>
+                        </a>
+                        <a href="/admin/pool" class="nav-icon-item {{if eq .ActivePage "pool"}}active{{end}}" title="Address Pool">
+                            <i class="fas fa-swimming-pool"></i>
+                        </a>
+                        <a href="/admin/gap-monitor" class="nav-icon-item {{if eq .ActivePage "gap-monitor"}}active{{end}}" title="Gap Monitor">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </a>
+                        <a href="/admin/rate-limiter" class="nav-icon-item {{if eq .ActivePage "rate-limiter"}}active{{end}}" title="Rate Limiter">
+                            <i class="fas fa-shield-alt"></i>
+                        </a>
+                        <a href="/admin/logs" class="nav-icon-item {{if eq .ActivePage "logs"}}active{{end}}" title="System Logs">
+                            <i class="fas fa-file-alt"></i>
+                        </a>
+                        <a href="/admin/analytics" class="nav-icon-item {{if eq .ActivePage "analytics"}}active{{end}}" title="Analytics">
+                            <i class="fas fa-chart-line"></i>
+                        </a>
+                        <a href="/admin/alerts" class="nav-icon-item {{if eq .ActivePage "alerts"}}active{{end}}" title="Alerts">
+                            <i class="fas fa-bell"></i>
+                        </a>
+                        <a href="/admin/sessions" class="nav-icon-item {{if eq .ActivePage "sessions"}}active{{end}}" title="Session Management">
+                            <i class="fas fa-users"></i>
+                        </a>
+                        <a href="/admin/config" class="nav-icon-item {{if eq .ActivePage "config"}}active{{end}}" title="Configuration">
+                            <i class="fas fa-cogs"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Dark mode toggle -->
+                    <div class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">
+                        <span class="sr-only">Toggle dark mode</span>
+                    </div>
+                    
+                    <!-- Current time -->
+                    <div class="hidden sm:flex text-sm text-gray-500 dark:text-gray-400 items-center">
+                        <i class="fas fa-clock mr-2"></i>
+                        <span id="current-time"></span>
+                    </div>
+                    
+                    <!-- Mobile menu button -->
+                    <button class="mobile-menu-button md:hidden" onclick="toggleMobileMenu()">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    
+                    <!-- Logout button -->
+                    <form action="/admin/logout" method="post" class="inline hidden sm:block">
+                        <button type="submit" class="text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400 text-sm font-medium transition-colors" autocomplete="off">
+                            <i class="fas fa-sign-out-alt mr-1"></i>Logout
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Mobile menu -->
+            <div class="mobile-menu" id="mobile-menu">
+                <a href="/admin/dashboard" class="nav-item {{if eq .ActivePage "dashboard"}}active{{end}}">
+                    <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                </a>
+                <a href="/admin/pool" class="nav-item {{if eq .ActivePage "pool"}}active{{end}}">
+                    <i class="fas fa-swimming-pool mr-2"></i>Address Pool
+                </a>
+                <a href="/admin/gap-monitor" class="nav-item {{if eq .ActivePage "gap-monitor"}}active{{end}}">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Gap Monitor
+                </a>
+                <a href="/admin/rate-limiter" class="nav-item {{if eq .ActivePage "rate-limiter"}}active{{end}}">
+                    <i class="fas fa-shield-alt mr-2"></i>Rate Limiter
+                </a>
+                <a href="/admin/logs" class="nav-item {{if eq .ActivePage "logs"}}active{{end}}">
+                    <i class="fas fa-file-alt mr-2"></i>System Logs
+                </a>
+                <a href="/admin/analytics" class="nav-item {{if eq .ActivePage "analytics"}}active{{end}}">
+                    <i class="fas fa-chart-line mr-2"></i>Analytics
+                </a>
+                <a href="/admin/alerts" class="nav-item {{if eq .ActivePage "alerts"}}active{{end}}">
+                    <i class="fas fa-bell mr-2"></i>Alerts
+                </a>
+                <a href="/admin/sessions" class="nav-item {{if eq .ActivePage "sessions"}}active{{end}}">
+                    <i class="fas fa-users mr-2"></i>Session Management
+                </a>
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                    <form action="/admin/logout" method="post">
+                        <button type="submit" class="nav-item text-red-600 hover:text-red-700 w-full text-left">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+        <!-- Flash messages -->
+        {{if .Flash}}
+        <div class="mb-6">
+            {{range .Flash}}
+            <div class="notification-success rounded-lg p-4 mb-3 animate-fade-in">
+                <i class="fas fa-check-circle mr-2"></i>{{.}}
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+
+        {{if .Errors}}
+        <div class="mb-6">
+            {{range .Errors}}
+            <div class="notification-error rounded-lg p-4 mb-3 animate-fade-in">
+                <i class="fas fa-exclamation-circle mr-2"></i>{{.}}
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+
+        <!-- Main content -->
+        <div class="animate-fade-in">
+            {{template "content" .}}
+        </div>
+    </main>
+
+    <!-- Connection status indicator -->
+    <div id="connection-status" class="fixed bottom-4 right-4 z-50 hidden">
+        <div class="bg-gray-800 text-white px-3 py-2 rounded-lg text-sm">
+            <i class="fas fa-wifi mr-2"></i>
+            <span>Reconnecting...</span>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode toggle function
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            localStorage.setItem('theme', newTheme);
+            html.setAttribute('data-theme', newTheme);
+            
+            if (newTheme === 'dark') {
+                html.classList.add('dark');
+            } else {
+                html.classList.remove('dark');
+            }
+        }
+
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            const button = document.querySelector('.mobile-menu-button');
+            
+            menu.classList.toggle('active');
+            button.classList.toggle('active');
+        }
+
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = now.toLocaleString();
+            }
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // Auto-refresh every 30 seconds (only if WebSocket is not connected)
+        setInterval(function() {
+            if (window.location.pathname.includes('/admin/dashboard')) {
+                // Only trigger refresh if WebSocket is not connected or failed
+                if (!window.wsConnection || window.wsConnection.readyState !== WebSocket.OPEN) {
+                    htmx.trigger('#auto-refresh', 'refresh');
+                }
+            }
+        }, 30000);
+
+        // Enhanced HTMX error handling
+        document.body.addEventListener('htmx:responseError', function(event) {
+            console.error('HTMX Error:', event.detail.xhr.responseText);
+            showNotification('error', 'Connection error. Please check your network.');
+        });
+
+        // Connection status monitoring
+        let isOnline = navigator.onLine;
+        
+        function updateConnectionStatus() {
+            const statusEl = document.getElementById('connection-status');
+            if (!navigator.onLine && isOnline) {
+                statusEl.classList.remove('hidden');
+                showNotification('error', 'Connection lost. Attempting to reconnect...');
+                isOnline = false;
+            } else if (navigator.onLine && !isOnline) {
+                statusEl.classList.add('hidden');
+                showNotification('success', 'Connection restored');
+                isOnline = true;
+                // Refresh the dashboard if on dashboard page
+                if (window.location.pathname.includes('/admin/dashboard')) {
+                    htmx.trigger('#auto-refresh', 'refresh');
+                }
+            }
+        }
+        
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const menu = document.getElementById('mobile-menu');
+            const button = document.querySelector('.mobile-menu-button');
+            
+            if (menu.classList.contains('active') && 
+                !menu.contains(event.target) && 
+                !button.contains(event.target)) {
+                menu.classList.remove('active');
+                button.classList.remove('active');
+            }
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            // Escape key closes mobile menu
+            if (e.key === 'Escape') {
+                const menu = document.getElementById('mobile-menu');
+                const button = document.querySelector('.mobile-menu-button');
+                if (menu.classList.contains('active')) {
+                    menu.classList.remove('active');
+                    button.classList.remove('active');
+                }
+            }
+            
+            // Alt + D toggles dark mode
+            if (e.altKey && e.key === 'd') {
+                e.preventDefault();
+                toggleDarkMode();
+            }
+        });
+    </script>
+</body>
+</html>

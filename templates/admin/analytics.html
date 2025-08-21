@@ -1,0 +1,1147 @@
+{{define "content"}}
+<div class="analytics-dashboard animate-fade-in">
+    <!-- Analytics Header -->
+    <div class="dashboard-header mb-8">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    <i class="fas fa-chart-line mr-3 text-blue-600"></i>Analytics & Metrics
+                </h1>
+                <p class="text-gray-600 dark:text-gray-400 mt-2">
+                    Real-time performance insights and historical data analysis
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <select id="timePeriodSelect" class="filter-control bg-white dark:bg-gray-800">
+                    <option value="1h">Last Hour</option>
+                    <option value="6h">Last 6 Hours</option>
+                    <option value="24h" selected>Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                </select>
+                <button onclick="refreshAnalytics()" class="btn btn-primary">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+                <button onclick="exportAnalytics()" class="btn btn-secondary">
+                    <i class="fas fa-download mr-2"></i>Export
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Performance Indicators -->
+    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Uptime KPI -->
+        <div class="kpi-card card hover:scale-105 transition-transform">
+            <div class="card-body text-center">
+                <div class="kpi-icon mb-4">
+                    <i class="fas fa-clock text-4xl text-green-500"></i>
+                </div>
+                <div class="kpi-value text-3xl font-bold text-green-600 dark:text-green-400 mb-2" id="uptimeValue">
+                    99.9%
+                </div>
+                <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    System Uptime
+                </div>
+                <div class="kpi-change text-xs text-green-600 mt-2">
+                    <i class="fas fa-arrow-up mr-1"></i>+0.1% from yesterday
+                </div>
+            </div>
+        </div>
+
+        <!-- Address Generation Rate KPI -->
+        <div class="kpi-card card hover:scale-105 transition-transform">
+            <div class="card-body text-center">
+                <div class="kpi-icon mb-4">
+                    <i class="fas fa-plus-circle text-4xl text-blue-500"></i>
+                </div>
+                <div class="kpi-value text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2" id="addressGenValue">
+                    8.5
+                </div>
+                <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    Addresses/Min
+                </div>
+                <div class="kpi-change text-xs text-blue-600 mt-2">
+                    <i class="fas fa-arrow-up mr-1"></i>+12% from last hour
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Success Rate KPI -->
+        <div class="kpi-card card hover:scale-105 transition-transform">
+            <div class="card-body text-center">
+                <div class="kpi-icon mb-4">
+                    <i class="fas fa-check-circle text-4xl text-emerald-500"></i>
+                </div>
+                <div class="kpi-value text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-2" id="paymentSuccessValue">
+                    97.2%
+                </div>
+                <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    Payment Success
+                </div>
+                <div class="kpi-change text-xs text-emerald-600 mt-2">
+                    <i class="fas fa-arrow-up mr-1"></i>+1.5% improvement
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Rate KPI -->
+        <div class="kpi-card card hover:scale-105 transition-transform">
+            <div class="card-body text-center">
+                <div class="kpi-icon mb-4">
+                    <i class="fas fa-exclamation-triangle text-4xl text-amber-500"></i>
+                </div>
+                <div class="kpi-value text-3xl font-bold text-amber-600 dark:text-amber-400 mb-2" id="errorRateValue">
+                    0.8%
+                </div>
+                <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    Error Rate
+                </div>
+                <div class="kpi-change text-xs text-green-600 mt-2">
+                    <i class="fas fa-arrow-down mr-1"></i>-0.3% improvement
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Charts Section -->
+    <div class="charts-section grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Address Generation Trend -->
+        <div class="chart-card card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-chart-area text-blue-500 mr-3"></i>
+                    Address Generation Trend
+                </h3>
+                <div class="chart-controls">
+                    <button class="chart-toggle active" data-chart="area">Area</button>
+                    <button class="chart-toggle" data-chart="line">Line</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container h-64">
+                    <canvas id="addressGenChart"></canvas>
+                </div>
+                <div class="chart-stats mt-4 grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-lg font-bold text-blue-600" id="avgGenRate">8.5</div>
+                        <div class="text-xs text-gray-500">Avg Rate</div>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-green-600" id="peakGenRate">12.3</div>
+                        <div class="text-xs text-gray-500">Peak Rate</div>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-purple-600" id="totalGenerated">1,247</div>
+                        <div class="text-xs text-gray-500">Total Generated</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Success Trend -->
+        <div class="chart-card card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-chart-line text-emerald-500 mr-3"></i>
+                    Payment Success Trend
+                </h3>
+                <div class="chart-controls">
+                    <button class="chart-toggle active" data-chart="line">Line</button>
+                    <button class="chart-toggle" data-chart="bar">Bar</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container h-64">
+                    <canvas id="paymentTrendChart"></canvas>
+                </div>
+                <div class="chart-stats mt-4 grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-lg font-bold text-emerald-600" id="avgSuccessRate">97.2%</div>
+                        <div class="text-xs text-gray-500">Avg Success</div>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-blue-600" id="totalPayments">523</div>
+                        <div class="text-xs text-gray-500">Total Payments</div>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-purple-600" id="failedPayments">15</div>
+                        <div class="text-xs text-gray-500">Failed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Performance & Errors -->
+    <div class="performance-section grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <!-- System Performance Chart -->
+        <div class="chart-card card lg:col-span-2">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-tachometer-alt text-purple-500 mr-3"></i>
+                    System Performance Score
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container h-64">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+                <div class="performance-details mt-4 space-y-3">
+                    <div class="performance-metric flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Response Time</span>
+                        <div class="flex items-center">
+                            <span class="text-sm font-medium mr-2" id="responseTime">75ms</span>
+                            <div class="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                                <div class="h-2 bg-green-500 rounded-full" style="width: 85%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="performance-metric flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Memory Usage</span>
+                        <div class="flex items-center">
+                            <span class="text-sm font-medium mr-2" id="memoryUsage">156MB</span>
+                            <div class="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                                <div class="h-2 bg-blue-500 rounded-full" style="width: 62%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="performance-metric flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">CPU Usage</span>
+                        <div class="flex items-center">
+                            <span class="text-sm font-medium mr-2" id="cpuUsage">23%</span>
+                            <div class="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                                <div class="h-2 bg-yellow-500 rounded-full" style="width: 23%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Rate Distribution -->
+        <div class="chart-card card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-bug text-red-500 mr-3"></i>
+                    Error Distribution
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container h-64">
+                    <canvas id="errorDistributionChart"></canvas>
+                </div>
+                <div class="error-legend mt-4 space-y-2">
+                    <div class="flex justify-between items-center text-sm">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-red-500 rounded mr-2"></div>
+                            <span>Critical</span>
+                        </div>
+                        <span class="font-medium">2</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-yellow-500 rounded mr-2"></div>
+                            <span>Warning</span>
+                        </div>
+                        <span class="font-medium">8</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-blue-500 rounded mr-2"></div>
+                            <span>Info</span>
+                        </div>
+                        <span class="font-medium">5</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Activity & Insights -->
+    <div class="insights-section grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Real-time Activity Feed -->
+        <div class="activity-card card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-stream text-indigo-500 mr-3"></i>
+                    Real-time Activity
+                </h3>
+                <div class="activity-status">
+                    <span class="flex items-center text-sm text-green-600 dark:text-green-400">
+                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                        Live
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="activity-feed h-64 overflow-y-auto space-y-3" id="activityFeed">
+                    <!-- Real-time activities will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="insights-card card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-lightbulb text-yellow-500 mr-3"></i>
+                    AI Insights & Recommendations
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="insights-list space-y-4" id="insightsList">
+                    <!-- Insights will be populated here -->
+                </div>
+                <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div class="text-center">
+                        <button onclick="generateInsights()" class="btn btn-primary">
+                            <i class="fas fa-magic mr-2"></i>Generate New Insights
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Analytics Tables -->
+    <div class="tables-section">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-table text-gray-500 mr-3"></i>
+                    Detailed Analytics
+                </h3>
+                <div class="table-controls flex gap-2">
+                    <button class="table-tab active" data-tab="overview">Overview</button>
+                    <button class="table-tab" data-tab="performance">Performance</button>
+                    <button class="table-tab" data-tab="errors">Errors</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Overview Tab -->
+                <div class="tab-content active" id="overview-tab">
+                    <div class="overflow-x-auto">
+                        <table class="analytics-table w-full">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Current</th>
+                                    <th>1h Ago</th>
+                                    <th>24h Ago</th>
+                                    <th>Change</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="overviewTableBody">
+                                <!-- Table data will be populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Performance Tab -->
+                <div class="tab-content" id="performance-tab">
+                    <div class="overflow-x-auto">
+                        <table class="analytics-table w-full">
+                            <thead>
+                                <tr>
+                                    <th>Component</th>
+                                    <th>Response Time</th>
+                                    <th>Throughput</th>
+                                    <th>Error Rate</th>
+                                    <th>Health Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="performanceTableBody">
+                                <!-- Performance data will be populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Errors Tab -->
+                <div class="tab-content" id="errors-tab">
+                    <div class="overflow-x-auto">
+                        <table class="analytics-table w-full">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Component</th>
+                                    <th>Error Type</th>
+                                    <th>Severity</th>
+                                    <th>Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="errorsTableBody">
+                                <!-- Error data will be populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="analyticsLoading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-8 text-center">
+        <div class="loading-spinner mx-auto mb-4"></div>
+        <p class="text-gray-600 dark:text-gray-400">Loading analytics data...</p>
+    </div>
+</div>
+
+<style>
+/* Analytics-specific styles */
+.analytics-dashboard {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.kpi-card {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ef4444, #10b981);
+    background-size: 200% 100%;
+    animation: gradientShift 3s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 0%; }
+    50% { background-position: 100% 0%; }
+}
+
+.kpi-icon {
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+}
+
+.kpi-value {
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chart-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.chart-container {
+    position: relative;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chart-toggle {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chart-toggle.active {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+}
+
+.chart-toggle:hover:not(.active) {
+    background: var(--border-color);
+}
+
+.chart-stats {
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .chart-stats {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.performance-metric {
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+    transition: all 0.2s ease;
+}
+
+.performance-metric:hover {
+    background: rgba(255, 255, 255, 0.5);
+    transform: translateX(4px);
+}
+
+[data-theme="dark"] .performance-metric {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .performance-metric:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.activity-feed {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    border-left: 4px solid var(--accent-blue);
+    transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+    background: rgba(255, 255, 255, 0.5);
+    transform: translateX(4px);
+}
+
+[data-theme="dark"] .activity-item {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .activity-item:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.insight-item {
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
+    border-radius: 12px;
+    border-left: 4px solid var(--accent-yellow);
+    transition: all 0.3s ease;
+}
+
+.insight-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .insight-item {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.1) 100%);
+}
+
+.table-tab {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.table-tab.active {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+}
+
+.table-tab:hover:not(.active) {
+    background: var(--border-color);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.analytics-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.analytics-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.875rem;
+}
+
+.analytics-table th:first-child {
+    border-top-left-radius: 8px;
+}
+
+.analytics-table th:last-child {
+    border-top-right-radius: 8px;
+}
+
+.analytics-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.analytics-table tr:hover td {
+    background: var(--bg-tertiary);
+}
+
+.analytics-table tr:last-child td:first-child {
+    border-bottom-left-radius: 8px;
+}
+
+.analytics-table tr:last-child td:last-child {
+    border-bottom-right-radius: 8px;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.status-badge.healthy {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+}
+
+.status-badge.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--accent-yellow);
+}
+
+.status-badge.critical {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-red);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .charts-section {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .performance-section {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .insights-section {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .chart-container {
+        height: 200px !important;
+    }
+    
+    .chart-stats {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .analytics-table {
+        font-size: 0.75rem;
+    }
+    
+    .analytics-table th,
+    .analytics-table td {
+        padding: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .kpi-value {
+        font-size: 2rem;
+    }
+    
+    .chart-container {
+        height: 180px !important;
+        padding: 0.5rem;
+    }
+    
+    .performance-metric {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    
+    .insight-item {
+        padding: 0.75rem;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .kpi-card,
+    .chart-card,
+    .activity-card,
+    .insights-card {
+        border-width: 2px;
+        border-color: currentColor;
+    }
+    
+    .chart-container {
+        border: 1px solid currentColor;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .kpi-card::before {
+        animation: none;
+    }
+    
+    .analytics-dashboard,
+    .tab-content.active {
+        animation: none;
+    }
+    
+    .kpi-card,
+    .chart-card {
+        transition: none;
+    }
+}
+</style>
+
+<script>
+// Analytics Dashboard JavaScript
+let analyticsData = {};
+let charts = {};
+let currentPeriod = '24h';
+
+// Initialize analytics dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeAnalytics();
+    setupEventListeners();
+    startRealTimeUpdates();
+});
+
+function initializeAnalytics() {
+    loadAnalyticsData();
+    initializeCharts();
+    populateTablesData();
+    generateInsights();
+    startActivityFeed();
+}
+
+function setupEventListeners() {
+    // Time period selector
+    document.getElementById('timePeriodSelect').addEventListener('change', function(e) {
+        currentPeriod = e.target.value;
+        refreshAnalytics();
+    });
+    
+    // Chart toggles
+    document.querySelectorAll('.chart-toggle').forEach(button => {
+        button.addEventListener('click', function() {
+            const chartType = this.dataset.chart;
+            const container = this.closest('.chart-card');
+            
+            // Update toggle state
+            container.querySelectorAll('.chart-toggle').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update chart (placeholder for chart type switching)
+            console.log('Switching chart type to:', chartType);
+        });
+    });
+    
+    // Table tabs
+    document.querySelectorAll('.table-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+            
+            // Update tab state
+            document.querySelectorAll('.table-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show corresponding content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + '-tab').classList.add('active');
+        });
+    });
+}
+
+function loadAnalyticsData() {
+    // Simulate loading analytics data
+    analyticsData = {
+        uptime: 99.9,
+        addressGenRate: 8.5,
+        paymentSuccessRate: 97.2,
+        errorRate: 0.8,
+        responseTime: 75,
+        memoryUsage: 156,
+        cpuUsage: 23,
+        insights: [
+            "System performance is optimal with 99.9% uptime",
+            "Address generation rate increased by 12% in the last hour",
+            "Payment success rate improved by 1.5% compared to yesterday",
+            "Error rate decreased by 0.3% - system stability improving"
+        ]
+    };
+    
+    updateKPIs();
+}
+
+function updateKPIs() {
+    document.getElementById('uptimeValue').textContent = analyticsData.uptime + '%';
+    document.getElementById('addressGenValue').textContent = analyticsData.addressGenRate;
+    document.getElementById('paymentSuccessValue').textContent = analyticsData.paymentSuccessRate + '%';
+    document.getElementById('errorRateValue').textContent = analyticsData.errorRate + '%';
+    document.getElementById('responseTime').textContent = analyticsData.responseTime + 'ms';
+    document.getElementById('memoryUsage').textContent = analyticsData.memoryUsage + 'MB';
+    document.getElementById('cpuUsage').textContent = analyticsData.cpuUsage + '%';
+}
+
+function initializeCharts() {
+    // Address Generation Chart
+    const addressGenCtx = document.getElementById('addressGenChart').getContext('2d');
+    charts.addressGen = new Chart(addressGenCtx, {
+        type: 'line',
+        data: {
+            labels: generateTimeLabels(),
+            datasets: [{
+                label: 'Addresses/Min',
+                data: generateSampleData(20, 5, 15),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: getChartOptions('Addresses per Minute')
+    });
+    
+    // Payment Trend Chart
+    const paymentTrendCtx = document.getElementById('paymentTrendChart').getContext('2d');
+    charts.paymentTrend = new Chart(paymentTrendCtx, {
+        type: 'line',
+        data: {
+            labels: generateTimeLabels(),
+            datasets: [{
+                label: 'Success Rate %',
+                data: generateSampleData(20, 95, 100),
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: getChartOptions('Success Rate (%)')
+    });
+    
+    // Performance Chart
+    const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+    charts.performance = new Chart(performanceCtx, {
+        type: 'line',
+        data: {
+            labels: generateTimeLabels(),
+            datasets: [{
+                label: 'Performance Score',
+                data: generateSampleData(20, 85, 100),
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: getChartOptions('Performance Score')
+    });
+    
+    // Error Distribution Chart
+    const errorCtx = document.getElementById('errorDistributionChart').getContext('2d');
+    charts.errorDistribution = new Chart(errorCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Critical', 'Warning', 'Info'],
+            datasets: [{
+                data: [2, 8, 5],
+                backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function getChartOptions(yAxisLabel) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            x: {
+                display: false
+            },
+            y: {
+                display: false
+            }
+        },
+        elements: {
+            point: {
+                radius: 3,
+                hoverRadius: 6
+            }
+        }
+    };
+}
+
+function generateTimeLabels() {
+    const labels = [];
+    for (let i = 19; i >= 0; i--) {
+        const time = new Date(Date.now() - i * 60000);
+        labels.push(time.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
+    }
+    return labels;
+}
+
+function generateSampleData(count, min, max) {
+    const data = [];
+    for (let i = 0; i < count; i++) {
+        data.push(Math.random() * (max - min) + min);
+    }
+    return data;
+}
+
+function populateTablesData() {
+    // Overview Table
+    const overviewData = [
+        { metric: 'System Uptime', current: '99.9%', hour: '99.8%', day: '99.7%', change: '+0.2%', status: 'healthy' },
+        { metric: 'Address Generation', current: '8.5/min', hour: '7.6/min', day: '8.1/min', change: '+11.8%', status: 'healthy' },
+        { metric: 'Payment Success', current: '97.2%', hour: '96.8%', day: '95.7%', change: '+1.5%', status: 'healthy' },
+        { metric: 'Error Rate', current: '0.8%', hour: '1.1%', day: '1.1%', change: '-0.3%', status: 'healthy' },
+        { metric: 'Response Time', current: '75ms', hour: '78ms', day: '82ms', change: '-8.5%', status: 'healthy' }
+    ];
+    
+    populateTable('overviewTableBody', overviewData, ['metric', 'current', 'hour', 'day', 'change', 'status']);
+    
+    // Performance Table
+    const performanceData = [
+        { component: 'Address Pool', responseTime: '45ms', throughput: '8.5/min', errorRate: '0.2%', healthScore: '98%' },
+        { component: 'Gap Monitor', responseTime: '12ms', throughput: '120/min', errorRate: '0.1%', healthScore: '99%' },
+        { component: 'Rate Limiter', responseTime: '8ms', throughput: '200/min', errorRate: '0.0%', healthScore: '100%' },
+        { component: 'WebSocket', responseTime: '25ms', throughput: '50/min', errorRate: '0.5%', healthScore: '95%' }
+    ];
+    
+    populateTable('performanceTableBody', performanceData, ['component', 'responseTime', 'throughput', 'errorRate', 'healthScore']);
+    
+    // Errors Table
+    const errorsData = [
+        { time: '14:23:15', component: 'Pool', errorType: 'Generation Timeout', severity: 'warning', count: '3', actions: 'view' },
+        { time: '14:18:42', component: 'API', errorType: 'Rate Limit Hit', severity: 'info', count: '5', actions: 'view' },
+        { time: '14:15:33', component: 'WebSocket', errorType: 'Connection Drop', severity: 'warning', count: '2', actions: 'view' },
+        { time: '14:12:18', component: 'Gap', errorType: 'Threshold Warning', severity: 'critical', count: '1', actions: 'view' }
+    ];
+    
+    populateTable('errorsTableBody', errorsData, ['time', 'component', 'errorType', 'severity', 'count', 'actions']);
+}
+
+function populateTable(tableId, data, columns) {
+    const tbody = document.getElementById(tableId);
+    tbody.innerHTML = '';
+    
+    data.forEach(row => {
+        const tr = document.createElement('tr');
+        columns.forEach(col => {
+            const td = document.createElement('td');
+            
+            if (col === 'status' || col === 'severity') {
+                td.innerHTML = `<span class="status-badge ${row[col]}">${row[col]}</span>`;
+            } else if (col === 'actions') {
+                td.innerHTML = `<button class="btn-secondary text-xs">View Details</button>`;
+            } else if (col === 'change') {
+                const isPositive = row[col].startsWith('+');
+                const color = isPositive ? 'text-green-600' : 'text-red-600';
+                const icon = isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
+                td.innerHTML = `<span class="${color}"><i class="fas ${icon} mr-1"></i>${row[col]}</span>`;
+            } else {
+                td.textContent = row[col];
+            }
+            
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+function startActivityFeed() {
+    const feed = document.getElementById('activityFeed');
+    const activities = [
+        { icon: 'fas fa-plus-circle', text: 'Generated 5 new addresses', time: '2 minutes ago', type: 'success' },
+        { icon: 'fas fa-check-circle', text: 'Payment confirmed: 0.0025 BTC', time: '3 minutes ago', type: 'success' },
+        { icon: 'fas fa-exclamation-triangle', text: 'Rate limit warning for IP 192.168.1.100', time: '5 minutes ago', type: 'warning' },
+        { icon: 'fas fa-sync-alt', text: 'Pool refill completed successfully', time: '8 minutes ago', type: 'info' },
+        { icon: 'fas fa-user-shield', text: 'Admin login from new location', time: '12 minutes ago', type: 'info' }
+    ];
+    
+    feed.innerHTML = '';
+    activities.forEach(activity => {
+        const div = document.createElement('div');
+        div.className = 'activity-item';
+        div.innerHTML = `
+            <div class="flex items-center w-full">
+                <i class="${activity.icon} text-lg mr-3 ${getActivityColor(activity.type)}"></i>
+                <div class="flex-1">
+                    <div class="text-sm font-medium">${activity.text}</div>
+                    <div class="text-xs text-gray-500">${activity.time}</div>
+                </div>
+            </div>
+        `;
+        feed.appendChild(div);
+    });
+}
+
+function getActivityColor(type) {
+    switch (type) {
+        case 'success': return 'text-green-500';
+        case 'warning': return 'text-yellow-500';
+        case 'error': return 'text-red-500';
+        default: return 'text-blue-500';
+    }
+}
+
+function generateInsights() {
+    const insightsList = document.getElementById('insightsList');
+    insightsList.innerHTML = '';
+    
+    analyticsData.insights.forEach(insight => {
+        const div = document.createElement('div');
+        div.className = 'insight-item';
+        div.innerHTML = `
+            <div class="flex items-start">
+                <i class="fas fa-lightbulb text-yellow-500 mr-3 mt-1"></i>
+                <div class="flex-1">
+                    <p class="text-sm text-gray-700 dark:text-gray-300">${insight}</p>
+                </div>
+            </div>
+        `;
+        insightsList.appendChild(div);
+    });
+}
+
+function startRealTimeUpdates() {
+    setInterval(() => {
+        // Simulate real-time updates
+        analyticsData.addressGenRate = (Math.random() * 10 + 5).toFixed(1);
+        analyticsData.responseTime = Math.floor(Math.random() * 50 + 50);
+        updateKPIs();
+        
+        // Update charts with new data
+        Object.values(charts).forEach(chart => {
+            if (chart.data.datasets[0].data) {
+                chart.data.datasets[0].data.shift();
+                chart.data.datasets[0].data.push(Math.random() * 20 + 80);
+                chart.update('none');
+            }
+        });
+    }, 5000);
+}
+
+function refreshAnalytics() {
+    const loading = document.getElementById('analyticsLoading');
+    loading.classList.remove('hidden');
+    
+    setTimeout(() => {
+        loadAnalyticsData();
+        populateTablesData();
+        startActivityFeed();
+        loading.classList.add('hidden');
+    }, 1000);
+}
+
+function exportAnalytics() {
+    const data = {
+        timestamp: new Date().toISOString(),
+        period: currentPeriod,
+        analytics: analyticsData
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showNotification('success', 'Analytics data exported successfully');
+}
+
+// Utility function for notifications
+function showNotification(type, message) {
+    // Implement notification system
+    console.log(`${type.toUpperCase()}: ${message}`);
+}
+</script>
+{{end}}

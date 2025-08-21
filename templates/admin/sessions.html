@@ -1,0 +1,904 @@
+{{define "content"}}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <i class="fas fa-users text-blue-500 mr-3"></i>Session Management
+                </h1>
+                <p class="text-gray-600 dark:text-gray-400 text-sm">
+                    Monitor and manage active user payment sessions in real-time
+                </p>
+            </div>
+            <div class="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2">
+                <button onclick="refreshSessions()" class="btn-secondary text-sm">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+                <button onclick="exportSessions()" class="btn-primary text-sm">
+                    <i class="fas fa-download mr-2"></i>Export
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Statistics -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6" id="session-stats">
+        <!-- Active Sessions Card -->
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900">
+                        <i class="fas fa-play text-blue-600 dark:text-blue-400"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Active Sessions</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white" id="active-count">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WebSocket Connections Card -->
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 dark:bg-green-900">
+                        <i class="fas fa-wifi text-green-600 dark:text-green-400"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">WebSocket</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white" id="websocket-count">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Rate Card -->
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900">
+                        <i class="fas fa-check-circle text-purple-600 dark:text-purple-400"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Success Rate</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white" id="success-rate">0%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Amount Card -->
+        <div class="card">
+            <div class="card-body">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900">
+                        <i class="fas fa-bitcoin text-yellow-600 dark:text-yellow-400"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Amount</p>
+                        <p class="text-lg font-bold text-gray-900 dark:text-white" id="total-amount">0 BTC</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Management Tabs -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+        <!-- Tab Headers -->
+        <div class="border-b border-gray-200 dark:border-gray-700">
+            <nav class="flex overflow-x-auto -mb-px" aria-label="Tabs">
+                <button onclick="switchTab('active')" 
+                        class="tab-button active" 
+                        id="active-tab">
+                    <i class="fas fa-play mr-2"></i>
+                    <span class="hidden sm:inline">Active Sessions</span>
+                    <span class="sm:hidden">Active</span>
+                    <span class="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full" id="active-badge">0</span>
+                </button>
+                <button onclick="switchTab('history')" 
+                        class="tab-button" 
+                        id="history-tab">
+                    <i class="fas fa-history mr-2"></i>
+                    <span class="hidden sm:inline">Session History</span>
+                    <span class="sm:hidden">History</span>
+                    <span class="ml-2 bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full" id="history-badge">0</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="p-4 sm:p-6">
+            <!-- Active Sessions Tab -->
+            <div id="active-sessions-content" class="tab-content active">
+                <!-- Mobile-First Filter Controls -->
+                <div class="mb-4 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <div class="relative">
+                            <input type="text" 
+                                   placeholder="Search sessions..." 
+                                   id="active-search"
+                                   class="input-field pl-8 w-full sm:w-auto"
+                                   onkeyup="filterActiveSessions()">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                        <select id="active-status-filter" 
+                                class="input-field w-full sm:w-auto"
+                                onchange="filterActiveSessions()">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="websocket">With WebSocket</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="cleanupExpiredSessions()" class="btn-secondary text-sm">
+                            <i class="fas fa-broom mr-2"></i>
+                            <span class="hidden sm:inline">Cleanup Expired</span>
+                            <span class="sm:hidden">Cleanup</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Sessions Table/Cards -->
+                <div class="hidden sm:block overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-900">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Session</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User Info</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="active-sessions-table" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            <!-- Active sessions will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Cards View -->
+                <div class="sm:hidden space-y-4" id="active-sessions-cards">
+                    <!-- Active session cards will be loaded here -->
+                </div>
+
+                <!-- No sessions message -->
+                <div id="no-active-sessions" class="text-center py-8 hidden">
+                    <i class="fas fa-users text-gray-400 text-4xl mb-4"></i>
+                    <p class="text-gray-500 dark:text-gray-400">No active sessions found</p>
+                </div>
+            </div>
+
+            <!-- Session History Tab -->
+            <div id="history-sessions-content" class="tab-content hidden">
+                <!-- Mobile-First Filter Controls -->
+                <div class="mb-4 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <div class="relative">
+                            <input type="text" 
+                                   placeholder="Search history..." 
+                                   id="history-search"
+                                   class="input-field pl-8 w-full sm:w-auto"
+                                   onkeyup="filterHistorySessions()">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                        <select id="history-status-filter" 
+                                class="input-field w-full sm:w-auto"
+                                onchange="filterHistorySessions()">
+                            <option value="">All Status</option>
+                            <option value="completed">Completed</option>
+                            <option value="expired">Expired</option>
+                            <option value="terminated">Terminated</option>
+                        </select>
+                        <select id="history-limit" 
+                                class="input-field w-full sm:w-auto"
+                                onchange="loadSessionHistory()">
+                            <option value="50">Last 50</option>
+                            <option value="100">Last 100</option>
+                            <option value="500">Last 500</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- History Sessions Table/Cards -->
+                <div class="hidden sm:block overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-900">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Session</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User Info</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Completed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-sessions-table" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            <!-- History sessions will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Cards View -->
+                <div class="sm:hidden space-y-4" id="history-sessions-cards">
+                    <!-- History session cards will be loaded here -->
+                </div>
+
+                <!-- No history message -->
+                <div id="no-history-sessions" class="text-center py-8 hidden">
+                    <i class="fas fa-history text-gray-400 text-4xl mb-4"></i>
+                    <p class="text-gray-500 dark:text-gray-400">No session history found</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Session Detail Modal -->
+<div id="session-detail-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-lg bg-white dark:bg-gray-800">
+        <div class="mt-3">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-info-circle mr-2"></i>Session Details
+                </h3>
+                <button onclick="closeSessionModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Content -->
+            <div class="py-4" id="session-detail-content">
+                <!-- Session details will be loaded here -->
+            </div>
+            
+            <!-- Modal Actions -->
+            <div class="flex flex-col sm:flex-row gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="closeSessionModal()" class="btn-secondary">Close</button>
+                <button onclick="terminateSessionFromModal()" 
+                        id="terminate-button" 
+                        class="btn-danger hidden">
+                    <i class="fas fa-stop mr-2"></i>Terminate Session
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Terminate Session Modal -->
+<div id="terminate-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-lg bg-white dark:bg-gray-800">
+        <div class="mt-3">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white text-red-600">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Terminate Session
+                </h3>
+                <button onclick="closeTerminateModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Content -->
+            <div class="py-4">
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Are you sure you want to terminate this session? This action cannot be undone.
+                </p>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Reason (optional):
+                    </label>
+                    <textarea id="terminate-reason" 
+                              class="input-field w-full" 
+                              rows="3" 
+                              placeholder="Enter reason for termination..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Modal Actions -->
+            <div class="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="closeTerminateModal()" class="btn-secondary flex-1">Cancel</button>
+                <button onclick="confirmTerminateSession()" class="btn-danger flex-1">
+                    <i class="fas fa-stop mr-2"></i>Terminate
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-button {
+    white-space: nowrap;
+    padding: 1rem;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #6b7280;
+    transition: all 0.2s;
+}
+
+.tab-button:hover {
+    color: #374151;
+    border-bottom-color: #d1d5db;
+}
+
+.tab-button.active {
+    border-bottom-color: #3b82f6;
+    color: #2563eb;
+}
+
+.dark .tab-button {
+    color: #9ca3af;
+}
+
+.dark .tab-button:hover {
+    color: #d1d5db;
+}
+
+.dark .tab-button.active {
+    color: #60a5fa;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.session-card {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    padding: 1rem;
+}
+
+.dark .session-card {
+    background-color: #374151;
+    border-color: #4b5563;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.dark .status-active {
+    background-color: #14532d;
+    color: #bbf7d0;
+}
+
+.status-completed {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.dark .status-completed {
+    background-color: #1e3a8a;
+    color: #bfdbfe;
+}
+
+.status-expired {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.dark .status-expired {
+    background-color: #92400e;
+    color: #fde68a;
+}
+
+.status-terminated {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.dark .status-terminated {
+    background-color: #991b1b;
+    color: #fecaca;
+}
+
+.websocket-indicator {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.dark .websocket-indicator {
+    background-color: #14532d;
+    color: #bbf7d0;
+}
+</style>
+
+<script>
+let currentSessionData = null;
+let currentTerminatingSessionId = null;
+
+// Load initial data
+document.addEventListener('DOMContentLoaded', function() {
+    loadSessionStats();
+    loadActiveSessions();
+    loadSessionHistory();
+    
+    // Set up auto-refresh every 30 seconds
+    setInterval(function() {
+        if (document.getElementById('active-tab').classList.contains('active')) {
+            loadActiveSessions();
+        }
+        loadSessionStats();
+    }, 30000);
+});
+
+// Tab switching
+function switchTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    document.getElementById(tab + '-tab').classList.add('active');
+    document.getElementById(tab + '-sessions-content').classList.add('active');
+    
+    // Load data for the active tab
+    if (tab === 'active') {
+        loadActiveSessions();
+    } else if (tab === 'history') {
+        loadSessionHistory();
+    }
+}
+
+// Load session statistics
+function loadSessionStats() {
+    fetch('/admin/api/sessions/stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('active-count').textContent = data.active_sessions.count;
+            document.getElementById('websocket-count').textContent = data.active_sessions.websocket_count;
+            document.getElementById('success-rate').textContent = data.metrics.success_rate.toFixed(1) + '%';
+            document.getElementById('total-amount').textContent = data.active_sessions.total_amount.toFixed(8) + ' BTC';
+            
+            // Update badges
+            document.getElementById('active-badge').textContent = data.active_sessions.count;
+            document.getElementById('history-badge').textContent = data.historical.total_sessions;
+        })
+        .catch(error => {
+            console.error('Error loading session stats:', error);
+            showNotification('error', 'Failed to load session statistics');
+        });
+}
+
+// Load active sessions
+function loadActiveSessions() {
+    fetch('/admin/api/sessions/active')
+        .then(response => response.json())
+        .then(data => {
+            renderActiveSessions(data.sessions || []);
+        })
+        .catch(error => {
+            console.error('Error loading active sessions:', error);
+            showNotification('error', 'Failed to load active sessions');
+        });
+}
+
+// Load session history
+function loadSessionHistory() {
+    const limit = document.getElementById('history-limit').value || 100;
+    fetch(`/admin/api/sessions/history?limit=${limit}`)
+        .then(response => response.json())
+        .then(data => {
+            renderHistorySessions(data.sessions || []);
+        })
+        .catch(error => {
+            console.error('Error loading session history:', error);
+            showNotification('error', 'Failed to load session history');
+        });
+}
+
+// Render active sessions
+function renderActiveSessions(sessions) {
+    const tableBody = document.getElementById('active-sessions-table');
+    const cardsContainer = document.getElementById('active-sessions-cards');
+    const noSessionsDiv = document.getElementById('no-active-sessions');
+    
+    if (sessions.length === 0) {
+        tableBody.innerHTML = '';
+        cardsContainer.innerHTML = '';
+        noSessionsDiv.classList.remove('hidden');
+        return;
+    }
+    
+    noSessionsDiv.classList.add('hidden');
+    
+    // Render table rows (desktop)
+    tableBody.innerHTML = sessions.map(session => `
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="showSessionDetails('${session.id}')">
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900 dark:text-white">${session.id.substring(0, 8)}...</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">${session.address.substring(0, 20)}...</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900 dark:text-white">${session.ip_address}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">${session.email || 'No email'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'N/A'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                ${formatDuration(session.duration_seconds)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="status-badge status-${session.status}">${session.status}</span>
+                ${session.is_websocket ? '<span class="websocket-indicator ml-2"><i class="fas fa-wifi mr-1"></i>WS</span>' : ''}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <button onclick="event.stopPropagation(); initiateTerminateSession('${session.id}')" 
+                        class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                    <i class="fas fa-stop mr-1"></i>Terminate
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    
+    // Render cards (mobile)
+    cardsContainer.innerHTML = sessions.map(session => `
+        <div class="session-card" onclick="showSessionDetails('${session.id}')">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <p class="font-medium text-gray-900 dark:text-white text-sm">${session.id.substring(0, 12)}...</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">${session.address.substring(0, 25)}...</p>
+                </div>
+                <div class="flex gap-2">
+                    <span class="status-badge status-${session.status}">${session.status}</span>
+                    ${session.is_websocket ? '<span class="websocket-indicator"><i class="fas fa-wifi"></i></span>' : ''}
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 text-sm mb-3">
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">IP Address</p>
+                    <p class="font-medium text-gray-900 dark:text-white">${session.ip_address}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Duration</p>
+                    <p class="font-medium text-gray-900 dark:text-white">${formatDuration(session.duration_seconds)}</p>
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center">
+                <p class="text-sm text-gray-900 dark:text-white">
+                    ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'No amount'}
+                </p>
+                <button onclick="event.stopPropagation(); initiateTerminateSession('${session.id}')" 
+                        class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm">
+                    <i class="fas fa-stop mr-1"></i>Terminate
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Render history sessions
+function renderHistorySessions(sessions) {
+    const tableBody = document.getElementById('history-sessions-table');
+    const cardsContainer = document.getElementById('history-sessions-cards');
+    const noSessionsDiv = document.getElementById('no-history-sessions');
+    
+    if (sessions.length === 0) {
+        tableBody.innerHTML = '';
+        cardsContainer.innerHTML = '';
+        noSessionsDiv.classList.remove('hidden');
+        return;
+    }
+    
+    noSessionsDiv.classList.add('hidden');
+    
+    // Render table rows (desktop)
+    tableBody.innerHTML = sessions.map(session => `
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="showSessionDetails('${session.id}')">
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900 dark:text-white">${session.id.substring(0, 8)}...</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">${session.address.substring(0, 20)}...</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900 dark:text-white">${session.ip_address}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">${session.email || 'No email'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'N/A'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                ${formatDuration(session.duration_seconds)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="status-badge status-${session.status}">${session.status}</span>
+                ${session.is_websocket ? '<span class="websocket-indicator ml-2"><i class="fas fa-wifi mr-1"></i>WS</span>' : ''}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                ${new Date(session.last_active).toLocaleString()}
+            </td>
+        </tr>
+    `).join('');
+    
+    // Render cards (mobile)
+    cardsContainer.innerHTML = sessions.map(session => `
+        <div class="session-card" onclick="showSessionDetails('${session.id}')">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <p class="font-medium text-gray-900 dark:text-white text-sm">${session.id.substring(0, 12)}...</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">${session.address.substring(0, 25)}...</p>
+                </div>
+                <div class="flex gap-2">
+                    <span class="status-badge status-${session.status}">${session.status}</span>
+                    ${session.is_websocket ? '<span class="websocket-indicator"><i class="fas fa-wifi"></i></span>' : ''}
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 text-sm mb-3">
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Completed</p>
+                    <p class="font-medium text-gray-900 dark:text-white text-xs">${new Date(session.last_active).toLocaleString()}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Duration</p>
+                    <p class="font-medium text-gray-900 dark:text-white">${formatDuration(session.duration_seconds)}</p>
+                </div>
+            </div>
+            
+            <div class="text-sm text-gray-900 dark:text-white">
+                ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'No amount'}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Show session details modal
+function showSessionDetails(sessionId) {
+    // Find session in current data
+    fetch(`/admin/api/sessions/active`)
+        .then(response => response.json())
+        .then(data => {
+            let session = data.sessions?.find(s => s.id === sessionId);
+            if (!session) {
+                // Try history
+                return fetch(`/admin/api/sessions/history`).then(r => r.json());
+            }
+            return { sessions: [session] };
+        })
+        .then(data => {
+            let session = data.sessions?.find(s => s.id === sessionId);
+            if (session) {
+                currentSessionData = session;
+                displaySessionDetails(session);
+                document.getElementById('session-detail-modal').classList.remove('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading session details:', error);
+            showNotification('error', 'Failed to load session details');
+        });
+}
+
+// Display session details in modal
+function displaySessionDetails(session) {
+    const content = document.getElementById('session-detail-content');
+    const terminateButton = document.getElementById('terminate-button');
+    
+    // Show/hide terminate button based on session status
+    if (session.status === 'active') {
+        terminateButton.classList.remove('hidden');
+    } else {
+        terminateButton.classList.add('hidden');
+    }
+    
+    content.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Session ID</label>
+                <p class="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 p-2 rounded">${session.id}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                <span class="status-badge status-${session.status}">${session.status}</span>
+                ${session.is_websocket ? '<span class="websocket-indicator ml-2"><i class="fas fa-wifi mr-1"></i>WebSocket</span>' : ''}
+            </div>
+            <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bitcoin Address</label>
+                <p class="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 p-2 rounded font-mono">${session.address}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">IP Address</label>
+                <p class="text-sm text-gray-900 dark:text-white">${session.ip_address}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                <p class="text-sm text-gray-900 dark:text-white">${session.email || 'Not provided'}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                <p class="text-sm text-gray-900 dark:text-white">${session.amount ? session.amount.toFixed(8) + ' BTC' : 'Not specified'}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment ID</label>
+                <p class="text-sm text-gray-900 dark:text-white">${session.payment_id || 'Not assigned'}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Created</label>
+                <p class="text-sm text-gray-900 dark:text-white">${new Date(session.created_at).toLocaleString()}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Active</label>
+                <p class="text-sm text-gray-900 dark:text-white">${new Date(session.last_active).toLocaleString()}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration</label>
+                <p class="text-sm text-gray-900 dark:text-white">${formatDuration(session.duration_seconds)}</p>
+            </div>
+            <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User Agent</label>
+                <p class="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 p-2 rounded break-all">${session.user_agent}</p>
+            </div>
+        </div>
+    `;
+}
+
+// Close session detail modal
+function closeSessionModal() {
+    document.getElementById('session-detail-modal').classList.add('hidden');
+    currentSessionData = null;
+}
+
+// Initiate session termination
+function initiateTerminateSession(sessionId) {
+    currentTerminatingSessionId = sessionId;
+    document.getElementById('terminate-modal').classList.remove('hidden');
+    document.getElementById('terminate-reason').value = '';
+}
+
+// Terminate session from modal
+function terminateSessionFromModal() {
+    if (currentSessionData) {
+        initiateTerminateSession(currentSessionData.id);
+        closeSessionModal();
+    }
+}
+
+// Close terminate modal
+function closeTerminateModal() {
+    document.getElementById('terminate-modal').classList.add('hidden');
+    currentTerminatingSessionId = null;
+}
+
+// Confirm session termination
+function confirmTerminateSession() {
+    if (!currentTerminatingSessionId) return;
+    
+    const reason = document.getElementById('terminate-reason').value.trim();
+    
+    fetch('/admin/api/sessions/terminate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            session_id: currentTerminatingSessionId,
+            reason: reason
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Session terminated successfully');
+            closeTerminateModal();
+            loadActiveSessions();
+            loadSessionStats();
+        } else {
+            showNotification('error', data.error || 'Failed to terminate session');
+        }
+    })
+    .catch(error => {
+        console.error('Error terminating session:', error);
+        showNotification('error', 'Failed to terminate session');
+    });
+}
+
+// Cleanup expired sessions
+function cleanupExpiredSessions() {
+    if (!confirm('Are you sure you want to cleanup expired sessions?')) return;
+    
+    fetch('/admin/api/sessions/cleanup', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            expired_only: true,
+            older_than_hours: 24
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message);
+            loadActiveSessions();
+            loadSessionStats();
+        } else {
+            showNotification('error', data.error || 'Cleanup failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error during cleanup:', error);
+        showNotification('error', 'Cleanup operation failed');
+    });
+}
+
+// Export sessions
+function exportSessions() {
+    const format = prompt('Export format (json/csv):', 'json');
+    if (!format) return;
+    
+    const url = `/admin/api/sessions/export?format=${format}&include_active=true&include_history=true`;
+    window.open(url, '_blank');
+}
+
+// Refresh sessions
+function refreshSessions() {
+    loadSessionStats();
+    if (document.getElementById('active-tab').classList.contains('active')) {
+        loadActiveSessions();
+    } else {
+        loadSessionHistory();
+    }
+    showNotification('info', 'Sessions refreshed');
+}
+
+// Filter active sessions
+function filterActiveSessions() {
+    // This would filter the displayed sessions based on search and status
+    // Implementation would filter the existing rendered content
+}
+
+// Filter history sessions
+function filterHistorySessions() {
+    // This would filter the displayed history sessions
+    // Implementation would filter the existing rendered content
+}
+
+// Format duration helper
+function formatDuration(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${mins}m`;
+}
+
+// Notification helper
+function showNotification(type, message) {
+    // Use the global notification system
+    if (typeof window.showNotification === 'function' && window.showNotification !== arguments.callee) {
+        window.showNotification(type, message);
+    } else {
+        console.log(`${type.toUpperCase()}: ${message}`);
+    }
+}
+</script>
+{{end}}

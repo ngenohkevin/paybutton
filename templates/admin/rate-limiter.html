@@ -1,0 +1,666 @@
+{{define "content"}}
+<!-- Page header -->
+<div class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Rate Limiter</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Monitor and manage API rate limits, user restrictions, and system protection
+            </p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <!-- Quick Actions -->
+            <button id="refresh-data" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
+            <button id="bulk-reset" 
+                    class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                    onclick="showBulkResetDialog()">
+                <i class="fas fa-redo mr-2"></i>Bulk Reset
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Global Status Overview -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <!-- Global Token Pool Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Global Tokens</p>
+                <p id="global-tokens" class="text-2xl font-bold text-gray-900 dark:text-white">{{.Stats.global_tokens}}</p>
+            </div>
+            <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                <i class="fas fa-globe text-blue-600 dark:text-blue-400"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div id="global-tokens-bar" 
+                     class="h-2 rounded-full transition-all duration-300 bg-blue-500"
+                     style="width: {{.GlobalTokensPercentage}}%">
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {{.Stats.global_tokens}}/{{.Stats.global_max}} available
+            </p>
+        </div>
+    </div>
+
+    <!-- Active IP Limits Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">IP Limits</p>
+                <p id="ip-limits-count" class="text-2xl font-bold {{if gt .Stats.ip_limits 10}}text-orange-600 dark:text-orange-400{{else if gt .Stats.ip_limits 5}}text-yellow-600 dark:text-yellow-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                    {{.Stats.ip_limits}}
+                </p>
+            </div>
+            <div class="p-3 rounded-full {{if gt .Stats.ip_limits 10}}bg-orange-100 dark:bg-orange-900/20{{else if gt .Stats.ip_limits 5}}bg-yellow-100 dark:bg-yellow-900/20{{else}}bg-green-100 dark:bg-green-900/20{{end}}">
+                <i class="fas fa-network-wired {{if gt .Stats.ip_limits 10}}text-orange-600 dark:text-orange-400{{else if gt .Stats.ip_limits 5}}text-yellow-600 dark:text-yellow-400{{else}}text-green-600 dark:text-green-400{{end}}"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <p class="text-xs {{if gt .Stats.ip_limits 10}}text-orange-600 dark:text-orange-400{{else if gt .Stats.ip_limits 5}}text-yellow-600 dark:text-yellow-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                {{if gt .Stats.ip_limits 10}}High activity{{else if gt .Stats.ip_limits 5}}Moderate activity{{else}}Normal activity{{end}}
+            </p>
+        </div>
+    </div>
+
+    <!-- Active Email Limits Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Email Limits</p>
+                <p id="email-limits-count" class="text-2xl font-bold {{if gt .Stats.email_limits 8}}text-red-600 dark:text-red-400{{else if gt .Stats.email_limits 3}}text-orange-600 dark:text-orange-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                    {{.Stats.email_limits}}
+                </p>
+            </div>
+            <div class="p-3 rounded-full {{if gt .Stats.email_limits 8}}bg-red-100 dark:bg-red-900/20{{else if gt .Stats.email_limits 3}}bg-orange-100 dark:bg-orange-900/20{{else}}bg-green-100 dark:bg-green-900/20{{end}}">
+                <i class="fas fa-envelope {{if gt .Stats.email_limits 8}}text-red-600 dark:text-red-400{{else if gt .Stats.email_limits 3}}text-orange-600 dark:text-orange-400{{else}}text-green-600 dark:text-green-400{{end}}"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <p class="text-xs {{if gt .Stats.email_limits 8}}text-red-600 dark:text-red-400{{else if gt .Stats.email_limits 3}}text-orange-600 dark:text-orange-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                {{if gt .Stats.email_limits 8}}High usage{{else if gt .Stats.email_limits 3}}Moderate usage{{else}}Normal usage{{end}}
+            </p>
+        </div>
+    </div>
+
+    <!-- System Protection Status -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Protection Status</p>
+                <div class="flex items-center mt-2">
+                    <div class="w-3 h-3 rounded-full {{if lt .Stats.global_tokens 10}}bg-red-500{{else if lt .Stats.global_tokens 30}}bg-yellow-500{{else}}bg-green-500{{end}} mr-2"></div>
+                    <p id="protection-status" class="text-lg font-semibold {{if lt .Stats.global_tokens 10}}text-red-600 dark:text-red-400{{else if lt .Stats.global_tokens 30}}text-yellow-600 dark:text-yellow-400{{else}}text-green-600 dark:text-green-400{{end}}">
+                        {{if lt .Stats.global_tokens 10}}Critical{{else if lt .Stats.global_tokens 30}}Warning{{else}}Healthy{{end}}
+                    </p>
+                </div>
+            </div>
+            <div class="p-3 rounded-full {{if lt .Stats.global_tokens 10}}bg-red-100 dark:bg-red-900/20{{else if lt .Stats.global_tokens 30}}bg-yellow-100 dark:bg-yellow-900/20{{else}}bg-green-100 dark:bg-green-900/20{{end}}">
+                <i class="fas fa-shield-alt {{if lt .Stats.global_tokens 10}}text-red-600 dark:text-red-400{{else if lt .Stats.global_tokens 30}}text-yellow-600 dark:text-yellow-400{{else}}text-green-600 dark:text-green-400{{end}}"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <button id="reset-global" onclick="resetGlobalTokens()" 
+                    class="text-sm px-3 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors font-medium">
+                Reset Global
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+    <!-- Active Limits Table -->
+    <div class="xl:col-span-2">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Active Rate Limits</h3>
+                    <div class="flex gap-2">
+                        <button class="text-sm px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors" onclick="filterLimits('all')">All</button>
+                        <button class="text-sm px-3 py-1 rounded-full bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors" onclick="filterLimits('ip')">IP</button>
+                        <button class="text-sm px-3 py-1 rounded-full bg-green-100 hover:bg-green-200 dark:bg-green-900/20 dark:hover:bg-green-900/30 text-green-700 dark:text-green-300 transition-colors" onclick="filterLimits('email')">Email</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Identifier</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tokens</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Access</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="limits-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {{if .ActiveLimits}}
+                            {{range .ActiveLimits}}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{if eq .Type "IP"}}bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300{{else}}bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300{{end}}">
+                                        <i class="fas {{if eq .Type "IP"}}fa-network-wired{{else}}fa-envelope{{end}} mr-1"></i>
+                                        {{.Type}}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">{{.Identifier}}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
+                                            <div class="h-2 rounded-full {{if lt .TokensPercentage 20}}bg-red-500{{else if lt .TokensPercentage 50}}bg-yellow-500{{else}}bg-green-500{{end}}" style="width: {{.TokensPercentage}}%"></div>
+                                        </div>
+                                        <span class="text-sm text-gray-900 dark:text-white">{{.CurrentTokens}}/{{.MaxTokens}}</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{if eq .Status "Limited"}}bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300{{else if eq .Status "Warning"}}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300{{else}}bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300{{end}}">
+                                        {{.Status}}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{.LastAccess}}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button onclick="resetLimit('{{.Identifier}}')" 
+                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">
+                                        Reset
+                                    </button>
+                                    <button onclick="blockLimit('{{.Identifier}}')" 
+                                            class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                        Block
+                                    </button>
+                                </td>
+                            </tr>
+                            {{end}}
+                        {{else}}
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-shield-check text-4xl mb-4 text-green-500"></i>
+                                <p class="text-lg font-medium">No Active Limits</p>
+                                <p class="text-sm">All users are within normal rate limits</p>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Panel -->
+    <div class="space-y-6">
+        <!-- Rate Limit Configuration -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Configuration</h3>
+                <div class="space-y-4">
+                    <!-- Global Limits -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Global Token Pool
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="global-max-tokens" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                   value="{{.Stats.global_max}}" min="50" max="1000">
+                            <button onclick="updateGlobalConfig()" 
+                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                                Update
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Maximum global tokens available
+                        </p>
+                    </div>
+
+                    <!-- IP Limits -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            IP Rate Limit
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <input type="number" id="ip-max-tokens" 
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       value="10" min="1" max="50" placeholder="Max tokens">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Max tokens</p>
+                            </div>
+                            <div>
+                                <input type="number" id="ip-refill-rate" 
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       value="5" min="1" max="20" placeholder="Refill rate">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Per 30 min</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Email Limits -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Email Rate Limit
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <input type="number" id="email-max-tokens" 
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       value="5" min="1" max="20" placeholder="Max tokens">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Max tokens</p>
+                            </div>
+                            <div>
+                                <input type="number" id="email-refill-rate" 
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       value="3" min="1" max="10" placeholder="Refill rate">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Per hour</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Save Configuration -->
+                    <div class="pt-4">
+                        <button onclick="saveRateLimitConfig()" 
+                                class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                            <i class="fas fa-save mr-2"></i>Save Configuration
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Statistics</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Total Requests (24h)</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{.Stats.total_requests_24h}}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Blocked Requests</span>
+                        <span class="text-sm font-medium text-red-600 dark:text-red-400">{{.Stats.blocked_requests}}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Success Rate</span>
+                        <span class="text-sm font-medium text-green-600 dark:text-green-400">{{.Stats.success_rate}}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Cleanup Runs</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{.Stats.cleanup_runs}}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
+                <div class="space-y-2">
+                    <button onclick="showBulkResetDialog()" 
+                            class="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium text-left">
+                        <i class="fas fa-redo mr-2"></i>Bulk Reset Limits
+                    </button>
+                    <button onclick="triggerCleanup()" 
+                            class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium text-left">
+                        <i class="fas fa-broom mr-2"></i>Trigger Cleanup
+                    </button>
+                    <button onclick="exportLimitsData()" 
+                            class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium text-left">
+                        <i class="fas fa-download mr-2"></i>Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Reset Dialog Modal -->
+<div id="bulk-reset-dialog" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+        <div class="p-6">
+            <div class="flex items-center mb-4">
+                <div class="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-full mr-3">
+                    <i class="fas fa-redo text-orange-600 dark:text-orange-400"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Bulk Reset Rate Limits</h3>
+            </div>
+            
+            <p class="text-gray-600 dark:text-gray-400 mb-4">
+                Choose which rate limits to reset. This action will restore full token capacity for the selected categories.
+            </p>
+            
+            <div class="space-y-3 mb-6">
+                <label class="flex items-center">
+                    <input type="checkbox" id="reset-global" class="mr-3" checked>
+                    <span class="text-gray-700 dark:text-gray-300">Reset Global Token Pool</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="reset-all-ips" class="mr-3">
+                    <span class="text-gray-700 dark:text-gray-300">Reset All IP Limits</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="reset-all-emails" class="mr-3">
+                    <span class="text-gray-700 dark:text-gray-300">Reset All Email Limits</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="clear-expired" class="mr-3" checked>
+                    <span class="text-gray-700 dark:text-gray-300">Clear Expired Limits</span>
+                </label>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="hideBulkResetDialog()" 
+                        class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    Cancel
+                </button>
+                <button onclick="confirmBulkReset()" 
+                        class="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
+                    Reset Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+let rateLimiterData = {{.Stats}};
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    setupAutoRefresh();
+});
+
+// Configuration management functions
+function updateGlobalConfig() {
+    const newMax = document.getElementById('global-max-tokens').value;
+    
+    fetch('/admin/api/rate-limiter/update-global', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max_tokens: parseInt(newMax) })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Global configuration updated successfully');
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to update global configuration');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+function saveRateLimitConfig() {
+    const config = {
+        ip_max_tokens: parseInt(document.getElementById('ip-max-tokens').value),
+        ip_refill_rate: parseInt(document.getElementById('ip-refill-rate').value),
+        email_max_tokens: parseInt(document.getElementById('email-max-tokens').value),
+        email_refill_rate: parseInt(document.getElementById('email-refill-rate').value)
+    };
+    
+    fetch('/admin/api/rate-limiter/update-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Rate limit configuration saved successfully');
+        } else {
+            showNotification('error', data.message || 'Failed to save configuration');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+// Limit management functions
+function resetLimit(identifier) {
+    if (!confirm(`Are you sure you want to reset rate limits for ${identifier}?`)) return;
+    
+    fetch('/admin/api/rate-limiter/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: identifier })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Rate limit reset successfully');
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to reset rate limit');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+function blockLimit(identifier) {
+    if (!confirm(`Are you sure you want to block ${identifier}? This will set their token count to 0.`)) return;
+    
+    fetch('/admin/api/rate-limiter/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: identifier })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'User blocked successfully');
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to block user');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+function resetGlobalTokens() {
+    if (!confirm('Are you sure you want to reset the global token pool?')) return;
+    
+    fetch('/admin/api/rate-limiter/reset-global', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Global token pool reset successfully');
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to reset global tokens');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+// Bulk reset dialog functions
+function showBulkResetDialog() {
+    document.getElementById('bulk-reset-dialog').classList.remove('hidden');
+    document.getElementById('bulk-reset-dialog').classList.add('flex');
+}
+
+function hideBulkResetDialog() {
+    document.getElementById('bulk-reset-dialog').classList.add('hidden');
+    document.getElementById('bulk-reset-dialog').classList.remove('flex');
+}
+
+function confirmBulkReset() {
+    const resetOptions = {
+        reset_global: document.getElementById('reset-global').checked,
+        reset_all_ips: document.getElementById('reset-all-ips').checked,
+        reset_all_emails: document.getElementById('reset-all-emails').checked,
+        clear_expired: document.getElementById('clear-expired').checked
+    };
+    
+    fetch('/admin/api/rate-limiter/bulk-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resetOptions)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', `Bulk reset completed: ${data.message}`);
+            hideBulkResetDialog();
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to perform bulk reset');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+// Table filtering functions
+function filterLimits(type) {
+    // Update active button
+    document.querySelectorAll('[onclick*="filterLimits"]').forEach(btn => {
+        btn.className = btn.className.replace(/bg-blue-\d+/g, 'bg-gray-100').replace(/text-blue-\d+/g, 'text-gray-700');
+    });
+    event.target.className = event.target.className.replace(/bg-gray-\d+/g, 'bg-blue-100').replace(/text-gray-\d+/g, 'text-blue-700');
+    
+    // Filter table rows
+    const rows = document.querySelectorAll('#limits-table-body tr');
+    rows.forEach(row => {
+        if (type === 'all') {
+            row.style.display = '';
+        } else {
+            const typeCell = row.cells[0];
+            const limitType = typeCell ? typeCell.textContent.trim().toLowerCase() : '';
+            row.style.display = limitType.includes(type.toLowerCase()) ? '' : 'none';
+        }
+    });
+}
+
+// Utility functions
+function triggerCleanup() {
+    if (!confirm('This will remove all expired rate limit entries. Continue?')) return;
+    
+    fetch('/admin/api/rate-limiter/cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', `Cleanup completed: ${data.removed_entries} entries removed`);
+            refreshData();
+        } else {
+            showNotification('error', data.message || 'Failed to trigger cleanup');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Network error occurred');
+    });
+}
+
+function exportLimitsData() {
+    window.open('/admin/api/rate-limiter/export', '_blank');
+}
+
+function refreshData() {
+    location.reload(); // Simple refresh - could be made more sophisticated with HTMX
+}
+
+function setupAutoRefresh() {
+    // Auto-refresh every 30 seconds
+    setInterval(refreshData, 30000);
+    
+    // Refresh button handler
+    document.getElementById('refresh-data').addEventListener('click', refreshData);
+}
+
+function showNotification(type, message) {
+    // Use the global notification system from admin.js
+    if (typeof window.showNotification === 'function' && window.showNotification !== arguments.callee) {
+        window.showNotification(type, message);
+    } else {
+        alert(message);
+    }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl+R for refresh
+    if (e.ctrlKey && e.key === 'r') {
+        e.preventDefault();
+        refreshData();
+    }
+    
+    // Ctrl+B for bulk reset
+    if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        showBulkResetDialog();
+    }
+});
+</script>
+
+<style>
+/* Custom styles for mobile responsiveness */
+@media (max-width: 640px) {
+    .grid-cols-1 {
+        grid-template-columns: 1fr;
+    }
+    
+    .gap-4 {
+        gap: 1rem;
+    }
+    
+    .text-2xl {
+        font-size: 1.5rem;
+    }
+    
+    .p-6 {
+        padding: 1rem;
+    }
+    
+    .overflow-x-auto table {
+        min-width: 600px;
+    }
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Animation for table rows */
+#limits-table-body tr {
+    transition: background-color 0.2s ease;
+}
+
+/* Progress bars */
+.progress-bar {
+    transition: width 0.3s ease;
+}
+</style>
+{{end}}

@@ -1,0 +1,298 @@
+{{define "content"}}
+<div id="auto-refresh" hx-get="/admin/api/status" hx-trigger="load, refresh" hx-target="#dashboard-content" hx-swap="innerHTML">
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div class="mb-4 sm:mb-0">
+            <h1 class="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
+                <i class="fas fa-tachometer-alt mr-3 text-blue-600"></i>System Dashboard
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2 text-sm">Monitor your PayButton service in real-time</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <button onclick="location.reload()" class="btn btn-secondary">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
+            <div class="card px-4 py-2 flex items-center">
+                <span class="text-sm text-gray-600 dark:text-gray-300">Auto-refresh: </span>
+                <span class="text-sm font-medium text-green-600 ml-2">
+                    <i class="fas fa-circle text-green-500 animate-pulse mr-1"></i>Active
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div id="dashboard-content">
+        <!-- Loading state -->
+        <div class="flex flex-col justify-center items-center py-16">
+            <div class="loading-spinner mb-4"></div>
+            <span class="text-gray-600 dark:text-gray-300 animate-pulse">Loading system status...</span>
+            <div class="flex space-x-2 mt-4">
+                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.1s;"></div>
+                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Real-time chart updates with enhanced styling
+let poolChart, gapChart, rateLimitChart;
+
+function updateCharts(data) {
+    try {
+        // Address Pool Chart
+        if (poolChart && data.components && data.components.address_pool) {
+            const pool = data.components.address_pool;
+            // Match actual JSON field names from PoolStats struct
+            const available = pool.current_pool_size || 0;
+            const totalGenerated = pool.total_generated || 0;
+            const totalUsed = pool.total_used || 0;
+            const reserved = Math.max(0, totalGenerated - available - totalUsed);
+            
+            poolChart.data.datasets[0].data = [available, totalUsed + reserved];
+            poolChart.data.labels = [`Available (${available})`, `Used/Reserved (${totalUsed + reserved})`];
+            poolChart.update('none');
+        }
+        
+        // Gap Monitor Chart
+        if (gapChart && data.components && data.components.gap_monitor) {
+            const gap = data.components.gap_monitor;
+            const paid = gap.paid_addresses || 0;
+            const unpaid = gap.unpaid_addresses || 0;
+            
+            gapChart.data.datasets[0].data = [paid, unpaid];
+            gapChart.data.labels = [`Paid (${paid})`, `Unpaid (${unpaid})`];
+            gapChart.update('none');
+        }
+        
+        // Rate Limiter Chart
+        if (rateLimitChart && data.components && data.components.rate_limiter) {
+            const rate = data.components.rate_limiter;
+            const available = rate.global_tokens || 0;
+            const max = rate.global_max || 100;
+            const used = Math.max(0, max - available);
+            
+            rateLimitChart.data.datasets[0].data = [available, used];
+            rateLimitChart.data.labels = [`Available (${available})`, `Used (${used})`];
+            rateLimitChart.update('none');
+        }
+    } catch (error) {
+        console.error('Error updating charts:', error);
+    }
+}
+
+// Listen for HTMX updates
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    if (event.target.id === 'dashboard-content') {
+        // Re-initialize charts after content update and load data
+        setTimeout(() => {
+            initializeCharts();
+            // Fetch and update chart data after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                fetch('/admin/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        updateCharts(data);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching initial chart data:', error);
+                    });
+            }, 200);
+        }, 100);
+    }
+});
+
+function getChartTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+        borderColor: isDark ? '#334155' : '#e2e8f0',
+        textColor: isDark ? '#f8fafc' : '#1e293b',
+        gridColor: isDark ? '#334155' : '#f1f5f9'
+    };
+}
+
+function initializeCharts() {
+    const theme = getChartTheme();
+    
+    // Destroy existing charts if they exist
+    if (poolChart) {
+        poolChart.destroy();
+        poolChart = null;
+    }
+    if (gapChart) {
+        gapChart.destroy();
+        gapChart = null;
+    }
+    if (rateLimitChart) {
+        rateLimitChart.destroy();
+        rateLimitChart = null;
+    }
+    
+    // Common chart options
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: theme.textColor,
+                    padding: 20,
+                    usePointStyle: true,
+                    font: {
+                        size: 12,
+                        family: 'Inter'
+                    }
+                }
+            },
+            tooltip: {
+                backgroundColor: theme.backgroundColor,
+                titleColor: theme.textColor,
+                bodyColor: theme.textColor,
+                borderColor: theme.borderColor,
+                borderWidth: 1,
+                cornerRadius: 8,
+                padding: 12,
+                displayColors: true,
+                titleFont: {
+                    family: 'Inter',
+                    size: 14,
+                    weight: 'bold'
+                },
+                bodyFont: {
+                    family: 'Inter',
+                    size: 13
+                }
+            }
+        },
+        animation: {
+            animateScale: true,
+            animateRotate: true,
+            duration: 800,
+            easing: 'easeInOutQuart'
+        }
+    };
+
+    // Initialize Address Pool Chart
+    const poolCtx = document.getElementById('poolChart');
+    if (poolCtx) {
+        poolChart = new Chart(poolCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Available', 'Used/Reserved'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#10B981', '#EF4444'],
+                    borderWidth: 3,
+                    borderColor: theme.backgroundColor,
+                    hoverBackgroundColor: ['#059669', '#DC2626'],
+                    hoverBorderWidth: 4,
+                    cutout: '60%'
+                }]
+            },
+            options: commonOptions
+        });
+    }
+    
+    // Initialize Gap Monitor Chart
+    const gapCtx = document.getElementById('gapChart');
+    if (gapCtx) {
+        gapChart = new Chart(gapCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Paid', 'Unpaid'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#10B981', '#F59E0B'],
+                    borderWidth: 3,
+                    borderColor: theme.backgroundColor,
+                    hoverBackgroundColor: ['#059669', '#D97706'],
+                    hoverBorderWidth: 4,
+                    cutout: '60%'
+                }]
+            },
+            options: commonOptions
+        });
+    }
+    
+    // Initialize Rate Limiter Chart
+    const rateCtx = document.getElementById('rateLimitChart');
+    if (rateCtx) {
+        rateLimitChart = new Chart(rateCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Available Tokens', 'Used Tokens'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#3B82F6', '#9CA3AF'],
+                    borderWidth: 3,
+                    borderColor: theme.backgroundColor,
+                    hoverBackgroundColor: ['#2563EB', '#6B7280'],
+                    hoverBorderWidth: 4,
+                    cutout: '60%'
+                }]
+            },
+            options: commonOptions
+        });
+    }
+}
+
+// Re-initialize charts on theme change
+document.addEventListener('themechange', function() {
+    setTimeout(initializeCharts, 100);
+});
+
+// Update charts periodically with real data
+let chartUpdateInterval;
+
+function startChartUpdates() {
+    // Clear any existing interval
+    if (chartUpdateInterval) {
+        clearInterval(chartUpdateInterval);
+    }
+    
+    // Update charts every 5 seconds
+    chartUpdateInterval = setInterval(() => {
+        if (poolChart || gapChart || rateLimitChart) {
+            fetch('/admin/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateCharts(data);
+                })
+                .catch(error => {
+                    console.error('Error updating charts:', error);
+                });
+        }
+    }, 5000);
+}
+
+// Start chart updates when dashboard loads
+document.body.addEventListener('htmx:afterSettle', function(event) {
+    if (event.target.id === 'dashboard-content') {
+        // Small delay to ensure charts are initialized
+        setTimeout(() => {
+            startChartUpdates();
+            // Initial update
+            fetch('/admin/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateCharts(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching chart data:', error);
+                });
+        }, 300);
+    }
+});
+
+// Clean up interval when navigating away
+window.addEventListener('beforeunload', () => {
+    if (chartUpdateInterval) {
+        clearInterval(chartUpdateInterval);
+    }
+});
+</script>
+{{end}}

@@ -1,0 +1,623 @@
+{{define "content"}}
+<div class="animate-fade-in">
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div class="mb-4 sm:mb-0">
+            <h1 class="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
+                <i class="fas fa-swimming-pool mr-3 text-blue-600"></i>Address Pool Management
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2 text-sm">Manage and monitor Bitcoin address pool generation and usage</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <button onclick="refreshPoolData()" class="btn btn-secondary">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
+            <button onclick="exportPoolData()" class="btn btn-primary">
+                <i class="fas fa-download mr-2"></i>Export Pool Data
+            </button>
+        </div>
+    </div>
+
+    <!-- Pool Overview Cards -->
+    <div class="dashboard-grid mb-8">
+        <!-- Pool Statistics Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-chart-bar text-blue-500 mr-2"></i>Pool Statistics
+                </h3>
+            </div>
+            <div class="card-body">
+                <div id="pool-stats" class="space-y-4">
+                    <!-- Loading skeleton -->
+                    <div class="animate-pulse">
+                        <div class="loading-skeleton h-4 w-3/4 mb-2"></div>
+                        <div class="loading-skeleton h-4 w-1/2 mb-2"></div>
+                        <div class="loading-skeleton h-4 w-5/6"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pool Configuration Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-cogs text-green-500 mr-2"></i>Pool Configuration
+                </h3>
+            </div>
+            <div class="card-body">
+                <div id="pool-config" class="space-y-4">
+                    <div class="metric-item">
+                        <span class="metric-label">Minimum Pool Size</span>
+                        <span class="metric-value" id="min-pool-size">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Maximum Pool Size</span>
+                        <span class="metric-value" id="max-pool-size">-</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Refill Threshold</span>
+                        <span class="metric-value" id="refill-threshold">-</span>
+                    </div>
+                    <div class="pt-4">
+                        <button onclick="configurePool()" class="btn btn-primary w-full">
+                            <i class="fas fa-edit mr-2"></i>Configure Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-bolt text-yellow-500 mr-2"></i>Quick Actions
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="space-y-3">
+                    <button onclick="forceRefillPool()" class="btn btn-success w-full">
+                        <i class="fas fa-plus mr-2"></i>Force Pool Refill
+                    </button>
+                    <button onclick="recycleExpiredAddresses()" class="btn btn-warning w-full">
+                        <i class="fas fa-recycle mr-2"></i>Recycle Expired
+                    </button>
+                    <button onclick="clearUnusedAddresses()" class="btn btn-danger w-full">
+                        <i class="fas fa-trash mr-2"></i>Clear Unused
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Address Lists Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Available Addresses -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-check-circle text-green-500 mr-2"></i>Available Addresses
+                    <span class="text-sm font-normal text-gray-500 ml-2" id="available-count">(-)</span>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <input type="text" id="available-search" placeholder="Search addresses..." 
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                </div>
+                <div id="available-addresses" class="max-h-96 overflow-y-auto">
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>Loading addresses...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reserved Addresses -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-clock text-yellow-500 mr-2"></i>Reserved Addresses
+                    <span class="text-sm font-normal text-gray-500 ml-2" id="reserved-count">(-)</span>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <input type="text" id="reserved-search" placeholder="Search addresses or emails..." 
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                </div>
+                <div id="reserved-addresses" class="max-h-96 overflow-y-auto">
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>Loading addresses...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Used Addresses Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-history text-purple-500 mr-2"></i>Used Addresses History
+                <span class="text-sm font-normal text-gray-500 ml-2" id="used-count">(-)</span>
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                <div class="flex-1">
+                    <input type="text" id="used-search" placeholder="Search addresses, emails, or amounts..." 
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                </div>
+                <div class="flex gap-2">
+                    <select id="used-filter" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                    <button onclick="exportUsedAddresses()" class="btn btn-secondary">
+                        <i class="fas fa-file-csv mr-2"></i>Export CSV
+                    </button>
+                </div>
+            </div>
+            <div id="used-addresses" class="max-h-96 overflow-y-auto">
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p>Loading address history...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pool Configuration Modal -->
+<div id="pool-config-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="card max-w-md w-full">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-cogs mr-2"></i>Configure Pool Settings
+                </h3>
+            </div>
+            <div class="card-body">
+                <form id="pool-config-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Minimum Pool Size
+                        </label>
+                        <input type="number" id="config-min-size" min="1" max="100" 
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Maximum Pool Size
+                        </label>
+                        <input type="number" id="config-max-size" min="10" max="1000" 
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Refill Threshold
+                        </label>
+                        <input type="number" id="config-refill-threshold" min="1" max="50" 
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeConfigModal()" class="btn btn-secondary flex-1">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary flex-1">
+                            <i class="fas fa-save mr-2"></i>Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Pool management JavaScript functions
+let poolData = null;
+
+// Load pool data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadPoolData();
+    setupSearchFilters();
+    
+    // Refresh data every 30 seconds
+    setInterval(loadPoolData, 30000);
+});
+
+async function loadPoolData() {
+    try {
+        const response = await fetch('/admin/pool/details');
+        if (!response.ok) throw new Error('Failed to fetch pool data');
+        
+        poolData = await response.json();
+        updatePoolDisplay();
+        
+    } catch (error) {
+        console.error('Error loading pool data:', error);
+        showNotification('error', 'Failed to load pool data: ' + error.message);
+    }
+}
+
+function updatePoolDisplay() {
+    if (!poolData) return;
+    
+    // Update statistics
+    updatePoolStats();
+    updatePoolConfig();
+    updateAddressLists();
+}
+
+function updatePoolStats() {
+    const stats = poolData.stats || {};
+    const statsHtml = `
+        <div class="metric-item">
+            <span class="metric-label">Current Pool Size</span>
+            <span class="metric-value success">${stats.current_pool_size || 0}</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Total Generated</span>
+            <span class="metric-value">${stats.total_generated || 0}</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Total Used</span>
+            <span class="metric-value">${stats.total_used || 0}</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Total Recycled</span>
+            <span class="metric-value success">${stats.total_recycled || 0}</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Gap Limit Errors</span>
+            <span class="metric-value ${(stats.gap_limit_errors || 0) > 0 ? 'danger' : 'success'}">${stats.gap_limit_errors || 0}</span>
+        </div>
+    `;
+    document.getElementById('pool-stats').innerHTML = statsHtml;
+}
+
+function updatePoolConfig() {
+    const config = poolData.config || {};
+    document.getElementById('min-pool-size').textContent = config.min_pool_size || 'Unknown';
+    document.getElementById('max-pool-size').textContent = config.max_pool_size || 'Unknown';
+    document.getElementById('refill-threshold').textContent = config.refill_threshold || 'Unknown';
+}
+
+function updateAddressLists() {
+    const available = poolData.available || [];
+    const reserved = poolData.reserved || [];
+    const used = poolData.used || [];
+    
+    // Update counts
+    document.getElementById('available-count').textContent = `(${available.length})`;
+    document.getElementById('reserved-count').textContent = `(${reserved.length})`;
+    document.getElementById('used-count').textContent = `(${used.length})`;
+    
+    // Update available addresses
+    updateAddressList('available-addresses', available, (addr) => `
+        <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-b-0">
+            <div class="font-mono text-sm text-gray-900 dark:text-white">${addr.address}</div>
+            <div class="text-xs text-gray-500 mt-1">
+                Created: ${formatDate(addr.created_at)}
+            </div>
+        </div>
+    `);
+    
+    // Update reserved addresses
+    updateAddressList('reserved-addresses', reserved, (addr) => `
+        <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-b-0">
+            <div class="flex justify-between items-start">
+                <div class="flex-1 min-w-0">
+                    <div class="font-mono text-sm text-gray-900 dark:text-white truncate">${addr.address}</div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        Reserved: ${formatDate(addr.reserved_at)} • ${addr.reserved_for || 'Unknown'}
+                    </div>
+                </div>
+                <button onclick="releaseReservation('${addr.address}')" 
+                        class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 ml-2">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `);
+    
+    // Update used addresses
+    updateAddressList('used-addresses', used, (addr) => `
+        <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-b-0">
+            <div class="flex justify-between items-start">
+                <div class="flex-1 min-w-0">
+                    <div class="font-mono text-sm text-gray-900 dark:text-white truncate">${addr.address}</div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        Used: ${formatDate(addr.used_at)} • ${addr.used_by || 'Unknown'}
+                        ${addr.amount ? ` • ${addr.amount} BTC` : ''}
+                    </div>
+                </div>
+                <span class="status-indicator status-${addr.amount > 0 ? 'healthy' : 'warning'} text-xs">
+                    ${addr.amount > 0 ? 'Paid' : 'Pending'}
+                </span>
+            </div>
+        </div>
+    `);
+}
+
+function updateAddressList(containerId, addresses, renderFn) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    if (addresses.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-inbox text-2xl mb-2"></i>
+                <p>No addresses found</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = addresses.map(renderFn).join('');
+}
+
+function setupSearchFilters() {
+    // Available addresses search
+    document.getElementById('available-search')?.addEventListener('input', (e) => {
+        filterAddressList('available-addresses', e.target.value, poolData?.available || []);
+    });
+    
+    // Reserved addresses search
+    document.getElementById('reserved-search')?.addEventListener('input', (e) => {
+        filterAddressList('reserved-addresses', e.target.value, poolData?.reserved || []);
+    });
+    
+    // Used addresses search and filter
+    document.getElementById('used-search')?.addEventListener('input', (e) => {
+        filterUsedAddresses();
+    });
+    
+    document.getElementById('used-filter')?.addEventListener('change', () => {
+        filterUsedAddresses();
+    });
+}
+
+function filterAddressList(containerId, searchTerm, addresses) {
+    const filtered = addresses.filter(addr => 
+        addr.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (addr.reserved_for && addr.reserved_for.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (addr.used_by && addr.used_by.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+    
+    // Re-render filtered results
+    if (containerId === 'available-addresses') {
+        updateAddressList(containerId, filtered, (addr) => `
+            <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-b-0">
+                <div class="font-mono text-sm text-gray-900 dark:text-white">${addr.address}</div>
+                <div class="text-xs text-gray-500 mt-1">Created: ${formatDate(addr.created_at)}</div>
+            </div>
+        `);
+    }
+    // Add more filters for other lists as needed
+}
+
+function filterUsedAddresses() {
+    const searchTerm = document.getElementById('used-search')?.value?.toLowerCase() || '';
+    const filter = document.getElementById('used-filter')?.value || 'all';
+    
+    let filtered = poolData?.used || [];
+    
+    // Apply search filter
+    if (searchTerm) {
+        filtered = filtered.filter(addr => 
+            addr.address.toLowerCase().includes(searchTerm) ||
+            (addr.used_by && addr.used_by.toLowerCase().includes(searchTerm)) ||
+            (addr.amount && addr.amount.toString().includes(searchTerm))
+        );
+    }
+    
+    // Apply time filter
+    const now = new Date();
+    if (filter !== 'all') {
+        filtered = filtered.filter(addr => {
+            const usedDate = new Date(addr.used_at);
+            switch (filter) {
+                case 'today':
+                    return usedDate.toDateString() === now.toDateString();
+                case 'week':
+                    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    return usedDate >= weekAgo;
+                case 'month':
+                    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    return usedDate >= monthAgo;
+                default:
+                    return true;
+            }
+        });
+    }
+    
+    // Re-render filtered results
+    updateAddressList('used-addresses', filtered, (addr) => `
+        <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-b-0">
+            <div class="flex justify-between items-start">
+                <div class="flex-1 min-w-0">
+                    <div class="font-mono text-sm text-gray-900 dark:text-white truncate">${addr.address}</div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        Used: ${formatDate(addr.used_at)} • ${addr.used_by || 'Unknown'}
+                        ${addr.amount ? ` • ${addr.amount} BTC` : ''}
+                    </div>
+                </div>
+                <span class="status-indicator status-${addr.amount > 0 ? 'healthy' : 'warning'} text-xs">
+                    ${addr.amount > 0 ? 'Paid' : 'Pending'}
+                </span>
+            </div>
+        </div>
+    `);
+}
+
+// Action functions
+function refreshPoolData() {
+    loadPoolData();
+    showNotification('info', 'Pool data refreshed');
+}
+
+function forceRefillPool() {
+    if (confirm('Force refill the address pool? This will generate new addresses.')) {
+        fetch('/admin/pool/refill', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('success', data.message || 'Pool refill initiated');
+                setTimeout(loadPoolData, 2000);
+            })
+            .catch(error => {
+                showNotification('error', 'Failed to refill pool: ' + error.message);
+            });
+    }
+}
+
+function recycleExpiredAddresses() {
+    if (confirm('Recycle expired reserved addresses back to the available pool?')) {
+        fetch('/admin/pool/recycle', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('success', data.message || 'Expired addresses recycled');
+                loadPoolData();
+            })
+            .catch(error => {
+                showNotification('error', 'Failed to recycle addresses: ' + error.message);
+            });
+    }
+}
+
+function clearUnusedAddresses() {
+    if (confirm('WARNING: This will permanently delete all unused addresses from the pool. Are you sure?')) {
+        fetch('/admin/pool/clear-unused', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('success', data.message || 'Unused addresses cleared');
+                loadPoolData();
+            })
+            .catch(error => {
+                showNotification('error', 'Failed to clear addresses: ' + error.message);
+            });
+    }
+}
+
+function releaseReservation(address) {
+    if (confirm(`Release reservation for address ${address}?`)) {
+        fetch('/admin/pool/release', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: address })
+        })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('success', 'Address reservation released');
+                loadPoolData();
+            })
+            .catch(error => {
+                showNotification('error', 'Failed to release reservation: ' + error.message);
+            });
+    }
+}
+
+function configurePool() {
+    if (!poolData?.config) {
+        showNotification('error', 'Pool configuration data not available');
+        return;
+    }
+    
+    // Pre-fill form with current values
+    document.getElementById('config-min-size').value = poolData.config.min_pool_size || 10;
+    document.getElementById('config-max-size').value = poolData.config.max_pool_size || 100;
+    document.getElementById('config-refill-threshold').value = poolData.config.refill_threshold || 5;
+    
+    document.getElementById('pool-config-modal').classList.remove('hidden');
+}
+
+function closeConfigModal() {
+    document.getElementById('pool-config-modal').classList.add('hidden');
+}
+
+// Handle config form submission
+document.getElementById('pool-config-form')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const config = {
+        min_pool_size: parseInt(document.getElementById('config-min-size').value),
+        max_pool_size: parseInt(document.getElementById('config-max-size').value),
+        refill_threshold: parseInt(document.getElementById('config-refill-threshold').value)
+    };
+    
+    fetch('/admin/pool/configure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    })
+        .then(response => response.json())
+        .then(data => {
+            showNotification('success', 'Pool configuration updated');
+            closeConfigModal();
+            loadPoolData();
+        })
+        .catch(error => {
+            showNotification('error', 'Failed to update configuration: ' + error.message);
+        });
+});
+
+function exportPoolData() {
+    fetch('/admin/pool/export')
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'pool-data-' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            showNotification('success', 'Pool data exported');
+        })
+        .catch(error => {
+            showNotification('error', 'Export failed: ' + error.message);
+        });
+}
+
+function exportUsedAddresses() {
+    const filter = document.getElementById('used-filter')?.value || 'all';
+    
+    fetch(`/admin/pool/export-used?filter=${filter}`)
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `used-addresses-${filter}-` + new Date().toISOString().slice(0, 10) + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            showNotification('success', 'Address history exported');
+        })
+        .catch(error => {
+            showNotification('error', 'Export failed: ' + error.message);
+        });
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'Unknown';
+    try {
+        return new Date(dateString).toLocaleString();
+    } catch {
+        return dateString;
+    }
+}
+</script>
+{{end}}

@@ -1,0 +1,1232 @@
+{{define "content"}}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">System Logs</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Real-time system logs with filtering and search capabilities
+            </p>
+        </div>
+        <div class="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <button id="download-logs" class="btn btn-secondary">
+                <i class="fas fa-download mr-2"></i>Download Logs
+            </button>
+            <button id="clear-logs" class="btn btn-danger">
+                <i class="fas fa-trash mr-2"></i>Clear Display
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters Panel -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <i class="fas fa-filter mr-2 text-blue-600"></i>
+                Log Filters
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Log Level
+                    </label>
+                    <select id="level-filter" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Levels</option>
+                        <option value="error">ERROR</option>
+                        <option value="warn">WARN</option>
+                        <option value="info">INFO</option>
+                        <option value="debug">DEBUG</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Component
+                    </label>
+                    <select id="component-filter" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Components</option>
+                        <option value="system">SYSTEM</option>
+                        <option value="pool">POOL</option>
+                        <option value="gap">GAP</option>
+                        <option value="rate">RATE LIMITER</option>
+                        <option value="websocket">WEBSOCKET</option>
+                        <option value="status">STATUS</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Search
+                    </label>
+                    <input type="text" id="search-filter" placeholder="Search logs..." class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="flex items-end">
+                    <div class="flex flex-col sm:flex-row gap-2 sm:space-x-2 w-full">
+                        <button id="apply-filters" class="btn btn-primary flex-1">
+                            <i class="fas fa-search mr-2"></i>Apply
+                        </button>
+                        <button id="reset-filters" class="btn btn-secondary flex-1 sm:flex-none">
+                            <i class="fas fa-undo mr-2"></i>Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="connection-indicator" class="hidden">
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-lg">
+            <div class="flex items-center">
+                <div class="loading-spinner mr-3"></div>
+                <span>Connecting to log stream...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Viewer -->
+    <div class="card">
+        <div class="card-header sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center flex-wrap">
+                    <i class="fas fa-terminal mr-2 text-green-600"></i>
+                    <span class="mr-2">Live Logs</span>
+                    <span id="log-count" class="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">0 entries</span>
+                </h2>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <div id="stream-status" class="flex items-center text-sm">
+                        <div class="w-2 h-2 bg-red-500 rounded-full mr-2" id="stream-indicator"></div>
+                        <span id="stream-text" class="text-xs sm:text-sm">Disconnected</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1 sm:gap-2">
+                        <button id="toggle-stream" class="btn btn-xs sm:btn-sm btn-secondary">
+                            <i class="fas fa-play mr-1"></i><span class="hidden xs:inline">Start</span><span class="hidden sm:inline"> Stream</span>
+                        </button>
+                        <button id="auto-scroll-toggle" class="btn btn-xs sm:btn-sm btn-secondary" data-enabled="true">
+                            <i class="fas fa-arrow-down mr-1"></i><span class="hidden xs:inline">Auto</span><span class="hidden sm:inline"> Scroll</span>
+                        </button>
+                        <button id="fullscreen-toggle" class="btn btn-xs sm:btn-sm btn-secondary">
+                            <i class="fas fa-expand mr-1"></i><span class="hidden xs:inline">Full</span><span class="hidden sm:inline">screen</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0 relative">
+            <!-- Log container with terminal styling -->
+            <div id="log-container" class="logs-terminal h-64 sm:h-96 lg:h-[32rem] overflow-y-auto overflow-x-hidden">
+                <div id="log-content" class="p-2 sm:p-4 space-y-1">
+                    <!-- Initial message -->
+                    <div class="text-gray-500 italic text-xs sm:text-sm">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Click "Start Stream" to begin viewing live logs...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Statistics -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="log-stats-card error">
+            <div class="log-stats-number text-red-500" id="error-count">0</div>
+            <div class="log-stats-label">Errors</div>
+        </div>
+        <div class="log-stats-card warning">
+            <div class="log-stats-number text-yellow-500" id="warning-count">0</div>
+            <div class="log-stats-label">Warnings</div>
+        </div>
+        <div class="log-stats-card info">
+            <div class="log-stats-number text-blue-500" id="info-count">0</div>
+            <div class="log-stats-label">Info</div>
+        </div>
+        <div class="log-stats-card debug">
+            <div class="log-stats-number text-gray-500" id="debug-count">0</div>
+            <div class="log-stats-label">Debug</div>
+        </div>
+    </div>
+</div>
+
+<!-- Log Entry Template (hidden) -->
+<div id="log-entry-template" class="hidden">
+    <div class="log-entry flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2 py-1.5 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
+        <div class="flex flex-wrap items-center gap-1 sm:gap-2 text-xs">
+            <span class="log-timestamp text-gray-500 whitespace-nowrap font-mono"></span>
+            <span class="log-level font-semibold px-1.5 py-0.5 rounded text-xs"></span>
+            <span class="log-component text-blue-400 font-mono"></span>
+        </div>
+        <span class="log-message flex-1 break-words text-xs sm:text-sm leading-relaxed pl-2 sm:pl-0"></span>
+    </div>
+</div>
+
+<script>
+class LogViewer {
+    constructor() {
+        this.eventSource = null;
+        this.isStreaming = false;
+        this.autoScroll = true;
+        this.logCount = 0;
+        this.stats = { error: 0, warn: 0, info: 0, debug: 0 };
+        
+        this.initializeElements();
+        this.bindEvents();
+    }
+    
+    initializeElements() {
+        this.logContainer = document.getElementById('log-container');
+        this.logContent = document.getElementById('log-content');
+        this.streamIndicator = document.getElementById('stream-indicator');
+        this.streamText = document.getElementById('stream-text');
+        this.toggleStreamBtn = document.getElementById('toggle-stream');
+        this.autoScrollBtn = document.getElementById('auto-scroll-toggle');
+        this.logCountSpan = document.getElementById('log-count');
+        this.connectionIndicator = document.getElementById('connection-indicator');
+        
+        // Filter elements
+        this.levelFilter = document.getElementById('level-filter');
+        this.componentFilter = document.getElementById('component-filter');
+        this.searchFilter = document.getElementById('search-filter');
+        this.applyFiltersBtn = document.getElementById('apply-filters');
+        this.resetFiltersBtn = document.getElementById('reset-filters');
+        
+        // Action buttons
+        this.downloadLogsBtn = document.getElementById('download-logs');
+        this.clearLogsBtn = document.getElementById('clear-logs');
+        
+        // Stat elements
+        this.errorCountEl = document.getElementById('error-count');
+        this.warningCountEl = document.getElementById('warning-count');
+        this.infoCountEl = document.getElementById('info-count');
+        this.debugCountEl = document.getElementById('debug-count');
+    }
+    
+    bindEvents() {
+        this.toggleStreamBtn.addEventListener('click', () => this.toggleStream());
+        this.autoScrollBtn.addEventListener('click', () => this.toggleAutoScroll());
+        this.applyFiltersBtn.addEventListener('click', () => this.applyFilters());
+        this.resetFiltersBtn.addEventListener('click', () => this.resetFilters());
+        this.downloadLogsBtn.addEventListener('click', () => this.downloadLogs());
+        this.clearLogsBtn.addEventListener('click', () => this.clearLogs());
+        
+        // Fullscreen toggle
+        const fullscreenBtn = document.getElementById('fullscreen-toggle');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        }
+        
+        // Auto-apply filters on enter key
+        this.searchFilter.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.applyFilters();
+            }
+        });
+    }
+    
+    toggleStream() {
+        if (this.isStreaming) {
+            this.stopStream();
+        } else {
+            this.startStream();
+        }
+    }
+    
+    startStream() {
+        const level = this.levelFilter.value;
+        const component = this.componentFilter.value;
+        const search = this.searchFilter.value;
+        
+        const url = `/admin/api/logs/stream?level=${level}&component=${component}&search=${encodeURIComponent(search)}`;
+        
+        this.eventSource = new EventSource(url);
+        this.connectionIndicator.classList.remove('hidden');
+        
+        this.eventSource.onopen = () => {
+            this.isStreaming = true;
+            this.updateStreamStatus(true);
+            this.connectionIndicator.classList.add('hidden');
+            this.showNotification('success', 'Connected to log stream');
+        };
+        
+        this.eventSource.onmessage = (event) => {
+            this.addLogEntry(event.data);
+        };
+        
+        this.eventSource.onerror = (error) => {
+            console.error('EventSource failed:', error);
+            this.stopStream();
+            this.showNotification('error', 'Log stream disconnected');
+        };
+    }
+    
+    stopStream() {
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
+        }
+        
+        this.isStreaming = false;
+        this.updateStreamStatus(false);
+        this.connectionIndicator.classList.add('hidden');
+        
+        // Show notification that stream has stopped
+        this.showNotification('info', 'Log stream stopped');
+        
+        // Clear any pending operations
+        if (this.streamTimeout) {
+            clearTimeout(this.streamTimeout);
+            this.streamTimeout = null;
+        }
+    }
+    
+    updateStreamStatus(connected) {
+        if (connected) {
+            this.streamIndicator.className = 'w-2 h-2 bg-green-500 rounded-full mr-2';
+            this.streamText.textContent = 'Connected';
+            this.toggleStreamBtn.innerHTML = '<i class="fas fa-stop mr-1"></i>Stop Stream';
+            this.toggleStreamBtn.className = 'btn btn-sm btn-danger';
+        } else {
+            this.streamIndicator.className = 'w-2 h-2 bg-red-500 rounded-full mr-2';
+            this.streamText.textContent = 'Disconnected';
+            this.toggleStreamBtn.innerHTML = '<i class="fas fa-play mr-1"></i>Start Stream';
+            this.toggleStreamBtn.className = 'btn btn-sm btn-secondary';
+        }
+        
+        // Update fullscreen controls if in fullscreen mode
+        this.updateFullscreenControls();
+    }
+    
+    addLogEntry(logData) {
+        const entry = this.parseLogEntry(logData);
+        if (!entry) return;
+        
+        const logElement = this.createLogElement(entry);
+        this.logContent.appendChild(logElement);
+        
+        this.logCount++;
+        this.updateStats(entry.level);
+        this.updateLogCount();
+        
+        if (this.autoScroll) {
+            this.scrollToBottom();
+        }
+        
+        // Limit log entries to prevent memory issues
+        if (this.logCount > 1000) {
+            const firstEntry = this.logContent.querySelector('.log-entry');
+            if (firstEntry) {
+                firstEntry.remove();
+                this.logCount--;
+            }
+        }
+    }
+    
+    parseLogEntry(logData) {
+        // Parse log format: "2006-01-02 15:04:05 [LEVEL] [COMPONENT] message"
+        const regex = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[([A-Z]+)\] \[([A-Z]+)\] (.+)$/;
+        const match = logData.match(regex);
+        
+        if (!match) {
+            // Fallback for simple messages
+            return {
+                timestamp: new Date().toLocaleString(),
+                level: 'INFO',
+                component: 'SYSTEM',
+                message: logData
+            };
+        }
+        
+        return {
+            timestamp: match[1],
+            level: match[2],
+            component: match[3],
+            message: match[4]
+        };
+    }
+    
+    createLogElement(entry) {
+        const template = document.getElementById('log-entry-template');
+        const element = template.querySelector('.log-entry').cloneNode(true);
+        
+        const timestamp = element.querySelector('.log-timestamp');
+        const level = element.querySelector('.log-level');
+        const component = element.querySelector('.log-component');
+        const message = element.querySelector('.log-message');
+        
+        // Format timestamp for mobile (shorter format)
+        const isMobile = window.innerWidth < 640;
+        if (isMobile) {
+            // Show only time on mobile
+            const timeOnly = entry.timestamp.split(' ')[1] || entry.timestamp;
+            timestamp.textContent = timeOnly;
+        } else {
+            timestamp.textContent = entry.timestamp;
+        }
+        
+        level.textContent = entry.level;
+        component.textContent = `[${entry.component}]`;
+        message.textContent = entry.message;
+        
+        // Style based on log level with better mobile visibility
+        switch (entry.level) {
+            case 'ERROR':
+                level.className = 'log-level font-semibold px-1.5 py-0.5 rounded text-xs bg-red-500 text-white';
+                message.classList.add('text-red-600', 'dark:text-red-400');
+                break;
+            case 'WARN':
+                level.className = 'log-level font-semibold px-1.5 py-0.5 rounded text-xs bg-yellow-500 text-black';
+                message.classList.add('text-yellow-600', 'dark:text-yellow-400');
+                break;
+            case 'INFO':
+                level.className = 'log-level font-semibold px-1.5 py-0.5 rounded text-xs bg-blue-500 text-white';
+                break;
+            case 'DEBUG':
+                level.className = 'log-level font-semibold px-1.5 py-0.5 rounded text-xs bg-gray-500 text-white';
+                message.classList.add('text-gray-600', 'dark:text-gray-400');
+                break;
+            default:
+                level.className = 'log-level font-semibold px-1.5 py-0.5 rounded text-xs bg-gray-400 text-white';
+        }
+        
+        return element;
+    }
+    
+    updateStats(level) {
+        const levelLower = level.toLowerCase();
+        if (this.stats.hasOwnProperty(levelLower)) {
+            this.stats[levelLower]++;
+        }
+        
+        this.errorCountEl.textContent = this.stats.error;
+        this.warningCountEl.textContent = this.stats.warn;
+        this.infoCountEl.textContent = this.stats.info;
+        this.debugCountEl.textContent = this.stats.debug;
+    }
+    
+    updateLogCount() {
+        this.logCountSpan.textContent = `${this.logCount} entries`;
+    }
+    
+    toggleAutoScroll() {
+        this.autoScroll = !this.autoScroll;
+        
+        if (this.autoScroll) {
+            this.autoScrollBtn.innerHTML = '<i class="fas fa-arrow-down mr-1"></i>Auto Scroll';
+            this.autoScrollBtn.className = 'btn btn-sm btn-secondary';
+            this.scrollToBottom();
+        } else {
+            this.autoScrollBtn.innerHTML = '<i class="fas fa-pause mr-1"></i>Paused';
+            this.autoScrollBtn.className = 'btn btn-sm btn-warning';
+        }
+        
+        // Update fullscreen controls if in fullscreen mode
+        this.updateFullscreenControls();
+    }
+    
+    scrollToBottom() {
+        this.logContainer.scrollTop = this.logContainer.scrollHeight;
+    }
+    
+    applyFilters() {
+        if (this.isStreaming) {
+            this.stopStream();
+            setTimeout(() => this.startStream(), 100);
+        }
+    }
+    
+    resetFilters() {
+        this.levelFilter.value = 'all';
+        this.componentFilter.value = 'all';
+        this.searchFilter.value = '';
+        this.applyFilters();
+    }
+    
+    downloadLogs() {
+        const level = this.levelFilter.value;
+        const component = this.componentFilter.value;
+        const search = this.searchFilter.value;
+        
+        const url = `/admin/api/logs/download?level=${level}&component=${component}&search=${encodeURIComponent(search)}`;
+        window.open(url, '_blank');
+    }
+    
+    clearLogs() {
+        // Clear only the display, not the actual logs
+        this.logContent.innerHTML = '<div class="text-gray-500 italic"><i class="fas fa-info-circle mr-2"></i>Logs cleared from display...</div>';
+        this.logCount = 0;
+        this.stats = { error: 0, warn: 0, info: 0, debug: 0 };
+        this.updateLogCount();
+        this.updateStats('');
+    }
+    
+    toggleFullscreen() {
+        const logContainer = this.logContainer;
+        const fullscreenBtn = document.getElementById('fullscreen-toggle');
+        
+        // Always use CSS-only fullscreen (no browser native fullscreen)
+        if (!logContainer.classList.contains('fallback-fullscreen')) {
+            // Enter page fullscreen
+            this.enterFallbackFullscreen(logContainer);
+        } else {
+            // Exit page fullscreen
+            this.exitFallbackFullscreen(logContainer);
+        }
+    }
+    
+    enterFallbackFullscreen(element) {
+        // Store original parent for restoration
+        this.originalParent = element.parentNode;
+        this.originalNextSibling = element.nextSibling;
+        
+        // Move the element to body to escape main container
+        document.body.appendChild(element);
+        
+        // Apply TRULY FULL SCREEN positioning with navigation hidden
+        element.style.position = 'fixed';
+        element.style.top = '0px'; /* Full viewport - nav will be hidden */
+        element.style.left = '0px';
+        element.style.width = '100vw';
+        element.style.height = '100vh'; /* Full viewport height */
+        element.style.zIndex = '9999'; /* Above everything */
+        element.style.backgroundColor = '#1f2937';
+        element.style.transition = 'none'; /* No transitions */
+        element.style.transform = 'none'; /* No transforms */
+        element.classList.add('fallback-fullscreen');
+        
+        // Add fullscreen-active class to body for complete isolation
+        document.body.classList.add('fullscreen-active');
+        
+        // Add comprehensive fullscreen controls header
+        const header = document.createElement('div');
+        header.className = 'fullscreen-header';
+        
+        // Build header content with current state
+        const streamIndicatorClass = this.isStreaming ? 'bg-green-500' : 'bg-red-500';
+        const streamStatus = this.isStreaming ? 'Connected' : 'Disconnected';
+        const streamBtnClass = this.isStreaming ? 'btn-danger' : 'btn-secondary';
+        const streamBtnIcon = this.isStreaming ? 'fa-stop' : 'fa-play';
+        const streamBtnText = this.isStreaming ? 'Stop' : 'Start';
+        const autoScrollBtnClass = this.autoScroll ? 'btn-secondary' : 'btn-warning';
+        const autoScrollIcon = this.autoScroll ? 'fa-arrow-down' : 'fa-pause';
+        const autoScrollText = this.autoScroll ? 'Auto' : 'Paused';
+        
+        // Detect if mobile
+        const isMobile = window.innerWidth < 640;
+        
+        if (isMobile) {
+            // Compact mobile layout with two rows
+            header.innerHTML = `
+                <div style="display: flex; flex-direction: column; padding: 0.5rem; background: #374151; color: white; border-bottom: 1px solid #4b5563;">
+                    <!-- Title and Exit Row -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 style="margin: 0; font-size: 0.875rem; display: flex; align-items: center;">
+                            <i class="fas fa-terminal mr-1" style="font-size: 0.75rem;"></i>
+                            <span style="font-size: 0.875rem;">Logs</span>
+                        </h3>
+                        <button id="fullscreen-exit" class="btn btn-xs btn-warning" onclick="window.logViewer?.exitFullscreen()" style="padding: 0.25rem 0.5rem;">
+                            <i class="fas fa-compress"></i> Exit
+                        </button>
+                    </div>
+                    <!-- Controls Row -->
+                    <div style="display: flex; align-items: center; gap: 0.25rem; justify-content: space-between;">
+                        <!-- Status -->
+                        <div style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.65rem;">
+                            <div class="w-2 h-2 rounded-full ${streamIndicatorClass}" id="fullscreen-stream-indicator"></div>
+                            <span id="fullscreen-stream-text" style="font-size: 0.65rem;">${streamStatus}</span>
+                        </div>
+                        <!-- Buttons -->
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button id="fullscreen-toggle-stream" class="btn btn-xs ${streamBtnClass}" onclick="window.logViewer?.toggleStream()" style="padding: 0.2rem 0.4rem; font-size: 0.65rem;">
+                                <i class="fas ${streamBtnIcon}"></i> ${streamBtnText}
+                            </button>
+                            <button id="fullscreen-auto-scroll" class="btn btn-xs ${autoScrollBtnClass}" onclick="window.logViewer?.toggleAutoScroll()" style="padding: 0.2rem 0.4rem; font-size: 0.65rem;">
+                                <i class="fas ${autoScrollIcon}"></i> Auto
+                            </button>
+                            <button id="fullscreen-clear-logs" class="btn btn-xs btn-secondary" onclick="window.logViewer?.clearLogs()" style="padding: 0.2rem 0.4rem; font-size: 0.65rem;">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                            <button id="fullscreen-download" class="btn btn-xs btn-secondary" onclick="window.logViewer?.downloadLogs()" style="padding: 0.2rem 0.4rem; font-size: 0.65rem;">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Desktop layout - single row
+            header.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; background: #374151; color: white; border-bottom: 1px solid #4b5563; flex-wrap: wrap; gap: 0.5rem;">
+                    <h3 style="margin: 0; font-size: 1rem; flex: 0 0 auto;">
+                        <i class="fas fa-terminal mr-2"></i>System Logs - Expanded View
+                    </h3>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <!-- Connection Status -->
+                        <div style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem;">
+                            <div class="w-2 h-2 rounded-full ${streamIndicatorClass}" id="fullscreen-stream-indicator"></div>
+                            <span id="fullscreen-stream-text">${streamStatus}</span>
+                        </div>
+                        <!-- Stream Controls -->
+                        <button id="fullscreen-toggle-stream" class="btn btn-xs ${streamBtnClass}" onclick="window.logViewer?.toggleStream()">
+                            <i class="fas ${streamBtnIcon} mr-1"></i>${streamBtnText}
+                        </button>
+                        <!-- Auto Scroll Control -->
+                        <button id="fullscreen-auto-scroll" class="btn btn-xs ${autoScrollBtnClass}" onclick="window.logViewer?.toggleAutoScroll()">
+                            <i class="fas ${autoScrollIcon} mr-1"></i>${autoScrollText}
+                        </button>
+                        <!-- Action Buttons -->
+                        <button id="fullscreen-clear-logs" class="btn btn-xs btn-secondary" onclick="window.logViewer?.clearLogs()">
+                            <i class="fas fa-trash mr-1"></i>Clear
+                        </button>
+                        <button id="fullscreen-download" class="btn btn-xs btn-secondary" onclick="window.logViewer?.downloadLogs()">
+                            <i class="fas fa-download mr-1"></i>Export
+                        </button>
+                        <!-- Exit Button -->
+                        <button id="fullscreen-exit" class="btn btn-xs btn-warning" onclick="window.logViewer?.exitFullscreen()">
+                            <i class="fas fa-compress mr-1"></i>Exit
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        element.insertBefore(header, element.firstChild);
+        
+        // Update main button
+        const fullscreenBtn = document.getElementById('fullscreen-toggle');
+        if (fullscreenBtn) {
+            fullscreenBtn.innerHTML = '<i class="fas fa-compress mr-1"></i><span class="hidden sm:inline">Exit</span>';
+            fullscreenBtn.className = 'btn btn-xs sm:btn-sm btn-warning';
+        }
+        
+        this.showNotification('success', 'Expanded logs view - staying within page');
+    }
+    
+    exitFallbackFullscreen(element) {
+        // Remove fullscreen header
+        const header = element.querySelector('.fullscreen-header');
+        if (header) {
+            header.remove();
+        }
+        
+        // Restore element to its original position in the DOM
+        if (this.originalParent) {
+            if (this.originalNextSibling) {
+                this.originalParent.insertBefore(element, this.originalNextSibling);
+            } else {
+                this.originalParent.appendChild(element);
+            }
+        }
+        
+        // Exit page fullscreen
+        element.style.position = '';
+        element.style.top = '';
+        element.style.left = '';
+        element.style.width = '';
+        element.style.height = '';
+        element.style.zIndex = '';
+        element.style.backgroundColor = '';
+        element.classList.remove('fallback-fullscreen');
+        
+        // Remove fullscreen-active class from body to restore normal interactions
+        document.body.classList.remove('fullscreen-active');
+        
+        // Update button
+        const fullscreenBtn = document.getElementById('fullscreen-toggle');
+        if (fullscreenBtn) {
+            fullscreenBtn.innerHTML = '<i class="fas fa-expand mr-1"></i><span class="hidden sm:inline">Full</span>screen';
+            fullscreenBtn.className = 'btn btn-xs sm:btn-sm btn-secondary';
+        }
+        
+        this.showNotification('info', 'Exited expanded logs view');
+    }
+    
+    showNotification(type, message) {
+        // Use global notification function if available
+        if (typeof showNotification === 'function') {
+            showNotification(type, message);
+        } else {
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+    }
+    
+    exitFullscreen() {
+        // Directly call the exit fullscreen functionality
+        const logContainer = this.logContainer;
+        if (logContainer && logContainer.classList.contains('fallback-fullscreen')) {
+            this.exitFallbackFullscreen(logContainer);
+        }
+    }
+    
+    updateFullscreenControls() {
+        // Update fullscreen header controls when state changes
+        const streamIndicator = document.getElementById('fullscreen-stream-indicator');
+        const streamText = document.getElementById('fullscreen-stream-text');
+        const streamBtn = document.getElementById('fullscreen-toggle-stream');
+        const autoScrollBtn = document.getElementById('fullscreen-auto-scroll');
+        
+        if (streamIndicator && streamText && streamBtn) {
+            // Update stream status
+            streamIndicator.className = this.isStreaming 
+                ? 'w-2 h-2 rounded-full bg-green-500' 
+                : 'w-2 h-2 rounded-full bg-red-500';
+            streamText.textContent = this.isStreaming ? 'Connected' : 'Disconnected';
+            
+            // Update stream button
+            streamBtn.className = this.isStreaming 
+                ? 'btn btn-xs btn-danger' 
+                : 'btn btn-xs btn-secondary';
+            streamBtn.innerHTML = this.isStreaming 
+                ? '<i class="fas fa-stop mr-1"></i>Stop' 
+                : '<i class="fas fa-play mr-1"></i>Start';
+        }
+        
+        if (autoScrollBtn) {
+            // Update auto scroll button
+            autoScrollBtn.className = this.autoScroll 
+                ? 'btn btn-xs btn-secondary' 
+                : 'btn btn-xs btn-warning';
+            autoScrollBtn.innerHTML = this.autoScroll 
+                ? '<i class="fas fa-arrow-down mr-1"></i>Auto' 
+                : '<i class="fas fa-pause mr-1"></i>Paused';
+        }
+    }
+}
+
+// Initialize log viewer when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    window.logViewer = new LogViewer();
+    
+    // Listen for fullscreen change events
+    const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'msfullscreenchange'];
+    fullscreenEvents.forEach(eventName => {
+        document.addEventListener(eventName, function() {
+            const fullscreenBtn = document.getElementById('fullscreen-toggle');
+            if (!fullscreenBtn) return;
+            
+            if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+                !document.mozFullScreenElement && !document.msFullscreenElement) {
+                // Exited fullscreen
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand mr-1"></i>Fullscreen';
+                fullscreenBtn.className = 'btn btn-sm btn-secondary';
+            }
+        });
+    });
+});
+</script>
+
+<style>
+/* Additional styles for log viewer - NO TRANSITIONS IN FULLSCREEN */
+.log-entry {
+    transition: all 0.2s ease;
+}
+
+.log-entry:hover {
+    background-color: rgba(75, 85, 99, 0.1);
+}
+
+/* Disable all transitions for fullscreen log entries to prevent flickering */
+.fallback-fullscreen .log-entry {
+    transition: none !important;
+}
+
+.fallback-fullscreen .log-entry:hover {
+    background-color: rgba(75, 85, 99, 0.1) !important;
+    transition: none !important;
+}
+
+/* Custom scrollbar for log container */
+#log-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#log-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+#log-container::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.5);
+    border-radius: 4px;
+}
+
+#log-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(75, 85, 99, 0.7);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+    /* Fixed header for mobile to prevent controls from scrolling away */
+    .card-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: inherit;
+    }
+    
+    #log-container {
+        height: calc(100vh - 350px); /* Adjust based on header/filter heights */
+        font-size: 11px;
+    }
+    
+    .log-entry {
+        padding: 0.375rem;
+        margin: 2px 0;
+        border-left: 2px solid transparent;
+    }
+    
+    .log-entry:hover {
+        border-left-color: #3b82f6;
+        background-color: rgba(59, 130, 246, 0.05);
+    }
+    
+    .log-message {
+        font-size: 0.7rem;
+        line-height: 1.4;
+        word-break: break-word;
+        margin-top: 0.25rem;
+    }
+    
+    .log-timestamp {
+        font-size: 0.65rem;
+    }
+    
+    .log-level {
+        font-size: 0.6rem;
+        padding: 0.125rem 0.375rem;
+    }
+    
+    .log-component {
+        font-size: 0.65rem;
+    }
+    
+    /* Compact button styles for mobile */
+    .btn-xs {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+        min-width: auto;
+        white-space: nowrap;
+    }
+    
+    /* Better touch targets for mobile */
+    .btn-xs {
+        min-height: 32px;
+        min-width: 44px;
+    }
+    
+    /* Log stats cards on mobile */
+    .log-stats-card {
+        padding: 0.75rem;
+    }
+    
+    .log-stats-number {
+        font-size: 1.25rem;
+    }
+    
+    .log-stats-label {
+        font-size: 0.75rem;
+    }
+}
+
+/* Very small screens (iPhone SE, etc.) */
+@media (max-width: 375px) {
+    #log-container {
+        height: calc(100vh - 380px);
+    }
+    
+    .btn-xs {
+        padding: 0.2rem 0.375rem;
+        font-size: 0.65rem;
+    }
+    
+    .btn-xs i {
+        font-size: 0.75rem;
+    }
+    
+    .log-message {
+        font-size: 0.65rem;
+    }
+}
+
+/* High contrast mode adjustments */
+@media (prefers-contrast: high) {
+    #log-container {
+        background-color: #000;
+        color: #fff;
+    }
+    
+    .log-entry:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Animation for new log entries */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.log-entry {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Fullscreen header styles */
+.logs-fullscreen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #2d3748;
+    color: white;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #4a5568;
+    min-height: 3rem;
+    box-sizing: border-box;
+}
+
+.logs-fullscreen-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.logs-fullscreen-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+    gap: 0.375rem;
+}
+
+.connection-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #ef4444;
+}
+
+.connection-dot.connected {
+    background-color: #10b981;
+}
+
+.connection-dot.disconnected {
+    background-color: #ef4444;
+}
+
+/* Extra small button styles */
+.btn-xs {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1;
+    border-radius: 0.25rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn-xs i {
+    margin-right: 0.25rem;
+    font-size: 0.7rem;
+}
+
+/* Page-only fullscreen mode - NOT browser fullscreen */
+.logs-fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    background-color: #1a1a1a !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* Ensure body doesn't scroll when in page fullscreen */
+body.logs-fullscreen-active {
+    overflow: hidden;
+}
+
+/* Page-expanded logs mode - no browser fullscreen */
+.logs-expanded {
+    position: fixed !important;
+    z-index: 50 !important; /* Stay below navigation (which is typically z-index 100+) */
+    background-color: #1f2937 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+    overflow: hidden;
+    pointer-events: auto !important;
+}
+
+/* Prevent hover flickering on navigation when logs are expanded */
+.logs-expanded ~ nav,
+nav {
+    position: relative;
+    z-index: 1001 !important; /* Ensure navigation stays above fullscreen logs */
+    pointer-events: auto !important;
+    transition: none !important; /* No transitions to prevent flicker */
+}
+
+/* Ensure navigation links don't flicker */
+nav a, nav button {
+    transition: none !important;
+}
+
+nav a:hover, nav button:hover {
+    transition: none !important;
+}
+
+/* Fallback fullscreen mode for compatibility - EXTREME ANTI-FLICKERING */
+.fallback-fullscreen {
+    position: fixed !important;
+    top: 0 !important; /* Full screen - nav hidden */
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important; /* Full viewport */
+    z-index: 9999 !important; /* Above everything */
+    background-color: #1f2937 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    pointer-events: auto !important;
+    
+    /* EXTREME ANTI-FLICKERING MEASURES */
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    
+    /* Disable ALL hover effects */
+    -webkit-transition: none !important;
+    -moz-transition: none !important;
+    -o-transition: none !important;
+    -ms-transition: none !important;
+    
+    /* Force GPU acceleration OFF to prevent flickering */
+    will-change: auto !important;
+    backface-visibility: visible !important;
+    -webkit-backface-visibility: visible !important;
+    
+    /* Prevent any layout shifts */
+    contain: layout style !important;
+    
+    /* NUCLEAR ANTI-FLICKERING - Prevent any repaints */
+    -webkit-transform: translateZ(0) !important;
+    -moz-transform: translateZ(0) !important; 
+    -ms-transform: translateZ(0) !important;
+    -o-transform: translateZ(0) !important;
+    transform: translateZ(0) !important;
+    
+    /* Force solid background to prevent transparency issues */
+    background: #1f2937 !important;
+    
+    /* Disable any sub-pixel rendering that might cause flicker */
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Fix pointer events for fullscreen log content - EXTREME ANTI-FLICKERING */
+.fallback-fullscreen #log-content {
+    pointer-events: none !important; /* Disable pointer events on log content to allow button clicks */
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
+    will-change: auto !important;
+    backface-visibility: visible !important;
+}
+
+.fallback-fullscreen .log-entry {
+    pointer-events: auto !important; /* Re-enable for individual log entries */
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
+    will-change: auto !important;
+}
+
+/* Disable ALL hover effects in fullscreen mode to prevent flickering */
+.fallback-fullscreen *:hover {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
+}
+
+/* Force all children to be static to prevent any movement */
+.fallback-fullscreen * {
+    transition: none !important;
+    animation: none !important;
+    will-change: auto !important;
+}
+
+/* Specifically disable button hover effects in fullscreen */
+.fallback-fullscreen button:hover,
+.fallback-fullscreen .btn:hover {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* COMPLETELY ISOLATE FULLSCREEN MODE FROM PAGE INTERACTIONS */
+body.fullscreen-active {
+    overflow: hidden !important;
+}
+
+body.fullscreen-active * {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Hide nav but keep fullscreen container visible */
+body.fullscreen-active nav {
+    display: none !important;
+}
+
+/* Hide all main content EXCEPT the fullscreen container */
+body.fullscreen-active main > *:not(.fallback-fullscreen) {
+    display: none !important;
+}
+
+/* Ensure the fullscreen container is visible and properly positioned */
+body.fullscreen-active .fallback-fullscreen {
+    display: block !important;
+    top: 0 !important;
+    height: 100vh !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Ensure fullscreen header controls are clickable - WITHIN FULLSCREEN CONTAINER */
+.fullscreen-header {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 100 !important; /* High within fullscreen container */
+    transition: none !important; /* No transitions */
+    transform: none !important; /* No transforms */
+    will-change: auto !important; /* Prevent GPU layer creation */
+}
+
+.fullscreen-header button {
+    pointer-events: auto !important;
+    transition: none !important; /* No button transitions to prevent flicker */
+    transform: none !important;
+    will-change: auto !important;
+}
+
+.fullscreen-header button:hover {
+    transition: none !important; /* No hover transitions */
+    transform: none !important;
+}
+
+.logs-fullscreen #log-content {
+    height: calc(100vh - 3rem);
+    padding: 0.5rem;
+}
+
+.fallback-fullscreen #log-content {
+    height: calc(100vh - 4rem); /* Account for fullscreen header - slightly more for mobile */
+    padding: 0.5rem;
+    overflow-y: auto !important;
+    pointer-events: none !important;
+    
+    /* NUCLEAR ANTI-FLICKERING for log content */
+    -webkit-transform: translateZ(0) !important;
+    transform: translateZ(0) !important;
+    background: #1f2937 !important;
+    -webkit-font-smoothing: antialiased !important;
+}
+
+.fallback-fullscreen .log-entry {
+    pointer-events: auto !important;
+}
+
+/* Better mobile responsiveness for fullscreen */
+@media (max-width: 768px) {
+    .logs-fullscreen,
+    .fallback-fullscreen {
+        padding: 0 !important;
+    }
+    
+    .logs-fullscreen #log-content,
+    .fallback-fullscreen #log-content {
+        height: calc(100vh - 2.5rem);
+        font-size: 0.7rem;
+        padding: 0.25rem;
+    }
+    
+    .logs-fullscreen .log-entry,
+    .fallback-fullscreen .log-entry {
+        padding: 0.125rem;
+        margin: 1px 0;
+        font-size: 0.65rem;
+    }
+    
+    .logs-fullscreen .log-timestamp,
+    .logs-fullscreen .log-level,
+    .logs-fullscreen .log-component,
+    .fallback-fullscreen .log-timestamp,
+    .fallback-fullscreen .log-level,
+    .fallback-fullscreen .log-component {
+        font-size: 0.55rem;
+    }
+    
+    .logs-fullscreen .log-message,
+    .fallback-fullscreen .log-message {
+        font-size: 0.65rem;
+        line-height: 1.1;
+    }
+    
+    .logs-fullscreen-header {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        min-height: 2.5rem;
+    }
+    
+    .logs-fullscreen-title {
+        font-size: 0.9rem;
+    }
+    
+    .logs-fullscreen-controls {
+        gap: 0.5rem;
+    }
+    
+    .logs-fullscreen-header .btn {
+        padding: 0.25rem 0.375rem;
+        font-size: 0.7rem;
+    }
+    
+    .connection-status {
+        font-size: 0.75rem;
+    }
+}
+</style>
+
+<!-- Enhanced log viewer JavaScript - DISABLED for testing -->
+<!-- <script src="/static/js/logs.js"></script> -->
+{{end}}

@@ -1,0 +1,418 @@
+{{define "content"}}
+<div class="container mx-auto px-4 py-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">System Configuration</h1>
+            <p class="text-gray-600">Manage system settings and view configuration history</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2 mt-4 md:mt-0">
+            <button id="saveAllBtn" onclick="saveAllConfiguration()" 
+                    class="btn-primary w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <i class="fas fa-save mr-2"></i>Save All Changes
+            </button>
+            <button onclick="resetToDefaults()" class="btn-secondary w-full sm:w-auto">
+                <i class="fas fa-undo mr-2"></i>Reset to Defaults
+            </button>
+        </div>
+    </div>
+
+    <!-- Configuration Status -->
+    <div id="configStatus" class="card mb-6">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-info-circle text-blue-500 mr-2"></i>Configuration Status
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600 mb-1" id="configVersion">Loading...</div>
+                    <p class="text-sm text-gray-600">Current Version</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600 mb-1" id="lastUpdated">Loading...</div>
+                    <p class="text-sm text-gray-600">Last Updated</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-gray-600 mb-1" id="pendingChanges">0</div>
+                    <p class="text-sm text-gray-600">Pending Changes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex flex-wrap">
+                <button class="config-tab active" data-tab="pool">
+                    <i class="fas fa-swimming-pool mr-2"></i>
+                    <span class="hidden sm:inline">Address Pool</span>
+                    <span class="sm:hidden">Pool</span>
+                </button>
+                <button class="config-tab" data-tab="gap">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span class="hidden sm:inline">Gap Monitor</span>
+                    <span class="sm:hidden">Gap</span>
+                </button>
+                <button class="config-tab" data-tab="ratelimit">
+                    <i class="fas fa-shield-alt mr-2"></i>
+                    <span class="hidden sm:inline">Rate Limiter</span>
+                    <span class="sm:hidden">Rate</span>
+                </button>
+                <button class="config-tab" data-tab="websocket">
+                    <i class="fas fa-plug mr-2"></i>
+                    <span class="hidden sm:inline">WebSocket</span>
+                    <span class="sm:hidden">WS</span>
+                </button>
+                <button class="config-tab" data-tab="admin">
+                    <i class="fas fa-cog mr-2"></i>
+                    <span class="hidden sm:inline">Admin Dashboard</span>
+                    <span class="sm:hidden">Admin</span>
+                </button>
+                <button class="config-tab" data-tab="history">
+                    <i class="fas fa-history mr-2"></i>
+                    <span class="hidden sm:inline">Change History</span>
+                    <span class="sm:hidden">History</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Address Pool Configuration -->
+    <div id="pool-config" class="config-section active">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-swimming-pool text-blue-500 mr-2"></i>Address Pool Settings
+                </h3>
+                <p class="text-sm text-gray-600 mt-1">Configure Bitcoin address pool management</p>
+            </div>
+            <div class="card-body">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="poolMinSize" class="form-label required">Minimum Pool Size</label>
+                        <input type="number" id="poolMinSize" name="poolMinSize" class="form-input" 
+                               min="1" max="100" required>
+                        <p class="form-help">Minimum number of addresses to maintain in pool (1-100)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="poolMaxSize" class="form-label required">Maximum Pool Size</label>
+                        <input type="number" id="poolMaxSize" name="poolMaxSize" class="form-input" 
+                               min="5" max="1000" required>
+                        <p class="form-help">Maximum number of addresses allowed in pool (5-1000)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="poolRefillThreshold" class="form-label required">Refill Threshold</label>
+                        <input type="number" id="poolRefillThreshold" name="poolRefillThreshold" class="form-input" 
+                               min="1" required>
+                        <p class="form-help">Trigger refill when pool size drops below this number</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="poolRefillBatch" class="form-label required">Refill Batch Size</label>
+                        <input type="number" id="poolRefillBatch" name="poolRefillBatch" class="form-input" 
+                               min="1" max="50" required>
+                        <p class="form-help">Number of addresses to generate per refill batch (1-50)</p>
+                    </div>
+                    <div class="form-group md:col-span-2">
+                        <label for="poolCleanupInterval" class="form-label required">Cleanup Interval (minutes)</label>
+                        <input type="number" id="poolCleanupInterval" name="poolCleanupInterval" class="form-input" 
+                               min="5" max="1440" required>
+                        <p class="form-help">How often to clean up expired addresses (5-1440 minutes)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gap Monitor Configuration -->
+    <div id="gap-config" class="config-section">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>Gap Monitor Settings
+                </h3>
+                <p class="text-sm text-gray-600 mt-1">Configure gap limit monitoring and fallback behavior</p>
+            </div>
+            <div class="card-body">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="gapMaxLimit" class="form-label required">Maximum Gap Limit</label>
+                        <input type="number" id="gapMaxLimit" name="gapMaxLimit" class="form-input" 
+                               min="10" max="100" required>
+                        <p class="form-help">Maximum number of consecutive unpaid addresses (10-100)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="gapWarningThreshold" class="form-label required">Warning Threshold (%)</label>
+                        <input type="number" id="gapWarningThreshold" name="gapWarningThreshold" class="form-input" 
+                               min="0" max="100" step="1" required>
+                        <p class="form-help">Percentage of gap limit to trigger warnings (0-100%)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="gapCriticalThreshold" class="form-label required">Critical Threshold (%)</label>
+                        <input type="number" id="gapCriticalThreshold" name="gapCriticalThreshold" class="form-input" 
+                               min="0" max="100" step="1" required>
+                        <p class="form-help">Percentage of gap limit to trigger critical alerts (0-100%)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="gapFailThreshold" class="form-label required">Consecutive Fail Threshold</label>
+                        <input type="number" id="gapFailThreshold" name="gapFailThreshold" class="form-input" 
+                               min="1" max="20" required>
+                        <p class="form-help">Number of consecutive failures before fallback (1-20)</p>
+                    </div>
+                    <div class="form-group md:col-span-2">
+                        <label for="gapErrorHistory" class="form-label required">Error History Size</label>
+                        <input type="number" id="gapErrorHistory" name="gapErrorHistory" class="form-input" 
+                               min="10" max="1000" required>
+                        <p class="form-help">Number of recent errors to keep in memory (10-1000)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rate Limiter Configuration -->
+    <div id="ratelimit-config" class="config-section">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-shield-alt text-purple-500 mr-2"></i>Rate Limiter Settings
+                </h3>
+                <p class="text-sm text-gray-600 mt-1">Configure rate limiting for API access control</p>
+            </div>
+            <div class="card-body">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="rateLimitGlobalMax" class="form-label required">Global Max Tokens</label>
+                        <input type="number" id="rateLimitGlobalMax" name="rateLimitGlobalMax" class="form-input" 
+                               min="50" max="1000" required>
+                        <p class="form-help">Maximum global token pool size (50-1000)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="rateLimitGlobalRefill" class="form-label required">Global Refill Rate</label>
+                        <input type="number" id="rateLimitGlobalRefill" name="rateLimitGlobalRefill" class="form-input" 
+                               min="1" max="100" required>
+                        <p class="form-help">Tokens added to global pool per minute (1-100)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="rateLimitIPMax" class="form-label required">IP Max Tokens</label>
+                        <input type="number" id="rateLimitIPMax" name="rateLimitIPMax" class="form-input" 
+                               min="1" max="50" required>
+                        <p class="form-help">Maximum tokens per IP address (1-50)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="rateLimitIPRefill" class="form-label required">IP Refill Rate</label>
+                        <input type="number" id="rateLimitIPRefill" name="rateLimitIPRefill" class="form-input" 
+                               min="1" max="20" required>
+                        <p class="form-help">Tokens added per IP per minute (1-20)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="rateLimitEmailMax" class="form-label required">Email Max Tokens</label>
+                        <input type="number" id="rateLimitEmailMax" name="rateLimitEmailMax" class="form-input" 
+                               min="1" max="20" required>
+                        <p class="form-help">Maximum tokens per email address (1-20)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="rateLimitEmailRefill" class="form-label required">Email Refill Rate</label>
+                        <input type="number" id="rateLimitEmailRefill" name="rateLimitEmailRefill" class="form-input" 
+                               min="1" max="10" required>
+                        <p class="form-help">Tokens added per email per minute (1-10)</p>
+                    </div>
+                    <div class="form-group md:col-span-2">
+                        <label for="rateLimitCleanup" class="form-label required">Cleanup Interval (minutes)</label>
+                        <input type="number" id="rateLimitCleanup" name="rateLimitCleanup" class="form-input" 
+                               min="5" max="1440" required>
+                        <p class="form-help">How often to clean expired rate limits (5-1440 minutes)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebSocket Configuration -->
+    <div id="websocket-config" class="config-section">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-plug text-green-500 mr-2"></i>WebSocket Settings
+                </h3>
+                <p class="text-sm text-gray-600 mt-1">Configure WebSocket connection parameters</p>
+            </div>
+            <div class="card-body">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="wsReadBuffer" class="form-label required">Read Buffer Size (bytes)</label>
+                        <input type="number" id="wsReadBuffer" name="wsReadBuffer" class="form-input" 
+                               min="512" max="8192" step="512" required>
+                        <p class="form-help">WebSocket read buffer size (512-8192 bytes)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="wsWriteBuffer" class="form-label required">Write Buffer Size (bytes)</label>
+                        <input type="number" id="wsWriteBuffer" name="wsWriteBuffer" class="form-input" 
+                               min="512" max="8192" step="512" required>
+                        <p class="form-help">WebSocket write buffer size (512-8192 bytes)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="wsPingInterval" class="form-label required">Ping Interval (seconds)</label>
+                        <input type="number" id="wsPingInterval" name="wsPingInterval" class="form-input" 
+                               min="10" max="300" required>
+                        <p class="form-help">How often to send ping messages (10-300 seconds)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="wsPongTimeout" class="form-label required">Pong Timeout (seconds)</label>
+                        <input type="number" id="wsPongTimeout" name="wsPongTimeout" class="form-input" 
+                               min="5" max="120" required>
+                        <p class="form-help">Timeout for pong response (5-120 seconds)</p>
+                    </div>
+                    <div class="form-group md:col-span-2">
+                        <label for="wsMaxConnections" class="form-label required">Maximum Connections</label>
+                        <input type="number" id="wsMaxConnections" name="wsMaxConnections" class="form-input" 
+                               min="10" max="10000" required>
+                        <p class="form-help">Maximum concurrent WebSocket connections (10-10000)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Configuration -->
+    <div id="admin-config" class="config-section">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-cog text-gray-500 mr-2"></i>Admin Dashboard Settings
+                </h3>
+                <p class="text-sm text-gray-600 mt-1">Configure admin dashboard behavior and features</p>
+            </div>
+            <div class="card-body">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="adminSessionTimeout" class="form-label required">Session Timeout (hours)</label>
+                        <input type="number" id="adminSessionTimeout" name="adminSessionTimeout" class="form-input" 
+                               min="1" max="168" required>
+                        <p class="form-help">Admin session timeout (1-168 hours)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminRefreshInterval" class="form-label required">Refresh Interval (seconds)</label>
+                        <input type="number" id="adminRefreshInterval" name="adminRefreshInterval" class="form-input" 
+                               min="5" max="300" required>
+                        <p class="form-help">Dashboard data refresh interval (5-300 seconds)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminMaxLogs" class="form-label required">Max Log Entries</label>
+                        <input type="number" id="adminMaxLogs" name="adminMaxLogs" class="form-input" 
+                               min="100" max="10000" required>
+                        <p class="form-help">Maximum log entries to display (100-10000)</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminMetricsRetention" class="form-label required">Metrics Retention (hours)</label>
+                        <input type="number" id="adminMetricsRetention" name="adminMetricsRetention" class="form-input" 
+                               min="1" max="8760" required>
+                        <p class="form-help">How long to keep metrics data (1-8760 hours)</p>
+                    </div>
+                    <div class="form-group md:col-span-2">
+                        <div class="space-y-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="adminEnableMetrics" name="adminEnableMetrics" class="form-checkbox">
+                                <label for="adminEnableMetrics" class="ml-2 text-sm font-medium text-gray-700">
+                                    Enable Metrics Collection
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="adminEnableAlerts" name="adminEnableAlerts" class="form-checkbox">
+                                <label for="adminEnableAlerts" class="ml-2 text-sm font-medium text-gray-700">
+                                    Enable Alert System
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change History -->
+    <div id="history-config" class="config-section">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-history text-indigo-500 mr-2"></i>Configuration Change History
+                </h3>
+                <p class="text-sm text-gray-600 mt-1">View and manage configuration changes</p>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <button onclick="refreshHistory()" class="btn-secondary">
+                        <i class="fas fa-refresh mr-2"></i>Refresh History
+                    </button>
+                </div>
+                <div id="configHistory" class="space-y-4">
+                    <!-- History entries will be loaded here -->
+                    <div class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">Loading configuration history...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="confirmationModal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeModal()"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Confirm Configuration Change</h3>
+            <button onclick="closeModal()" class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p id="confirmationMessage" class="mb-4"></p>
+            <div id="changesSummary" class="bg-gray-50 p-4 rounded-lg mb-4">
+                <!-- Changes summary will be inserted here -->
+            </div>
+            <div class="form-group">
+                <label for="changeDescription" class="form-label">Change Description</label>
+                <textarea id="changeDescription" class="form-input" rows="3" 
+                          placeholder="Describe the reason for this configuration change..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeModal()" class="btn-secondary">Cancel</button>
+            <button onclick="confirmConfigurationChange()" class="btn-primary">
+                <i class="fas fa-save mr-2"></i>Save Configuration
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Rollback Modal -->
+<div id="rollbackModal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeRollbackModal()"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Confirm Configuration Rollback</h3>
+            <button onclick="closeRollbackModal()" class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p class="mb-4">Are you sure you want to rollback to this configuration? This will revert all settings to their previous values.</p>
+            <div id="rollbackDetails" class="bg-yellow-50 p-4 rounded-lg mb-4">
+                <!-- Rollback details will be inserted here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeRollbackModal()" class="btn-secondary">Cancel</button>
+            <button onclick="confirmRollback()" class="btn-danger">
+                <i class="fas fa-undo mr-2"></i>Rollback Configuration
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/config.js"></script>
+{{end}}
