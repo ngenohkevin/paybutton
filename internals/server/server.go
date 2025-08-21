@@ -66,6 +66,9 @@ func (s *Server) Start() error {
 	r.GET("/events/balance/:address", payment_processing.HandleSSE)                                       // SSE endpoint for real-time updates (lightweight)
 	r.POST("/webhook/btc", func(c *gin.Context) { payment_processing.HandleBlockonomicsWebhook(c, bot) }) // Blockonomics webhook
 	r.GET("/balance/:address", payment_processing.GetBalance)
+	
+	// Register admin endpoints for monitoring and management
+	RegisterAdminEndpoints(r)
 
 	// Add the webhook endpoint for Telegram
 	webhookPath := "/bot" + botToken.BotApiKey + "/webhook"

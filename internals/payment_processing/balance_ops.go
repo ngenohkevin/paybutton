@@ -224,6 +224,14 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					}
 					delete(checkingAddresses, address)
 					mutex.Unlock()
+					
+					// Update gap monitor for USDT payment
+					gapMonitor := GetGapMonitor()
+					gapMonitor.RecordPayment(address)
+					
+					// Update address pool if applicable
+					addressPool := GetAddressPool()
+					addressPool.MarkAddressUsed(address, email)
 
 					// Exit the check cycle as we've detected USDT
 					return
@@ -238,6 +246,33 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 			}
 
 			if balance > 0 && currencyType == "BTC" {
+				// Check if this is a static/shared address - if so, only log but don't process
+				if isStaticOrSharedAddress(address) {
+					log.Printf("ALERT: Payment detected on static/shared address %s for email %s, amount: %.2f USD", address, email, balance)
+					
+					// Send alert to Telegram but don't process
+					alertMsg := fmt.Sprintf(
+						"⚠️ *STATIC ADDRESS PAYMENT DETECTED*\n\n" +
+						"*Email:* `%s`\n" +
+						"*Address:* `%s`\n" +
+						"*Amount:* `%.2f USD`\n\n" +
+						"❌ *No automatic processing* - Manual intervention required",
+						email, address, balance)
+					
+					msg := tgbotapi.NewMessage(chatID, alertMsg)
+					msg.ParseMode = tgbotapi.ModeMarkdown
+					if _, err := bot.Send(msg); err != nil {
+						log.Printf("Error sending static address alert: %s", err)
+					}
+					
+					// Stop monitoring this address
+					mutex.Lock()
+					delete(checkingAddresses, address)
+					mutex.Unlock()
+					
+					return // Exit without processing
+				}
+				
 				balanceUSD := database.RoundToTwoDecimalPlaces(balance)
 
 				// Calculate BTC amount for WebSocket notification
@@ -267,7 +302,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				}
 				mutex.Unlock()
 
-				// Mark address as used
+				// Mark address as used and update monitoring systems
 				mutex.Lock()
 				if session != nil {
 					session.UsedAddresses[address] = true
@@ -279,6 +314,14 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				}
 				delete(checkingAddresses, address)
 				mutex.Unlock()
+				
+				// Update gap monitor - payment received reduces unpaid count
+				gapMonitor := GetGapMonitor()
+				gapMonitor.RecordPayment(address)
+				
+				// Update address pool if this was a pooled address
+				addressPool := GetAddressPool()
+				addressPool.MarkAddressUsed(address, email)
 
 				confirmationTime := time.Now().Format(time.RFC3339)
 				
@@ -420,4 +463,21 @@ func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 	}
 	
 	return balance, nil
+}
+
+// isStaticOrSharedAddress checks if the address is a static or shared fallback address
+func isStaticOrSharedAddress(address string) bool {
+	// Check if it's the main static address
+	if address == staticBTCAddress || address == staticUSDTAddress {
+		return true
+	}
+	
+	// Check if it's one of the shared tier addresses
+	for _, sharedAddr := range sharedBTCAddresses {
+		if address == sharedAddr {
+			return true
+		}
+	}
+	
+	return false
 }
