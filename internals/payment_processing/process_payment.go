@@ -27,14 +27,14 @@ var (
 	checkingAddresses     = make(map[string]bool)
 	checkingAddressesTime = make(map[string]time.Time) // Track when monitoring started
 	db                    *sql.DB
-	staticBTCAddress      = "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms"
+	staticBTCAddress      = "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl"
 	staticUSDTAddress     = "TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK"
 
 	// Shared addresses for high-volume periods (different amounts)
 	sharedBTCAddresses = map[string]string{
-		"tier1": "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms", // $0-50
-		"tier2": "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms", // $50-200
-		"tier3": "bc1q7ss2m46955mps6sytsmmjl73hz5v6etprvjsms", // $200+
+		"tier1": "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl", // $0-50
+		"tier2": "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl", // $50-200
+		"tier3": "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl", // $200+
 	}
 )
 
@@ -352,7 +352,7 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		mutex.Unlock()
 
 		// For fast mode, always use fast polling if we got a unique address
-		if address != staticBTCAddress && !strings.HasPrefix(address, "bc1q7ss2m46955") {
+		if address != staticBTCAddress && !strings.HasPrefix(address, "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl") {
 			if !checkingAddresses[address] {
 				checkingAddresses[address] = true
 				checkingAddressesTime[address] = time.Now()
