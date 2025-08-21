@@ -236,15 +236,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadPoolData() {
     try {
+        console.log('Fetching pool data from /admin/pool/details...');
         const response = await fetch('/admin/pool/details');
-        if (!response.ok) throw new Error('Failed to fetch pool data');
+        console.log('Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Response error:', errorText);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         poolData = await response.json();
+        console.log('Pool data loaded:', poolData);
         updatePoolDisplay();
         
     } catch (error) {
         console.error('Error loading pool data:', error);
         showNotification('error', 'Failed to load pool data: ' + error.message);
+        // Show fallback message in the stats area
+        document.getElementById('pool-stats').innerHTML = '<p class="text-red-500">Failed to load statistics. Check console for details.</p>';
     }
 }
 
@@ -258,7 +268,10 @@ function updatePoolDisplay() {
 }
 
 function updatePoolStats() {
+    console.log('Updating pool stats...');
     const stats = poolData.stats || {};
+    console.log('Stats object:', stats);
+    
     const statsHtml = `
         <div class="metric-item">
             <span class="metric-label">Current Pool Size</span>
@@ -281,7 +294,17 @@ function updatePoolStats() {
             <span class="metric-value ${(stats.gap_limit_errors || 0) > 0 ? 'danger' : 'success'}">${stats.gap_limit_errors || 0}</span>
         </div>
     `;
-    document.getElementById('pool-stats').innerHTML = statsHtml;
+    
+    console.log('Generated stats HTML:', statsHtml);
+    const statsElement = document.getElementById('pool-stats');
+    console.log('Stats element found:', !!statsElement);
+    
+    if (statsElement) {
+        statsElement.innerHTML = statsHtml;
+        console.log('Stats HTML updated successfully');
+    } else {
+        console.error('pool-stats element not found!');
+    }
 }
 
 function updatePoolConfig() {

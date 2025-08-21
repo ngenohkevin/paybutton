@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -57,6 +58,13 @@ func init() {
 // rateLimitMiddleware implements per-IP rate limiting
 func (s *Server) rateLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip rate limiting for admin endpoints and static files
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/admin") || strings.HasPrefix(path, "/static") {
+			c.Next()
+			return
+		}
+
 		ip := c.ClientIP()
 		limiter := getVisitor(ip, s.config.RequestsPerMinute, s.config.BurstSize)
 
