@@ -6,10 +6,12 @@
 ./tmp
 tmp
 
-CLAUDE.md
-GAP_LIMIT_SOLUTION.md
+*.md
+!README.md
+
 .claude
 .mcp.json
 .playwright-mcp
 .playwright
-DEPLOYMENT.md
+address_pool.json
+main
