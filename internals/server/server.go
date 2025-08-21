@@ -121,6 +121,9 @@ func (s *Server) Start() error {
 	// Register admin endpoints for monitoring and management
 	RegisterAdminEndpoints(r, adminAuth)
 
+	// Set up session tracking callback to connect payment processing with admin dashboard
+	payment_processing.SessionTracker = AddSession
+
 	// Add the webhook endpoint for Telegram
 	webhookPath := "/bot" + botToken.BotApiKey + "/webhook"
 	r.POST(webhookPath, func(c *gin.Context) {
@@ -366,6 +369,9 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	// Register admin endpoints for monitoring and management
 	RegisterAdminEndpoints(r, adminAuth)
+
+	// Set up session tracking callback to connect payment processing with admin dashboard
+	payment_processing.SessionTracker = AddSession
 
 	// Add the webhook endpoint for Telegram
 	webhookPath := "/bot" + botToken.BotApiKey + "/webhook"

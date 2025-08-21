@@ -18,6 +18,9 @@ import (
 var (
 	chatID                int64 = 7933331471
 	addressLimit                = 6
+
+	// Session tracking callback - set by server package to avoid circular imports
+	SessionTracker func(sessionID, address, userAgent, ipAddress, email string, amount float64, paymentID string)
 	addressExpiry               = 72 * time.Hour // Set address expiry time to 72 hours
 	blockCypherToken      string
 	blockonomicsAPIKey    string
@@ -216,6 +219,14 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	logMessage := fmt.Sprintf("Email: %s, Address: %s, Amount: %.2f, Name: %s, Product: %s", email, address, priceUSD, name, description)
 	log.Printf(logMessage)
 
+	// Track session for admin dashboard
+	if SessionTracker != nil {
+		sessionID := fmt.Sprintf("%s-%d", address, time.Now().Unix())
+		userAgent := c.GetHeader("User-Agent")
+		paymentID := fmt.Sprintf("pay-%s-%d", strings.ReplaceAll(email, "@", "-"), time.Now().Unix())
+		SessionTracker(sessionID, address, userAgent, clientIP, email, priceUSD, paymentID)
+	}
+
 	botLogMessage := fmt.Sprintf(
 		"*Site:* `%s`\n*Email:* `%s`\n*Address:* `%s`\n*Amount:* `%0.2f`\n*Name:* `%s`\n*Product:* `%s`\n*IP Address:* `%s`\n*Country:* `%s`\n*State:* `%s`\n*City:* `%s`\n*Local Time:* `%s`",
 		site, email, address, priceUSD, name, description, clientIP, ipAPIData.Location.Country, ipAPIData.Location.State, ipAPIData.Location.City, localTime)
@@ -352,6 +363,14 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		responseData["address"] = address
 		// Generate QR code (we don't need the filename for response)
 		responseData["qr_code"] = fmt.Sprintf("bitcoin:%s", address)
+
+		// Track session for admin dashboard
+		if SessionTracker != nil {
+			sessionID := fmt.Sprintf("%s-%d", address, time.Now().Unix())
+			userAgent := c.GetHeader("User-Agent")
+			paymentID := fmt.Sprintf("fastpay-%s-%d", strings.ReplaceAll(req.Email, "@", "-"), time.Now().Unix())
+			SessionTracker(sessionID, address, userAgent, clientIP, req.Email, priceUSD, paymentID)
+		}
 
 		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)
 		if err == nil {
