@@ -132,58 +132,110 @@ function updateSiteBreakdownTable(sites) {
     const tableContainer = document.getElementById('site-breakdown-table');
     if (!tableContainer) return;
     
+    // Check if we already have a table
+    const existingTable = tableContainer.querySelector('table');
+    
     if (sites.length === 0) {
-        tableContainer.innerHTML = `
-            <div class="flex items-center justify-center py-12 sm:py-8 text-gray-400">
-                <div class="text-center space-y-3 sm:space-y-2">
-                    <i class="fas fa-inbox text-4xl text-gray-600"></i>
-                    <p class="text-base sm:text-sm font-semibold text-gray-300">No active sites</p>
-                    <p class="text-sm sm:text-xs text-gray-400">Analytics data will appear here when sites are active</p>
+        // Only update if not already showing empty state
+        if (!tableContainer.querySelector('.fa-inbox')) {
+            tableContainer.innerHTML = `
+                <div class="flex items-center justify-center py-12 sm:py-8 text-gray-400">
+                    <div class="text-center space-y-3 sm:space-y-2">
+                        <i class="fas fa-inbox text-4xl text-gray-600"></i>
+                        <p class="text-base sm:text-sm font-semibold text-gray-300">No active sites</p>
+                        <p class="text-sm sm:text-xs text-gray-400">Analytics data will appear here when sites are active</p>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
         return;
     }
     
-    // Create table HTML
-    let tableHTML = `
-        <table class="w-full">
-            <thead class="bg-gray-800 dark:bg-gray-900 sticky top-0">
-                <tr class="text-xs text-gray-400 uppercase tracking-wider">
-                    <th class="px-4 py-3 text-left font-semibold">Site</th>
-                    <th class="px-4 py-3 text-center font-semibold">Active</th>
-                    <th class="px-4 py-3 text-center font-semibold">Weekly</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-700 dark:divide-gray-800">
-    `;
-    
-    sites.forEach((site, index) => {
-        const rowClass = index % 2 === 0 ? 'bg-gray-800/50' : 'bg-gray-900/50';
-        tableHTML += `
-            <tr class="${rowClass} hover:bg-gray-700/50 dark:hover:bg-gray-800/50 transition-colors">
-                <td class="px-4 py-3">
-                    <div class="flex items-center">
-                        <div class="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
-                        <span class="text-sm font-medium text-gray-200">${site.name || 'Unknown'}</span>
-                    </div>
-                </td>
-                <td class="px-4 py-3 text-center">
-                    <span class="text-sm font-bold text-blue-400">${site.active || 0}</span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                    <span class="text-sm font-bold text-purple-400">${site.weekly || 0}</span>
-                </td>
-            </tr>
+    // If we have an existing table, update values instead of recreating
+    if (existingTable) {
+        const tbody = existingTable.querySelector('tbody');
+        const existingRows = tbody.querySelectorAll('tr');
+        
+        // Update existing rows or add new ones
+        sites.forEach((site, index) => {
+            if (existingRows[index]) {
+                // Update existing row
+                const row = existingRows[index];
+                const nameEl = row.querySelector('.site-name');
+                const activeEl = row.querySelector('.site-active');
+                const weeklyEl = row.querySelector('.site-weekly');
+                
+                if (nameEl) nameEl.textContent = site.name || 'Unknown';
+                if (activeEl) activeEl.textContent = site.active || 0;
+                if (weeklyEl) weeklyEl.textContent = site.weekly || 0;
+            } else {
+                // Add new row
+                const rowClass = index % 2 === 0 ? 'bg-gray-800/50' : 'bg-gray-900/50';
+                const newRow = document.createElement('tr');
+                newRow.className = `${rowClass} hover:bg-gray-700/50 dark:hover:bg-gray-800/50 transition-colors`;
+                newRow.innerHTML = `
+                    <td class="px-4 py-3">
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
+                            <span class="text-sm font-medium text-gray-200 site-name">${site.name || 'Unknown'}</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-sm font-bold text-blue-400 site-active">${site.active || 0}</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-sm font-bold text-purple-400 site-weekly">${site.weekly || 0}</span>
+                    </td>
+                `;
+                tbody.appendChild(newRow);
+            }
+        });
+        
+        // Remove extra rows if sites list is shorter
+        while (existingRows.length > sites.length) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    } else {
+        // Create table for first time
+        let tableHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-800 dark:bg-gray-900 sticky top-0">
+                    <tr class="text-xs text-gray-400 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left font-semibold">Site</th>
+                        <th class="px-4 py-3 text-center font-semibold">Active</th>
+                        <th class="px-4 py-3 text-center font-semibold">Weekly</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700 dark:divide-gray-800">
         `;
-    });
-    
-    tableHTML += `
-            </tbody>
-        </table>
-    `;
-    
-    tableContainer.innerHTML = tableHTML;
+        
+        sites.forEach((site, index) => {
+            const rowClass = index % 2 === 0 ? 'bg-gray-800/50' : 'bg-gray-900/50';
+            tableHTML += `
+                <tr class="${rowClass} hover:bg-gray-700/50 dark:hover:bg-gray-800/50 transition-colors">
+                    <td class="px-4 py-3">
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
+                            <span class="text-sm font-medium text-gray-200 site-name">${site.name || 'Unknown'}</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-sm font-bold text-blue-400 site-active">${site.active || 0}</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-sm font-bold text-purple-400 site-weekly">${site.weekly || 0}</span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHTML += `
+                </tbody>
+            </table>
+        `;
+        
+        tableContainer.innerHTML = tableHTML;
+    }
 }
 
 // Refresh site analytics manually

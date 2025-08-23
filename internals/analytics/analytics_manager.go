@@ -318,10 +318,9 @@ func HandleWebSocket(c *gin.Context) {
 	pingTicker := time.NewTicker(15 * time.Second)
 	defer pingTicker.Stop()
 
-	// Handle messages and heartbeat
-	for {
-		select {
-		case <-pingTicker.C:
+	// Create a goroutine to handle ping messages
+	go func() {
+		for range pingTicker.C {
 			if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				logger.Warn("Analytics ping failed",
 					slog.String("site", siteName),
@@ -329,26 +328,34 @@ func HandleWebSocket(c *gin.Context) {
 					slog.String("error", err.Error()))
 				return
 			}
-		default:
-			// Read message from client (heartbeat or close)
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					logger.Warn("Analytics WebSocket unexpected close",
-						slog.String("site", siteName),
-						slog.String("session", sessionID),
-						slog.String("error", err.Error()))
-				}
-				return
-			}
+		}
+	}()
 
-			// Handle client heartbeat messages
-			var clientMsg map[string]interface{}
-			if err := json.Unmarshal(message, &clientMsg); err == nil {
-				if clientMsg["type"] == "heartbeat" {
-					// Reset read deadline on heartbeat
-					conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-				}
+	// Handle incoming messages (blocking)
+	for {
+		// Read message from client (heartbeat or close)
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				logger.Warn("Analytics WebSocket unexpected close",
+					slog.String("site", siteName),
+					slog.String("session", sessionID),
+					slog.String("error", err.Error()))
+			}
+			return
+		}
+
+		// Handle client heartbeat messages
+		var clientMsg map[string]interface{}
+		if err := json.Unmarshal(message, &clientMsg); err == nil {
+			if clientMsg["type"] == "heartbeat" {
+				// Reset read deadline on heartbeat
+				conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+				
+				// Log heartbeat received (debug level)
+				logger.Debug("Heartbeat received",
+					slog.String("site", siteName),
+					slog.String("session", sessionID))
 			}
 		}
 	}
