@@ -337,7 +337,7 @@ function updateSiteBreakdownTable(sites) {
     }
 }
 
-// Refresh site analytics manually (now just refreshes WebSocket connection)
+// Refresh site analytics manually (just load fresh data, don't disrupt WebSocket)
 function refreshSiteAnalytics() {
     const btn = event.target.closest('button');
     if (btn) {
@@ -345,18 +345,8 @@ function refreshSiteAnalytics() {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i><span>Refreshing...</span>';
     }
     
-    // Close existing WebSocket connection to force reconnect and get fresh data
-    if (analyticsWS) {
-        analyticsWS.close();
-    }
-    
-    // Load fresh data immediately
+    // Load fresh data immediately without disrupting WebSocket connection
     loadInitialAnalytics();
-    
-    // Reinitialize WebSocket
-    setTimeout(() => {
-        initAnalyticsWebSocket();
-    }, 100);
     
     if (btn) {
         setTimeout(() => {

@@ -176,7 +176,7 @@ function initWebSocket() {
         }
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/admin/ws`;
+        const wsUrl = `${protocol}//${window.location.host}/ws/admin/analytics`;
         
         wsConnection = new WebSocket(wsUrl);
         

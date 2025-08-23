@@ -868,37 +868,15 @@ func (am *AnalyticsManager) debouncedBroadcastAnalyticsUpdate() {
 
 // broadcastAnalyticsUpdate broadcasts analytics updates to all admin WebSocket connections
 func (am *AnalyticsManager) broadcastAnalyticsUpdate() {
-	adminConnectionsMutex.Lock()
-	// Create a list of active connections and remove stale ones
-	activeConnections := make([]*AdminWebSocketConnection, 0, len(adminConnections))
-	staleConnections := make([]string, 0)
-
-	for id, conn := range adminConnections {
-		// Test connection with a quick ping to detect closed connections
-		if err := conn.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-			// Connection is closed, mark for removal
-			staleConnections = append(staleConnections, id)
-			conn.conn.Close()
-		} else {
-			activeConnections = append(activeConnections, conn)
-		}
+	adminConnectionsMutex.RLock()
+	connections := make([]*AdminWebSocketConnection, 0, len(adminConnections))
+	for _, conn := range adminConnections {
+		connections = append(connections, conn)
 	}
+	adminConnectionsMutex.RUnlock()
 
-	// Remove stale connections from the map
-	for _, id := range staleConnections {
-		delete(adminConnections, id)
-	}
-	adminConnectionsMutex.Unlock()
-
-	if len(activeConnections) == 0 {
-		return // No active admin connections to update
-	}
-
-	// Log cleanup if any stale connections were removed
-	if len(staleConnections) > 0 {
-		logger.Info("Cleaned up stale admin connections before broadcast",
-			slog.Int("stale_removed", len(staleConnections)),
-			slog.Int("active_remaining", len(activeConnections)))
+	if len(connections) == 0 {
+		return // No admin connections to update
 	}
 
 	// Get latest analytics data
@@ -917,21 +895,33 @@ func (am *AnalyticsManager) broadcastAnalyticsUpdate() {
 		},
 	}
 
-	// Broadcast to all active admin connections
+	// Broadcast to all admin connections and collect failed ones
+	failedConnections := make([]string, 0)
 	successfulBroadcasts := 0
-	for _, adminConn := range activeConnections {
+
+	for _, adminConn := range connections {
 		if err := adminConn.conn.WriteJSON(updateData); err != nil {
-			// This should be rare now since we pre-checked connections
-			logger.Debug("Failed to broadcast to pre-checked admin connection",
-				slog.String("connection_id", adminConn.id),
-				slog.String("error", err.Error()))
+			failedConnections = append(failedConnections, adminConn.id)
 		} else {
 			successfulBroadcasts++
 		}
 	}
 
+	// Remove failed connections in a separate step to avoid disrupting active ones
+	if len(failedConnections) > 0 {
+		adminConnectionsMutex.Lock()
+		for _, id := range failedConnections {
+			if conn, exists := adminConnections[id]; exists {
+				conn.conn.Close()
+				delete(adminConnections, id)
+			}
+		}
+		adminConnectionsMutex.Unlock()
+	}
+
 	logger.Info("Broadcasted analytics update to admin connections",
 		slog.Int("admin_connections", successfulBroadcasts),
+		slog.Int("failed_connections", len(failedConnections)),
 		slog.Int("total_active", combined.TotalActive),
 		slog.Int("total_weekly", combined.TotalWeekly))
 }
