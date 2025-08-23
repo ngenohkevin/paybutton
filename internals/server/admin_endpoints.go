@@ -423,128 +423,258 @@ func getSystemStatusHTML(c *gin.Context) {
 		</div>
 	</div>
 	
-	<!-- Session Analytics Section -->
-	<div class="card mb-8">
-		<div class="card-header">
-			<h3 class="text-lg font-semibold text-gray-900">
-				<i class="fas fa-users text-blue-500 mr-2"></i>Session Overview
-			</h3>
+	<!-- Enhanced Session Analytics Section -->
+	<div class="card mb-8 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 dark:from-gray-900 dark:via-black dark:to-gray-900 border-0 shadow-2xl">
+		<div class="card-header bg-gradient-to-r from-gray-800 to-gray-700 dark:from-gray-900 dark:to-black text-white border-0 relative overflow-hidden">
+			<div class="absolute inset-0 bg-black opacity-30"></div>
+			<div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+				<h3 class="text-lg font-bold flex items-center">
+					<div class="p-2 bg-white bg-opacity-10 rounded-lg mr-3">
+						<i class="fas fa-users text-white"></i>
+					</div>
+					<span class="mr-3">Session Overview</span>
+					<div class="flex items-center px-3 py-1 bg-blue-500 bg-opacity-20 rounded-full border border-blue-400 border-opacity-30">
+						<div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2"></div>
+						<span class="text-xs font-semibold text-blue-300">Real-time</span>
+					</div>
+				</h3>
+			</div>
 		</div>
-		<div class="card-body">
+		<div class="card-body p-6">
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="session-overview">
 				<!-- Active Sessions -->
-				<div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-					<div class="flex items-center">
-						<div class="p-2 rounded-full bg-blue-100">
-							<i class="fas fa-play text-blue-600"></i>
+				<div class="group relative overflow-hidden bg-gradient-to-br from-blue-700 to-blue-800 dark:from-blue-800 dark:to-blue-900 p-6 rounded-2xl text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer border border-blue-600 border-opacity-20">
+					<div class="absolute top-0 right-0 w-20 h-20 bg-blue-300 opacity-5 rounded-full -translate-y-10 translate-x-10"></div>
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-4">
+							<div class="p-3 bg-blue-600 bg-opacity-30 rounded-xl border border-blue-500 border-opacity-20">
+								<i class="fas fa-play text-xl text-blue-200"></i>
+							</div>
+							<div class="text-right">
+								<div class="w-3 h-3 bg-blue-400 rounded-full animate-pulse shadow-lg"></div>
+							</div>
 						</div>
-						<div class="ml-3">
-							<p class="text-sm font-medium text-blue-600">Active Sessions</p>
-							<p class="text-xl font-bold text-blue-900" id="dashboard-active-sessions">-</p>
+						<div class="space-y-1">
+							<p class="text-blue-200 text-sm font-semibold">Active Sessions</p>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-active-sessions">
+								<span class="animate-pulse">-</span>
+							</p>
 						</div>
 					</div>
 				</div>
 				
 				<!-- WebSocket Connections -->
-				<div class="bg-green-50 p-4 rounded-lg border border-green-200">
-					<div class="flex items-center">
-						<div class="p-2 rounded-full bg-green-100">
-							<i class="fas fa-wifi text-green-600"></i>
+				<div class="group relative overflow-hidden bg-gradient-to-br from-green-700 to-green-800 dark:from-green-800 dark:to-green-900 p-6 rounded-2xl text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer border border-green-600 border-opacity-20">
+					<div class="absolute top-0 right-0 w-16 h-16 bg-green-300 opacity-5 rounded-full -translate-y-8 translate-x-8"></div>
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-4">
+							<div class="p-3 bg-green-600 bg-opacity-30 rounded-xl border border-green-500 border-opacity-20">
+								<i class="fas fa-wifi text-xl text-green-200"></i>
+							</div>
+							<div class="text-right">
+								<div class="w-3 h-3 bg-green-400 rounded-full animate-ping shadow-lg"></div>
+							</div>
 						</div>
-						<div class="ml-3">
-							<p class="text-sm font-medium text-green-600">WebSocket</p>
-							<p class="text-xl font-bold text-green-900" id="dashboard-websocket-count">-</p>
+						<div class="space-y-1">
+							<p class="text-green-200 text-sm font-semibold">WebSocket</p>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-websocket-count">
+								<span class="animate-pulse">-</span>
+							</p>
 						</div>
 					</div>
 				</div>
 				
 				<!-- Payment Rate -->
-				<div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
-					<div class="flex items-center">
-						<div class="p-2 rounded-full bg-purple-100">
-							<i class="fas fa-percentage text-purple-600"></i>
+				<div class="group relative overflow-hidden bg-gradient-to-br from-purple-700 to-purple-800 dark:from-purple-800 dark:to-purple-900 p-6 rounded-2xl text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer border border-purple-600 border-opacity-20">
+					<div class="absolute top-0 right-0 w-24 h-24 bg-purple-300 opacity-5 rounded-full -translate-y-12 translate-x-12"></div>
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-4">
+							<div class="p-3 bg-purple-600 bg-opacity-30 rounded-xl border border-purple-500 border-opacity-20">
+								<i class="fas fa-percentage text-xl text-purple-200"></i>
+							</div>
+							<div class="text-right">
+								<div class="w-3 h-3 bg-purple-400 rounded-full animate-pulse shadow-lg"></div>
+							</div>
 						</div>
-						<div class="ml-3">
-							<p class="text-sm font-medium text-purple-600">Payment Rate</p>
-							<p class="text-xl font-bold text-purple-900" id="dashboard-payment-rate">-</p>
+						<div class="space-y-1">
+							<p class="text-purple-200 text-sm font-semibold">Payment Rate</p>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-payment-rate">
+								<span class="animate-pulse">-</span>
+							</p>
 						</div>
 					</div>
 				</div>
 				
-				<!-- Total Revenue -->
-				<div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-					<div class="flex items-center">
-						<div class="p-2 rounded-full bg-yellow-100">
-							<i class="fas fa-dollar-sign text-yellow-600"></i>
+				<!-- Paid Amount -->
+				<div class="group relative overflow-hidden bg-gradient-to-br from-orange-700 to-orange-800 dark:from-orange-800 dark:to-orange-900 p-6 rounded-2xl text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer border border-orange-600 border-opacity-20">
+					<div class="absolute top-0 right-0 w-18 h-18 bg-orange-300 opacity-5 rounded-full -translate-y-9 translate-x-9"></div>
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-4">
+							<div class="p-3 bg-orange-600 bg-opacity-30 rounded-xl border border-orange-500 border-opacity-20">
+								<i class="fas fa-dollar-sign text-xl text-orange-200"></i>
+							</div>
+							<div class="text-right">
+								<div class="w-3 h-3 bg-orange-400 rounded-full animate-pulse shadow-lg"></div>
+							</div>
 						</div>
-						<div class="ml-3">
-							<p class="text-sm font-medium text-yellow-600">Paid Amount</p>
-							<p class="text-xl font-bold text-yellow-900" id="dashboard-paid-amount">-</p>
+						<div class="space-y-1">
+							<p class="text-orange-200 text-sm font-semibold">Paid Amount</p>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-paid-amount">
+								<span class="animate-pulse">-</span>
+							</p>
 						</div>
 					</div>
 				</div>
 			</div>
 			
-			<div class="mt-4 text-center">
-				<button onclick="window.location.href='/admin/sessions'" class="btn-primary">
-					<i class="fas fa-chart-line mr-2"></i>View Full Analytics
+			<div class="mt-6 text-center">
+				<button onclick="window.location.href='/admin/sessions'" class="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transform transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center justify-center space-x-2">
+					<i class="fas fa-chart-line"></i>
+					<span>View Full Analytics</span>
 				</button>
 			</div>
 		</div>
 	</div>
 	
-	<!-- Site Analytics Widget -->
-	<div class="card mb-8" id="site-analytics-widget">
-		<div class="card-header">
-			<h3 class="text-lg font-semibold text-gray-900">
-				<i class="fas fa-globe text-emerald-500 mr-2"></i>Site Analytics
-			</h3>
+	<!-- Enhanced Site Analytics Widget -->
+	<div class="card mb-8 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 dark:from-gray-900 dark:via-black dark:to-gray-900 border-0 shadow-2xl" id="site-analytics-widget">
+		<div class="card-header bg-gradient-to-r from-gray-800 to-gray-700 dark:from-gray-900 dark:to-black text-white border-0 relative overflow-hidden">
+			<div class="absolute inset-0 bg-black opacity-30"></div>
+			<div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+				<h3 class="text-lg font-bold flex items-center">
+					<div class="p-2 bg-white bg-opacity-10 rounded-lg mr-3">
+						<i class="fas fa-globe text-white"></i>
+					</div>
+					<span class="mr-3">Site Analytics</span>
+					<div class="flex items-center px-3 py-1 bg-green-500 bg-opacity-20 rounded-full border border-green-400 border-opacity-30">
+						<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2"></div>
+						<span class="text-xs font-semibold text-green-300">Live</span>
+					</div>
+				</h3>
+				<div class="text-xs text-gray-300" id="analytics-last-update">
+					Updated: <span id="analytics-timestamp" class="font-medium text-white">--:--:--</span>
+				</div>
+			</div>
 		</div>
-		<div class="card-body">
-			<div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="site-analytics-overview">
+		<div class="card-body p-6">
+			<!-- KPI Cards -->
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="site-analytics-overview">
 				<!-- Active Viewers -->
-				<div class="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-					<div class="flex items-center">
-						<div class="p-2 rounded-full bg-emerald-100">
-							<i class="fas fa-eye text-emerald-600"></i>
+				<div class="group relative overflow-hidden bg-gradient-to-br from-emerald-700 to-emerald-800 dark:from-emerald-800 dark:to-emerald-900 p-6 rounded-2xl text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer border border-emerald-600 border-opacity-20">
+					<div class="absolute top-0 right-0 w-24 h-24 bg-emerald-300 opacity-5 rounded-full -translate-y-12 translate-x-12"></div>
+					<div class="absolute bottom-0 left-0 w-16 h-16 bg-emerald-400 opacity-3 rounded-full translate-y-8 -translate-x-8"></div>
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-4">
+							<div class="p-3 bg-emerald-600 bg-opacity-30 rounded-xl border border-emerald-500 border-opacity-20">
+								<i class="fas fa-eye text-xl text-emerald-200"></i>
+							</div>
+							<div class="text-right">
+								<div class="w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg"></div>
+							</div>
 						</div>
-						<div class="ml-3">
-							<p class="text-sm font-medium text-emerald-600">Active Viewers</p>
-							<p class="text-xl font-bold text-emerald-900" id="dashboard-active-viewers">-</p>
+						<div class="space-y-1">
+							<p class="text-emerald-200 text-sm font-semibold">Active Viewers</p>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-active-viewers">
+								<span class="animate-pulse">-</span>
+							</p>
+							<p class="text-emerald-300 text-xs font-medium">
+								<i class="fas fa-trending-up mr-1"></i>Real-time count
+							</p>
 						</div>
 					</div>
 				</div>
 				
 				<!-- Weekly Visitors -->
-				<div class="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-					<div class="flex items-center">
-						<div class="p-2 rounded-full bg-indigo-100">
-							<i class="fas fa-calendar-week text-indigo-600"></i>
+				<div class="group relative overflow-hidden bg-gradient-to-br from-indigo-700 to-purple-800 dark:from-indigo-800 dark:to-purple-900 p-6 rounded-2xl text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer border border-indigo-600 border-opacity-20">
+					<div class="absolute top-0 right-0 w-20 h-20 bg-indigo-300 opacity-5 rounded-full -translate-y-10 translate-x-10"></div>
+					<div class="absolute bottom-0 left-0 w-12 h-12 bg-purple-400 opacity-3 rounded-full translate-y-6 -translate-x-6"></div>
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-4">
+							<div class="p-3 bg-indigo-600 bg-opacity-30 rounded-xl border border-indigo-500 border-opacity-20">
+								<i class="fas fa-calendar-week text-xl text-indigo-200"></i>
+							</div>
+							<div class="text-right">
+								<div class="text-xs text-indigo-300 font-medium">7 days</div>
+							</div>
 						</div>
-						<div class="ml-3">
-							<p class="text-sm font-medium text-indigo-600">Weekly Visitors</p>
-							<p class="text-xl font-bold text-indigo-900" id="dashboard-weekly-visitors">-</p>
+						<div class="space-y-1">
+							<p class="text-indigo-200 text-sm font-semibold">Weekly Visitors</p>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-weekly-visitors">
+								<span class="animate-pulse">-</span>
+							</p>
+							<p class="text-indigo-300 text-xs font-medium">
+								<i class="fas fa-chart-line mr-1"></i>Total this week
+							</p>
 						</div>
 					</div>
 				</div>
 				
 				<!-- Active Sites -->
-				<div class="bg-teal-50 p-4 rounded-lg border border-teal-200">
-					<div class="flex items-center">
-						<div class="p-2 rounded-full bg-teal-100">
-							<i class="fas fa-server text-teal-600"></i>
+				<div class="group relative overflow-hidden bg-gradient-to-br from-teal-700 to-cyan-800 dark:from-teal-800 dark:to-cyan-900 p-6 rounded-2xl text-white transform transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer border border-teal-600 border-opacity-20">
+					<div class="absolute top-0 right-0 w-28 h-28 bg-teal-300 opacity-5 rounded-full -translate-y-14 translate-x-14"></div>
+					<div class="absolute bottom-0 left-0 w-10 h-10 bg-cyan-400 opacity-3 rounded-full translate-y-5 -translate-x-5"></div>
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-4">
+							<div class="p-3 bg-teal-600 bg-opacity-30 rounded-xl border border-teal-500 border-opacity-20">
+								<i class="fas fa-server text-xl text-teal-200"></i>
+							</div>
+							<div class="text-right">
+								<div class="w-3 h-3 bg-cyan-400 rounded-full animate-ping shadow-lg"></div>
+							</div>
 						</div>
-						<div class="ml-3">
-							<p class="text-sm font-medium text-teal-600">Active Sites</p>
-							<p class="text-xl font-bold text-teal-900" id="dashboard-active-sites">-</p>
+						<div class="space-y-1">
+							<p class="text-teal-200 text-sm font-semibold">Active Sites</p>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-active-sites">
+								<span class="animate-pulse">-</span>
+							</p>
+							<p class="text-teal-300 text-xs font-medium">
+								<i class="fas fa-globe mr-1"></i>Sites online
+							</p>
 						</div>
 					</div>
 				</div>
 			</div>
 			
-			<div class="mt-4 text-center">
-				<button onclick="window.location.href='/admin/analytics'" class="btn-secondary">
-					<i class="fas fa-chart-bar mr-2"></i>View Site Analytics
+			<!-- Enhanced Site Breakdown Section -->
+			<div class="bg-gray-800 dark:bg-gray-900 rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-700 dark:border-gray-800">
+				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
+					<h4 class="text-lg sm:text-xl font-bold text-white flex items-center mb-2 sm:mb-0">
+						<div class="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg mr-3 text-white shadow-lg">
+							<i class="fas fa-list text-sm"></i>
+						</div>
+						Live Site Activity
+					</h4>
+					<div class="flex items-center space-x-2">
+						<div class="flex items-center text-xs text-gray-300">
+							<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2 shadow-sm"></div>
+							<span class="font-medium">Auto-refresh: 5s</span>
+						</div>
+					</div>
+				</div>
+				
+				<div class="bg-gray-900 dark:bg-black rounded-xl overflow-hidden shadow-inner border border-gray-700 dark:border-gray-800">
+					<div id="site-breakdown-table" class="min-h-48 sm:min-h-40 max-h-96 sm:max-h-80 overflow-y-auto custom-scrollbar">
+						<div class="flex items-center justify-center py-12 sm:py-8 text-gray-400">
+							<div class="text-center space-y-3 sm:space-y-2">
+								<div class="w-12 h-12 sm:w-8 sm:h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+								<p class="text-base sm:text-sm font-semibold text-gray-300">Loading site analytics...</p>
+								<p class="text-sm sm:text-xs text-gray-400">Fetching real-time data</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+				<button onclick="window.location.href='/admin/analytics'" 
+						class="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transform transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center justify-center space-x-2">
+					<i class="fas fa-chart-bar"></i>
+					<span>View Detailed Analytics</span>
+				</button>
+				<button onclick="refreshSiteAnalytics()" 
+						class="flex-1 sm:flex-none bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-xl font-semibold transform transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-2">
+					<i class="fas fa-sync-alt"></i>
+					<span>Refresh</span>
 				</button>
 			</div>
 		</div>

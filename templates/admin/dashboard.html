@@ -295,6 +295,118 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
+// Add custom styles for enhanced UI
+const customStyles = `
+<style>
+/* Custom scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgb(243 244 246);
+    border-radius: 3px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgb(55 65 81);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(45deg, rgb(59 130 246), rgb(37 99 235));
+    border-radius: 3px;
+    transition: background 0.3s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(45deg, rgb(37 99 235), rgb(29 78 216));
+}
+
+/* Enhanced hover animations */
+.hover\\:scale-102:hover {
+    transform: scale(1.02);
+}
+
+/* Pulse animation for live indicators */
+@keyframes pulse-green {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse-green {
+    animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Gradient text animation */
+@keyframes gradient-x {
+    0%, 100% {
+        background-size: 200% 200%;
+        background-position: left center;
+    }
+    50% {
+        background-size: 200% 200%;
+        background-position: right center;
+    }
+}
+
+.animate-gradient-x {
+    animation: gradient-x 3s ease infinite;
+}
+
+/* Enhanced card shadows */
+.card-shadow {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), 
+                0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.dark .card-shadow {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2), 
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Loading shimmer effect */
+@keyframes shimmer {
+    0% {
+        background-position: -468px 0;
+    }
+    100% {
+        background-position: 468px 0;
+    }
+}
+
+.animate-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 37%, #f0f0f0 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.dark .animate-shimmer {
+    background: linear-gradient(90deg, #374151 25%, #4b5563 37%, #374151 63%);
+    background-size: 400% 100%;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+    .text-responsive-lg {
+        font-size: 1.25rem !important;
+        line-height: 1.75rem !important;
+    }
+    
+    .text-responsive-xl {
+        font-size: 1.5rem !important;
+        line-height: 2rem !important;
+    }
+}
+</style>
+`;
+
+// Insert styles into head
+document.head.insertAdjacentHTML('beforeend', customStyles);
+
 // Session Analytics Functions
 let sessionUpdateInterval;
 
@@ -343,9 +455,12 @@ function updateSiteAnalyticsStats() {
             const weeklyVisitorsEl = document.getElementById('dashboard-weekly-visitors');
             const activeSitesEl = document.getElementById('dashboard-active-sites');
             
-            if (activeViewersEl) activeViewersEl.textContent = data.totalActive || 0;
-            if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.totalWeekly || 0;
-            if (activeSitesEl) activeSitesEl.textContent = data.activeSites || 0;
+            if (activeViewersEl) activeViewersEl.textContent = data.summary?.total_active || 0;
+            if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.summary?.total_weekly || 0;
+            if (activeSitesEl) activeSitesEl.textContent = data.summary?.active_sites || 0;
+            
+            // Update site breakdown table
+            updateSiteBreakdownTable(data.top_sites || []);
         })
         .catch(error => {
             console.error('Error updating site analytics stats:', error);
@@ -357,7 +472,202 @@ function updateSiteAnalyticsStats() {
             if (activeViewersEl) activeViewersEl.textContent = '0';
             if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = '0';
             if (activeSitesEl) activeSitesEl.textContent = '0';
+            
+            // Show error state for table
+            const tableEl = document.getElementById('site-breakdown-table');
+            if (tableEl) {
+                tableEl.innerHTML = '<div class="text-center py-4 text-red-500 dark:text-red-400 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to load site data</div>';
+            }
         });
+}
+
+function updateSiteBreakdownTable(sites) {
+    const tableEl = document.getElementById('site-breakdown-table');
+    if (!tableEl) return;
+    
+    // Update timestamp
+    const timestampEl = document.getElementById('analytics-timestamp');
+    if (timestampEl) {
+        timestampEl.textContent = new Date().toLocaleTimeString();
+    }
+    
+    if (!sites || sites.length === 0) {
+        tableEl.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-16 sm:py-12 px-4 text-gray-400">
+                <div class="w-20 h-20 sm:w-16 sm:h-16 bg-gray-700 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6 sm:mb-4 border border-gray-600">
+                    <i class="fas fa-globe text-3xl sm:text-2xl text-gray-500"></i>
+                </div>
+                <p class="text-xl sm:text-lg font-semibold mb-3 sm:mb-2 text-gray-300">No Active Sites</p>
+                <p class="text-base sm:text-sm text-center max-w-sm px-4 text-gray-400">
+                    Sites will appear here when visitors connect to your analytics service
+                </p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Build responsive card layout for mobile and table for desktop
+    let contentHTML = `
+        <!-- Mobile Card Layout (Hidden on desktop) -->
+        <div class="block lg:hidden space-y-4 p-4 sm:p-6">
+    `;
+    
+    sites.forEach((site, index) => {
+        const statusColor = site.active > 0 ? 'bg-green-400' : 'bg-gray-500';
+        const statusText = site.active > 0 ? 'Live' : 'Idle';
+        const activeColor = site.active > 0 ? 'text-emerald-300' : 'text-gray-400';
+        const bgGradient = site.active > 0 
+            ? 'bg-gradient-to-br from-emerald-800 to-emerald-900 border-emerald-600' 
+            : 'bg-gradient-to-br from-gray-700 to-gray-800 border-gray-600';
+        
+        contentHTML += `
+            <div class="relative ${bgGradient} border rounded-2xl p-6 transition-all duration-200 hover:shadow-2xl transform hover:scale-102 shadow-xl">
+                <div class="absolute top-4 right-4">
+                    <div class="flex items-center space-x-2 px-3 py-1 bg-black bg-opacity-20 rounded-full border border-opacity-30 ${site.active > 0 ? 'border-green-400' : 'border-gray-500'}">
+                        <div class="w-2 h-2 ${statusColor} rounded-full ${site.active > 0 ? 'animate-pulse' : ''} shadow-sm"></div>
+                        <span class="text-xs font-bold text-white">${statusText}</span>
+                    </div>
+                </div>
+                <div class="space-y-5">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg border border-blue-500 border-opacity-30">
+                            <i class="fas fa-globe text-blue-200 text-lg"></i>
+                        </div>
+                        <div class="flex-1 min-w-0 pr-12">
+                            <p class="text-lg font-black text-white truncate mb-1" title="${site.name}">
+                                ${site.name}
+                            </p>
+                            <p class="text-sm text-gray-300 font-semibold">Site #${index + 1}</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center bg-gray-800 bg-opacity-60 rounded-xl p-4 shadow-inner border border-gray-600 border-opacity-30">
+                            <div class="text-3xl font-black ${activeColor} mb-1">${site.active}</div>
+                            <div class="text-xs text-gray-300 font-bold uppercase tracking-wide">Active Now</div>
+                            ${site.active > 0 ? '<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse mx-auto mt-2 shadow-sm"></div>' : ''}
+                        </div>
+                        <div class="text-center bg-gray-800 bg-opacity-60 rounded-xl p-4 shadow-inner border border-gray-600 border-opacity-30">
+                            <div class="text-3xl font-black text-indigo-300 mb-1">${site.weekly || 0}</div>
+                            <div class="text-xs text-gray-300 font-bold uppercase tracking-wide">This Week</div>
+                            <div class="w-2 h-2 bg-indigo-400 rounded-full mx-auto mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    contentHTML += `
+        </div>
+        
+        <!-- Desktop Table Layout (Hidden on mobile/tablet) -->
+        <div class="hidden lg:block">
+            <table class="w-full">
+                <thead class="bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-600">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-globe text-blue-500"></i>
+                                <span>Site</span>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                            <div class="flex items-center justify-center space-x-2">
+                                <i class="fas fa-eye text-emerald-500"></i>
+                                <span>Active</span>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                            <div class="flex items-center justify-center space-x-2">
+                                <i class="fas fa-calendar-week text-indigo-500"></i>
+                                <span>Weekly</span>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                            <div class="flex items-center justify-center space-x-2">
+                                <i class="fas fa-signal text-teal-500"></i>
+                                <span>Status</span>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+    `;
+    
+    sites.forEach((site, index) => {
+        const statusColor = site.active > 0 
+            ? 'bg-green-500 text-white' 
+            : 'bg-gray-400 dark:bg-gray-600 text-white';
+        const statusText = site.active > 0 ? 'Live' : 'Idle';
+        const statusIcon = site.active > 0 ? 'fas fa-broadcast-tower' : 'fas fa-pause';
+        const activeColor = site.active > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500';
+        const rowBg = site.active > 0 
+            ? 'bg-green-50/30 dark:bg-green-900/10 hover:bg-green-50 dark:hover:bg-green-900/20' 
+            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700';
+        
+        contentHTML += `
+            <tr class="${rowBg} transition-all duration-200 hover:shadow-sm">
+                <td class="px-6 py-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                            <i class="fas fa-globe text-white text-sm"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center space-x-2">
+                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate max-w-48" title="${site.name}">
+                                    ${site.name}
+                                </p>
+                                ${site.active > 0 ? '<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>' : ''}
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                Site #${index + 1}
+                            </p>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <div class="flex flex-col items-center space-y-1">
+                        <span class="text-2xl font-black ${activeColor}">${site.active}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">viewers</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <div class="flex flex-col items-center space-y-1">
+                        <span class="text-xl font-bold text-indigo-600 dark:text-indigo-400">${site.weekly || 0}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">total</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <span class="inline-flex items-center px-3 py-2 rounded-full text-sm font-bold ${statusColor} shadow-sm">
+                        <i class="${statusIcon} mr-2 text-xs ${site.active > 0 ? 'animate-pulse' : ''}"></i>
+                        ${statusText}
+                    </span>
+                </td>
+            </tr>
+        `;
+    });
+    
+    contentHTML += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    tableEl.innerHTML = contentHTML;
+    
+    // Add smooth entrance animations
+    setTimeout(() => {
+        const cards = tableEl.querySelectorAll('div[class*="hover:scale-102"], tr');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(10px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.3s ease-out';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 50);
+        });
+    }, 10);
 }
 
 function startSiteAnalyticsUpdates() {
