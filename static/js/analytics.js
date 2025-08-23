@@ -32,10 +32,16 @@
         const scripts = document.getElementsByTagName('script');
         for (let script of scripts) {
             if (script.src && script.src.includes('analytics.js')) {
-                const url = new URL(script.src);
-                const siteParam = url.searchParams.get('site');
-                if (siteParam) {
-                    return siteParam.trim();
+                console.log('PayButton Analytics: Found script:', script.src);
+                try {
+                    const url = new URL(script.src);
+                    const siteParam = url.searchParams.get('site');
+                    if (siteParam) {
+                        console.log('PayButton Analytics: Site name from URL param:', siteParam);
+                        return siteParam.trim();
+                    }
+                } catch (e) {
+                    console.error('PayButton Analytics: Error parsing script URL:', e);
                 }
             }
         }
@@ -45,13 +51,16 @@
             if (script.src && script.src.includes('analytics.js')) {
                 const siteAttr = script.getAttribute('data-site');
                 if (siteAttr) {
+                    console.log('PayButton Analytics: Site name from data attribute:', siteAttr);
                     return siteAttr.trim();
                 }
             }
         }
 
         // Last fallback: use current hostname (cleaned)
-        return cleanHostname(window.location.hostname);
+        const hostname = cleanHostname(window.location.hostname);
+        console.log('PayButton Analytics: Using hostname as site name:', hostname);
+        return hostname;
     }
 
     /**
@@ -465,13 +474,48 @@
         },
         trackPageChange: trackPageChange, // Phase 5: Manual page tracking
         reconnect: function() {
+            console.log('PayButton Analytics: Manual reconnect requested');
             reconnectAttempts = 0;
+            isConnected = false;
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
             connect();
+        },
+        // Debug function to check status
+        debug: function() {
+            console.log('PayButton Analytics Debug:', {
+                siteName: siteName,
+                isConnected: isConnected,
+                websocket: websocket ? websocket.readyState : 'null',
+                sessionId: sessionId,
+                reconnectAttempts: reconnectAttempts
+            });
         }
     };
 
     // Auto-initialize when script loads
     console.log('PayButton Analytics: Script loaded, auto-initializing...');
-    initialize();
+    
+    // Ensure initialization happens
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        // Document is ready, initialize immediately
+        initialize();
+    } else {
+        // Wait for document to be ready
+        document.addEventListener('DOMContentLoaded', initialize);
+    }
+    
+    // Also try to initialize on load event as backup
+    window.addEventListener('load', function() {
+        if (!siteName) {
+            console.log('PayButton Analytics: Reinitializing on load event');
+            initialize();
+        } else if (!isConnected && !websocket) {
+            console.log('PayButton Analytics: Not connected on load, attempting connection');
+            connect();
+        }
+    });
 
 })();
