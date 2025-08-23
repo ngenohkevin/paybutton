@@ -930,6 +930,18 @@ function setupEventListeners() {
     });
 }
 
+// Real-time updates
+function startRealTimeUpdates() {
+    refreshInterval = setInterval(() => {
+        loadRealAnalyticsData();
+        // Update last updated timestamp
+        const lastUpdatedEl = document.getElementById('lastUpdated');
+        if (lastUpdatedEl) {
+            lastUpdatedEl.textContent = new Date().toLocaleString();
+        }
+    }, 5000); // Update every 5 seconds
+}
+
 function loadAnalyticsData() {
     // Simulate loading analytics data
     analyticsData = {
