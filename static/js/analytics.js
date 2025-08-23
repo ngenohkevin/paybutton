@@ -193,8 +193,14 @@
      * Connect to analytics WebSocket
      */
     function connect() {
-        if (websocket && (websocket.readyState === WebSocket.CONNECTING || websocket.readyState === WebSocket.OPEN)) {
-            return; // Already connecting or connected
+        // Clean up any existing connection first
+        if (websocket) {
+            if (websocket.readyState === WebSocket.CONNECTING || websocket.readyState === WebSocket.OPEN) {
+                return; // Already connecting or connected
+            }
+            // Clean up stale websocket
+            websocket.close();
+            websocket = null;
         }
 
         if (!siteName) {
@@ -229,7 +235,11 @@
                 // Generate new session ID on each connection
                 sessionId = generateSessionId();
                 
+                // Start heartbeat to keep connection alive
                 startHeartbeat();
+                
+                // Log successful connection
+                console.log(`PayButton Analytics: Connected for ${siteName}`);
             };
 
             websocket.onmessage = function(event) {
@@ -276,7 +286,10 @@
             websocket = null;
         }
 
-        handleReconnection();
+        // Only reconnect if the page is still visible
+        if (document.visibilityState === 'visible') {
+            handleReconnection();
+        }
     }
 
     /**
@@ -332,12 +345,22 @@
         }
 
         debug(`Initializing analytics for site: ${siteName}`);
+        
+        // Reset connection state on page load
+        isConnected = false;
+        websocket = null;
+        reconnectAttempts = 0;
+        sessionId = null;
 
         // Start connection when page is loaded
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', connect);
+            document.addEventListener('DOMContentLoaded', function() {
+                debug('DOM ready, connecting...');
+                connect();
+            });
         } else {
             // Page already loaded
+            debug('Page already loaded, connecting...');
             setTimeout(connect, 100);
         }
 
@@ -371,10 +394,14 @@
         // Handle page visibility changes
         if (typeof document.visibilityState !== 'undefined') {
             document.addEventListener('visibilitychange', function() {
-                if (document.visibilityState === 'visible' && !isConnected) {
-                    debug('Page became visible, reconnecting...');
-                    setTimeout(connect, 500);
-                } else if (document.visibilityState === 'hidden' && isConnected) {
+                if (document.visibilityState === 'visible') {
+                    // Always reconnect when page becomes visible if not connected
+                    if (!isConnected && !websocket) {
+                        debug('Page became visible, reconnecting...');
+                        reconnectAttempts = 0; // Reset reconnect attempts
+                        setTimeout(connect, 500);
+                    }
+                } else if (document.visibilityState === 'hidden') {
                     debug('Page became hidden');
                     // Keep connection alive but reduce heartbeat frequency
                 }
@@ -384,14 +411,30 @@
         // Handle page unload
         window.addEventListener('beforeunload', function() {
             if (websocket && websocket.readyState === WebSocket.OPEN) {
+                // Clean close to prevent reconnection attempts
+                isConnected = false;
+                stopHeartbeat();
                 websocket.close(1000, 'Page unload');
+                websocket = null;
+            }
+        });
+        
+        // Handle page reload/navigation
+        window.addEventListener('pagehide', function() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                // Clean close to prevent reconnection attempts
+                isConnected = false;
+                stopHeartbeat();
+                websocket.close(1000, 'Page unload');
+                websocket = null;
             }
         });
 
         // Handle online/offline events
         window.addEventListener('online', function() {
             debug('Connection restored');
-            if (!isConnected) {
+            if (!isConnected && !websocket) {
+                reconnectAttempts = 0; // Reset reconnect attempts
                 setTimeout(connect, 1000);
             }
         });
