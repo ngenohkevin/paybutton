@@ -49,6 +49,10 @@ type AnalyticsManager struct {
 	cacheTimestamp  time.Time                // last cache update
 	cacheDuration   time.Duration            // cache validity duration
 
+	// Debouncing for dashboard updates
+	lastBroadcast     time.Time     // last broadcast timestamp
+	broadcastDebounce time.Duration // minimum time between broadcasts
+
 	mutex      sync.RWMutex
 	cleanup    chan string  // for connection cleanup
 	ticker     *time.Ticker // hourly rotation
@@ -164,17 +168,19 @@ func Initialize() {
 	})).With("component", "analytics")
 
 	manager = &AnalyticsManager{
-		connections:     make(map[string][]*AnalyticsConnection),
-		weeklyData:      make(map[string]*SiteWeeklyData),
-		historicalData:  make(map[string]*SiteHistoricalData), // Phase 5
-		pageData:        make(map[string]*SitePageData),       // Phase 5
-		rateLimiter:     make(map[string]*AnalyticsRateLimit),
-		cachedAnalytics: make(map[string]SiteAnalytics), // Analytics caching
-		cacheTimestamp:  time.Time{},                    // Initialize with zero time
-		cacheDuration:   5 * time.Second,                // Cache for 5 seconds to reduce flickering
-		cleanup:         make(chan string, 100),
-		ticker:          time.NewTicker(time.Hour), // Rotate hourly data every hour
-		isShutdown:      false,                     // Initialize shutdown flag
+		connections:       make(map[string][]*AnalyticsConnection),
+		weeklyData:        make(map[string]*SiteWeeklyData),
+		historicalData:    make(map[string]*SiteHistoricalData), // Phase 5
+		pageData:          make(map[string]*SitePageData),       // Phase 5
+		rateLimiter:       make(map[string]*AnalyticsRateLimit),
+		cachedAnalytics:   make(map[string]SiteAnalytics), // Analytics caching
+		cacheTimestamp:    time.Time{},                    // Initialize with zero time
+		cacheDuration:     5 * time.Second,                // Cache for 5 seconds to reduce flickering
+		lastBroadcast:     time.Time{},                    // Initialize broadcast debouncing
+		broadcastDebounce: 2 * time.Second,                // Minimum 2 seconds between dashboard updates
+		cleanup:           make(chan string, 100),
+		ticker:            time.NewTicker(time.Hour), // Rotate hourly data every hour
+		isShutdown:        false,                     // Initialize shutdown flag
 	}
 
 	// Start background cleanup routines
@@ -194,16 +200,16 @@ func Shutdown() {
 	}
 
 	manager.mutex.Lock()
-	
+
 	// Check if already shutdown to prevent double close
 	if manager.isShutdown {
 		manager.mutex.Unlock()
 		return
 	}
-	
+
 	// Mark as shutdown
 	manager.isShutdown = true
-	
+
 	logger.Info("Analytics Manager: Starting graceful shutdown")
 
 	// Close all active connections
@@ -243,7 +249,7 @@ func Shutdown() {
 		close(manager.cleanup)
 		manager.cleanup = nil
 	}
-	
+
 	manager.mutex.Unlock()
 
 	logger.Info("Analytics Manager: Graceful shutdown completed",
@@ -329,7 +335,7 @@ func HandleWebSocket(c *gin.Context) {
 		for {
 			// Set read deadline for each read
 			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-			
+
 			// Read message from client (heartbeat or close)
 			_, message, err := conn.ReadMessage()
 			if err != nil {
@@ -599,12 +605,12 @@ func (am *AnalyticsManager) getSiteAnalyticsUnsafe(siteName string) SiteAnalytic
 
 // CombinedAnalytics holds all analytics data in a single cached structure
 type CombinedAnalytics struct {
-	Sites         map[string]SiteAnalytics `json:"sites"`
-	TotalActive   int                      `json:"total_active"`
-	TotalWeekly   int                      `json:"total_weekly"`
-	ActiveSites   int                      `json:"active_sites"`
-	LastUpdated   time.Time               `json:"last_updated"`
-	CacheValid    bool                    `json:"-"`
+	Sites       map[string]SiteAnalytics `json:"sites"`
+	TotalActive int                      `json:"total_active"`
+	TotalWeekly int                      `json:"total_weekly"`
+	ActiveSites int                      `json:"active_sites"`
+	LastUpdated time.Time                `json:"last_updated"`
+	CacheValid  bool                     `json:"-"`
 }
 
 // Global combined analytics cache
@@ -632,7 +638,7 @@ func GetCombinedAnalytics() *CombinedAnalytics {
 
 	globalCacheMutex.RLock()
 	// Check if global cache is valid (15 seconds for better performance)
-	if globalAnalyticsCache != nil && 
+	if globalAnalyticsCache != nil &&
 		time.Since(globalAnalyticsCache.LastUpdated) < 15*time.Second &&
 		globalAnalyticsCache.CacheValid {
 		defer globalCacheMutex.RUnlock()
@@ -645,7 +651,7 @@ func GetCombinedAnalytics() *CombinedAnalytics {
 	defer globalCacheMutex.Unlock()
 
 	// Double-check after acquiring write lock
-	if globalAnalyticsCache != nil && 
+	if globalAnalyticsCache != nil &&
 		time.Since(globalAnalyticsCache.LastUpdated) < 15*time.Second &&
 		globalAnalyticsCache.CacheValid {
 		return globalAnalyticsCache
@@ -725,9 +731,9 @@ func (am *AnalyticsManager) invalidateGlobalCache() {
 		globalAnalyticsCache.CacheValid = false
 	}
 	globalCacheMutex.Unlock()
-	
-	// Broadcast analytics updates to admin dashboard via WebSocket
-	go am.broadcastAnalyticsUpdate()
+
+	// Debounced broadcast analytics updates to admin dashboard via WebSocket
+	go am.debouncedBroadcastAnalyticsUpdate()
 }
 
 // AdminWebSocketConnection represents a WebSocket connection for admin dashboard
@@ -760,7 +766,7 @@ func HandleAdminWebSocket(c *gin.Context) {
 
 	// Generate unique connection ID
 	connID := generateSessionID()
-	
+
 	// Add connection to admin connections
 	adminConnectionsMutex.Lock()
 	adminConnections[connID] = &AdminWebSocketConnection{
@@ -769,7 +775,7 @@ func HandleAdminWebSocket(c *gin.Context) {
 		joinTime: time.Now(),
 	}
 	adminConnectionsMutex.Unlock()
-	
+
 	defer func() {
 		adminConnectionsMutex.Lock()
 		delete(adminConnections, connID)
@@ -847,6 +853,19 @@ func HandleAdminWebSocket(c *gin.Context) {
 	}
 }
 
+// debouncedBroadcastAnalyticsUpdate broadcasts analytics updates with debouncing to prevent flickering
+func (am *AnalyticsManager) debouncedBroadcastAnalyticsUpdate() {
+	now := time.Now()
+
+	// Check if enough time has passed since last broadcast
+	if now.Sub(am.lastBroadcast) < am.broadcastDebounce {
+		return // Skip this broadcast to prevent flickering
+	}
+
+	am.lastBroadcast = now
+	am.broadcastAnalyticsUpdate()
+}
+
 // broadcastAnalyticsUpdate broadcasts analytics updates to all admin WebSocket connections
 func (am *AnalyticsManager) broadcastAnalyticsUpdate() {
 	adminConnectionsMutex.RLock()
@@ -862,7 +881,7 @@ func (am *AnalyticsManager) broadcastAnalyticsUpdate() {
 
 	// Get latest analytics data
 	combined := GetCombinedAnalytics()
-	
+
 	updateData := map[string]interface{}{
 		"type": "analytics_update",
 		"data": map[string]interface{}{

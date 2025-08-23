@@ -9,9 +9,9 @@
     // Configuration
     const CONFIG = {
         HEARTBEAT_INTERVAL: 15000, // 15 seconds
-        RECONNECT_DELAYS: [500, 1000, 2000, 4000, 8000, 15000], // Faster initial attempts
+        RECONNECT_DELAYS: [1000, 2000, 4000, 8000, 15000, 30000], // More conservative attempts
         MAX_RECONNECT_ATTEMPTS: 6,
-        CONNECTION_TIMEOUT: 5000 // 5 seconds for faster detection
+        CONNECTION_TIMEOUT: 10000 // 10 seconds for more stability
     };
 
     // Analytics state
@@ -333,10 +333,12 @@
             debug(`Page changed from ${currentPagePath} to ${newPath}`);
             currentPagePath = newPath;
             
-            // Reconnect with new page path
-            if (isConnected) {
+            // Only reconnect if we have a meaningful page change
+            // Avoid reconnecting for minor hash or query param changes
+            if (isConnected && Math.abs(newPath.length - (currentPagePath || '').length) > 2) {
+                debug('Significant page change detected, reconnecting...');
                 handleDisconnection();
-                setTimeout(connect, 500);
+                setTimeout(connect, 1000);
             }
         }
     }
@@ -403,47 +405,24 @@
             setTimeout(trackPageChange, 100);
         });
 
-        // Handle page visibility changes
+        // Handle page visibility changes (less aggressive)
         if (typeof document.visibilityState !== 'undefined') {
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') {
-                    debug('Page became visible, ensuring connection...');
+                    debug('Page became visible');
                     
-                    // Reset reconnect attempts for fresh start
-                    reconnectAttempts = 0;
-                    
-                    // If not connected, connect immediately
+                    // Only reconnect if we've been disconnected for a while
                     if (!isConnected) {
-                        debug('Not connected, initiating connection...');
-                        
-                        // Clean up any existing connection
-                        if (websocket) {
-                            websocket.close();
-                            websocket = null;
-                        }
-                        
-                        // Clear any pending reconnection timers
-                        if (reconnectTimer) {
-                            clearTimeout(reconnectTimer);
-                            reconnectTimer = null;
-                        }
-                        
-                        // Connect immediately
-                        connect();
-                    } else {
-                        debug('Already connected, sending heartbeat...');
-                        // Send a heartbeat to verify connection
-                        if (websocket && websocket.readyState === WebSocket.OPEN) {
-                            websocket.send(JSON.stringify({
-                                type: 'heartbeat',
-                                timestamp: new Date().toISOString(),
-                                sessionId: sessionId
-                            }));
-                        }
+                        debug('Page visible and not connected, will reconnect in 2 seconds...');
+                        setTimeout(() => {
+                            if (!isConnected) {
+                                reconnectAttempts = 0;
+                                connect();
+                            }
+                        }, 2000);
                     }
                 } else if (document.visibilityState === 'hidden') {
-                    debug('Page became hidden');
-                    // Keep connection alive for now
+                    debug('Page became hidden - keeping connection alive');
                 }
             });
         }
@@ -470,12 +449,17 @@
             }
         });
         
-        // Handle window focus for better page reopen detection
+        // Handle window focus (less aggressive)
         window.addEventListener('focus', function() {
-            debug('Window focused, ensuring connection...');
+            debug('Window focused');
+            // Only reconnect after a delay if truly disconnected
             if (!isConnected) {
-                reconnectAttempts = 0;
-                setTimeout(connect, 100);
+                setTimeout(() => {
+                    if (!isConnected) {
+                        reconnectAttempts = 0;
+                        connect();
+                    }
+                }, 3000);
             }
         });
 
@@ -545,26 +529,19 @@
         document.addEventListener('DOMContentLoaded', initialize);
     }
     
-    // Also try to initialize on load event as backup
+    // Also try to initialize on load event as backup (less aggressive)
     window.addEventListener('load', function() {
         if (!siteName) {
             console.log('PayButton Analytics: Reinitializing on load event');
             initialize();
-        } else {
-            console.log('PayButton Analytics: Load event - forcing connection check');
-            
-            // Always reset and try to connect on page load
-            reconnectAttempts = 0; // Reset attempts
-            
-            // Clean up any existing connection
-            if (websocket) {
-                websocket.close();
-                websocket = null;
-            }
-            
-            isConnected = false;
-            console.log('PayButton Analytics: Forcing fresh connection on page load');
-            connect();
+        } else if (!isConnected) {
+            console.log('PayButton Analytics: Load event - connection check');
+            setTimeout(() => {
+                if (!isConnected) {
+                    reconnectAttempts = 0;
+                    connect();
+                }
+            }, 1000);
         }
     });
 
