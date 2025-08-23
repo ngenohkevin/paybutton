@@ -44,11 +44,9 @@ type AnalyticsManager struct {
 	// Rate limiting
 	rateLimiter map[string]*AnalyticsRateLimit // IP -> rate limit info
 
-	mutex        sync.RWMutex
-	cleanup      chan string  // for connection cleanup
-	ticker       *time.Ticker // hourly rotation
-	shutdown     chan struct{} // shutdown signal
-	shutdownOnce sync.Once    // ensure shutdown only happens once
+	mutex   sync.RWMutex
+	cleanup chan string  // for connection cleanup
+	ticker  *time.Ticker // hourly rotation
 }
 
 // AnalyticsRateLimit tracks connection attempts per IP
@@ -154,18 +152,10 @@ var logger *slog.Logger
 
 // Initialize creates and starts the analytics manager
 func Initialize() {
-	// Initialize structured logger for analytics if not already initialized
-	if logger == nil {
-		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
-		})).With("component", "analytics")
-	}
-
-	// Prevent double initialization
-	if manager != nil {
-		logger.Warn("Analytics Manager already initialized, skipping duplicate initialization")
-		return
-	}
+	// Initialize structured logger for analytics
+	logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})).With("component", "analytics")
 
 	manager = &AnalyticsManager{
 		connections:    make(map[string][]*AnalyticsConnection),
@@ -175,7 +165,6 @@ func Initialize() {
 		rateLimiter:    make(map[string]*AnalyticsRateLimit),
 		cleanup:        make(chan string, 100),
 		ticker:         time.NewTicker(time.Hour), // Rotate hourly data every hour
-		shutdown:       make(chan struct{}),
 	}
 
 	// Start background cleanup routines
@@ -194,54 +183,48 @@ func Shutdown() {
 		return
 	}
 
-	// Ensure shutdown only happens once
-	manager.shutdownOnce.Do(func() {
-		logger.Info("Analytics Manager: Starting graceful shutdown")
+	logger.Info("Analytics Manager: Starting graceful shutdown")
 
-		// Signal shutdown to background routines
-		close(manager.shutdown)
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
 
-		// Stop the ticker
-		if manager.ticker != nil {
-			manager.ticker.Stop()
-		}
-
-		manager.mutex.Lock()
-		defer manager.mutex.Unlock()
-
-		// Close all active connections
-		totalConnections := 0
-		siteCount := 0
-		for siteName, connections := range manager.connections {
-			siteCount++
-			for _, conn := range connections {
-				if conn.conn != nil {
-					// Send close message to client
-					closeMsg := map[string]interface{}{
-						"status":    "shutdown",
-						"reason":    "Server is shutting down",
-						"timestamp": time.Now().Format(time.RFC3339),
-					}
-
-					if err := conn.conn.WriteJSON(closeMsg); err == nil {
-						// Give client time to receive the message
-						time.Sleep(100 * time.Millisecond)
-					}
-
-					conn.conn.Close()
-					totalConnections++
+	// Close all active connections
+	totalConnections := 0
+	siteCount := 0
+	for siteName, connections := range manager.connections {
+		siteCount++
+		for _, conn := range connections {
+			if conn.conn != nil {
+				// Send close message to client
+				closeMsg := map[string]interface{}{
+					"status":    "shutdown",
+					"reason":    "Server is shutting down",
+					"timestamp": time.Now().Format(time.RFC3339),
 				}
-			}
-			delete(manager.connections, siteName)
-		}
 
-		logger.Info("Analytics Manager: Graceful shutdown completed",
-			slog.Int("connections_closed", totalConnections),
-			slog.Int("sites_affected", siteCount))
-		
-		// Reset manager to nil so it can be re-initialized
-		manager = nil
-	})
+				if err := conn.conn.WriteJSON(closeMsg); err == nil {
+					// Give client time to receive the message
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				conn.conn.Close()
+				totalConnections++
+			}
+		}
+		delete(manager.connections, siteName)
+	}
+
+	// Stop background routines
+	if manager.ticker != nil {
+		manager.ticker.Stop()
+	}
+
+	// Close cleanup channel
+	close(manager.cleanup)
+
+	logger.Info("Analytics Manager: Graceful shutdown completed",
+		slog.Int("connections_closed", totalConnections),
+		slog.Int("sites_affected", siteCount))
 }
 
 // HandleWebSocket handles WebSocket connections for analytics tracking
@@ -636,17 +619,10 @@ func (am *AnalyticsManager) cleanupRoutine() {
 
 	for {
 		select {
-		case <-am.shutdown:
-			// Graceful shutdown
-			return
 		case <-ticker.C:
 			am.cleanupStaleConnections()
 			am.cleanupRateLimits() // Clean up rate limit entries as well
-		case siteName, ok := <-am.cleanup:
-			if !ok {
-				// Channel closed, exit
-				return
-			}
+		case siteName := <-am.cleanup:
 			// Manual cleanup trigger
 			am.cleanupStaleConnectionsForSite(siteName)
 		}
@@ -696,18 +672,12 @@ func (am *AnalyticsManager) cleanupStaleConnectionsForSite(siteName string) {
 
 // hourlyRotation runs hourly data rotation for all sites
 func (am *AnalyticsManager) hourlyRotation() {
-	for {
-		select {
-		case <-am.shutdown:
-			// Graceful shutdown
-			return
-		case <-am.ticker.C:
-			am.mutex.Lock()
-			for siteName := range am.weeklyData {
-				am.rotateHourlyDataForSite(siteName)
-			}
-			am.mutex.Unlock()
+	for range am.ticker.C {
+		am.mutex.Lock()
+		for siteName := range am.weeklyData {
+			am.rotateHourlyDataForSite(siteName)
 		}
+		am.mutex.Unlock()
 	}
 }
 
