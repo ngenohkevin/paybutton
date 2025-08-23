@@ -1321,15 +1321,15 @@ function loadRealAnalyticsData() {
         .then(response => response.json())
         .then(data => {
             if (data) {
-                // Update stats cards
-                const activeViewersEl = document.getElementById('activeViewersCount');
-                if (activeViewersEl) activeViewersEl.textContent = data.total_active || '0';
+                // Update stats cards - using correct element IDs
+                const activeViewersEl = document.getElementById('totalActiveValue');
+                if (activeViewersEl) activeViewersEl.textContent = data.totals?.active || '0';
                 
-                const weeklyVisitorsEl = document.getElementById('weeklyVisitorsCount');
-                if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.total_weekly || '0';
+                const weeklyVisitorsEl = document.getElementById('totalWeeklyValue');
+                if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.totals?.weekly || '0';
                 
-                const activeSitesEl = document.getElementById('activeSitesCount');
-                if (activeSitesEl) activeSitesEl.textContent = data.active_sites || '0';
+                const activeSitesEl = document.getElementById('activeSitesValue');
+                if (activeSitesEl) activeSitesEl.textContent = data.totals?.active_sites || '0';
                 
                 // Update charts
                 updateChartsWithData(data);
