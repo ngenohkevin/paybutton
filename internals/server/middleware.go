@@ -83,11 +83,11 @@ func (s *Server) rateLimitMiddleware() gin.HandlerFunc {
 func (s *Server) websocketLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		
+
 		// Only apply to WebSocket endpoints - check path length first
 		isWebSocket := len(path) >= 4 && path[:4] == "/ws/"
 		isSSE := len(path) >= 8 && path[:8] == "/events/"
-		
+
 		if !isWebSocket && !isSSE {
 			c.Next()
 			return

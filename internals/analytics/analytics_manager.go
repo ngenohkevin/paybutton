@@ -31,46 +31,46 @@ var upgrader = websocket.Upgrader{
 type AnalyticsManager struct {
 	// Real-time active connections
 	connections map[string][]*AnalyticsConnection // siteName -> connections
-	
+
 	// Weekly visitor tracking (no database needed)
 	weeklyData map[string]*SiteWeeklyData // siteName -> weekly stats
-	
+
 	// Phase 5: Historical data storage (30 days of hourly data)
 	historicalData map[string]*SiteHistoricalData // siteName -> historical stats
-	
+
 	// Phase 5: Page path tracking
 	pageData map[string]*SitePageData // siteName -> page analytics
-	
+
 	// Rate limiting
 	rateLimiter map[string]*AnalyticsRateLimit // IP -> rate limit info
-	
+
 	mutex   sync.RWMutex
-	cleanup chan string    // for connection cleanup
-	ticker  *time.Ticker   // hourly rotation
+	cleanup chan string  // for connection cleanup
+	ticker  *time.Ticker // hourly rotation
 }
 
 // AnalyticsRateLimit tracks connection attempts per IP
 type AnalyticsRateLimit struct {
-	attempts   int
+	attempts    int
 	windowStart time.Time
-	lastAccess time.Time
+	lastAccess  time.Time
 }
 
 // AnalyticsConnection represents an active WebSocket connection
 type AnalyticsConnection struct {
 	conn      *websocket.Conn
-	sessionID string    // unique session for weekly tracking
+	sessionID string // unique session for weekly tracking
 	siteName  string
 	joinTime  time.Time
-	pagePath  string    // Phase 5: Track specific page path
-	region    string    // Phase 5: Geographic region (Tor-friendly)
+	pagePath  string // Phase 5: Track specific page path
+	region    string // Phase 5: Geographic region (Tor-friendly)
 }
 
 // SiteWeeklyData tracks weekly visitor counts using rotating hourly buckets
 type SiteWeeklyData struct {
-	hourlyVisitors [168]int                   // 24 hours * 7 days = 168 hours
-	uniqueSessions map[string]time.Time       // sessionID -> first visit time
-	currentHour    int                        // rotating index (0-167)
+	hourlyVisitors [168]int             // 24 hours * 7 days = 168 hours
+	uniqueSessions map[string]time.Time // sessionID -> first visit time
+	currentHour    int                  // rotating index (0-167)
 	lastUpdate     time.Time
 }
 
@@ -87,37 +87,37 @@ type SiteAnalytics struct {
 	WeeklyTotal int       `json:"weekly_total"`
 	LastSeen    time.Time `json:"last_seen"`
 	// Phase 5: Additional fields
-	TopPages    []PageStats `json:"top_pages,omitempty"`
-	Regions     []RegionStats `json:"regions,omitempty"`
+	TopPages []PageStats   `json:"top_pages,omitempty"`
+	Regions  []RegionStats `json:"regions,omitempty"`
 }
 
 // Phase 5: Historical data storage (30 days of hourly data)
 type SiteHistoricalData struct {
-	hourlyData  [720]int                    // 30 days * 24 hours = 720 hours
-	timestamps  [720]time.Time              // Corresponding timestamps
-	currentHour int                         // rotating index (0-719)
+	hourlyData  [720]int       // 30 days * 24 hours = 720 hours
+	timestamps  [720]time.Time // Corresponding timestamps
+	currentHour int            // rotating index (0-719)
 	lastUpdate  time.Time
 }
 
 // Phase 5: Page tracking for a site
 type SitePageData struct {
-	pageViews   map[string]*PageViewData    // pagePath -> view data
+	pageViews   map[string]*PageViewData // pagePath -> view data
 	lastCleanup time.Time
 }
 
 // Phase 5: Individual page view tracking
 type PageViewData struct {
-	path          string
-	viewCount     int
-	uniqueSessions map[string]time.Time     // sessionID -> last visit
-	lastAccess    time.Time
+	path           string
+	viewCount      int
+	uniqueSessions map[string]time.Time // sessionID -> last visit
+	lastAccess     time.Time
 }
 
 // Phase 5: Popular page statistics
 type PageStats struct {
-	Path     string `json:"path"`
-	Views    int    `json:"views"`
-	Unique   int    `json:"unique"`
+	Path     string    `json:"path"`
+	Views    int       `json:"views"`
+	Unique   int       `json:"unique"`
 	LastSeen time.Time `json:"last_seen"`
 }
 
@@ -170,8 +170,8 @@ func Initialize() {
 	// Start background cleanup routines
 	go manager.cleanupRoutine()
 	go manager.hourlyRotation()
-	
-	logger.Info("Analytics Manager initialized", 
+
+	logger.Info("Analytics Manager initialized",
 		slog.Int("pid", os.Getpid()),
 		slog.String("cleanup_interval", "60s"),
 		slog.String("rotation_interval", "1h"))
@@ -184,7 +184,7 @@ func Shutdown() {
 	}
 
 	logger.Info("Analytics Manager: Starting graceful shutdown")
-	
+
 	manager.mutex.Lock()
 	defer manager.mutex.Unlock()
 
@@ -197,16 +197,16 @@ func Shutdown() {
 			if conn.conn != nil {
 				// Send close message to client
 				closeMsg := map[string]interface{}{
-					"status": "shutdown",
-					"reason": "Server is shutting down",
+					"status":    "shutdown",
+					"reason":    "Server is shutting down",
 					"timestamp": time.Now().Format(time.RFC3339),
 				}
-				
+
 				if err := conn.conn.WriteJSON(closeMsg); err == nil {
 					// Give client time to receive the message
 					time.Sleep(100 * time.Millisecond)
 				}
-				
+
 				conn.conn.Close()
 				totalConnections++
 			}
@@ -218,11 +218,11 @@ func Shutdown() {
 	if manager.ticker != nil {
 		manager.ticker.Stop()
 	}
-	
+
 	// Close cleanup channel
 	close(manager.cleanup)
 
-	logger.Info("Analytics Manager: Graceful shutdown completed", 
+	logger.Info("Analytics Manager: Graceful shutdown completed",
 		slog.Int("connections_closed", totalConnections),
 		slog.Int("sites_affected", siteCount))
 }
@@ -240,7 +240,7 @@ func HandleWebSocket(c *gin.Context) {
 	if pagePath == "" {
 		pagePath = "/"
 	}
-	
+
 	// Phase 5: Detect region using Tor-friendly method
 	userAgent := c.GetHeader("User-Agent")
 	acceptLanguage := c.GetHeader("Accept-Language")
@@ -250,11 +250,11 @@ func HandleWebSocket(c *gin.Context) {
 	// Apply rate limiting
 	clientIP := c.ClientIP()
 	if !manager.checkRateLimit(clientIP) {
-		logger.Warn("Analytics WebSocket connection rate limited", 
+		logger.Warn("Analytics WebSocket connection rate limited",
 			slog.String("site", siteName),
 			slog.String("remote_addr", clientIP))
 		c.JSON(http.StatusTooManyRequests, gin.H{
-			"error": "Too many connection attempts. Please try again later.",
+			"error":       "Too many connection attempts. Please try again later.",
 			"retry_after": 60,
 		})
 		return
@@ -263,7 +263,7 @@ func HandleWebSocket(c *gin.Context) {
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		logger.Error("Failed to upgrade analytics WebSocket", 
+		logger.Error("Failed to upgrade analytics WebSocket",
 			slog.String("site", siteName),
 			slog.String("error", err.Error()),
 			slog.String("remote_addr", c.ClientIP()))
@@ -273,12 +273,12 @@ func HandleWebSocket(c *gin.Context) {
 
 	// Generate unique session ID (timestamp + random)
 	sessionID := generateSessionID()
-	
+
 	// Add connection to manager with Phase 5 fields
 	manager.addConnectionWithPath(siteName, conn, sessionID, pagePath, region)
 	defer manager.removeConnection(siteName, sessionID)
 
-	logger.Info("Analytics WebSocket connected", 
+	logger.Info("Analytics WebSocket connected",
 		slog.String("site", siteName),
 		slog.String("session", sessionID),
 		slog.String("remote_addr", c.ClientIP()))
@@ -290,9 +290,9 @@ func HandleWebSocket(c *gin.Context) {
 		"sessionId": sessionID,
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
-	
+
 	if err := conn.WriteJSON(initialStatus); err != nil {
-		logger.Error("Error sending initial analytics message", 
+		logger.Error("Error sending initial analytics message",
 			slog.String("site", siteName),
 			slog.String("session", sessionID),
 			slog.String("error", err.Error()))
@@ -301,7 +301,7 @@ func HandleWebSocket(c *gin.Context) {
 
 	// Set read deadline for heartbeat detection (30 seconds timeout)
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-	
+
 	// Handle heartbeat messages
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
@@ -317,7 +317,7 @@ func HandleWebSocket(c *gin.Context) {
 		select {
 		case <-pingTicker.C:
 			if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-				logger.Warn("Analytics ping failed", 
+				logger.Warn("Analytics ping failed",
 					slog.String("site", siteName),
 					slog.String("session", sessionID),
 					slog.String("error", err.Error()))
@@ -328,14 +328,14 @@ func HandleWebSocket(c *gin.Context) {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					logger.Warn("Analytics WebSocket unexpected close", 
+					logger.Warn("Analytics WebSocket unexpected close",
 						slog.String("site", siteName),
 						slog.String("session", sessionID),
 						slog.String("error", err.Error()))
 				}
 				return
 			}
-			
+
 			// Handle client heartbeat messages
 			var clientMsg map[string]interface{}
 			if err := json.Unmarshal(message, &clientMsg); err == nil {
@@ -366,7 +366,7 @@ func (am *AnalyticsManager) addConnectionWithPath(siteName string, conn *websock
 	// Check memory limits per site (default: 1000 connections)
 	maxConnectionsPerSite := 1000
 	if len(am.connections[siteName]) >= maxConnectionsPerSite {
-		logger.Warn("Site connection limit reached", 
+		logger.Warn("Site connection limit reached",
 			slog.String("site", siteName),
 			slog.Int("current_connections", len(am.connections[siteName])),
 			slog.Int("limit", maxConnectionsPerSite))
@@ -389,14 +389,14 @@ func (am *AnalyticsManager) addConnectionWithPath(siteName string, conn *websock
 
 	// Record visitor for weekly tracking
 	am.recordVisitor(siteName, sessionID)
-	
+
 	// Phase 5: Record historical data
 	am.recordHistoricalData(siteName)
-	
+
 	// Phase 5: Record page view
 	am.recordPageView(siteName, pagePath, sessionID)
 
-	logger.Info("Added analytics connection", 
+	logger.Info("Added analytics connection",
 		slog.String("site", siteName),
 		slog.String("session", sessionID),
 		slog.String("page", pagePath),
@@ -415,7 +415,7 @@ func (am *AnalyticsManager) removeConnection(siteName string, sessionID string) 
 		if conn.sessionID == sessionID {
 			// Remove connection from slice
 			am.connections[siteName] = append(connections[:i], connections[i+1:]...)
-			logger.Info("Removed analytics connection", 
+			logger.Info("Removed analytics connection",
 				slog.String("site", siteName),
 				slog.String("session", sessionID),
 				slog.Int("site_remaining", len(am.connections[siteName])))
@@ -426,7 +426,7 @@ func (am *AnalyticsManager) removeConnection(siteName string, sessionID string) 
 	// Clean up empty site entries
 	if len(am.connections[siteName]) == 0 {
 		delete(am.connections, siteName)
-		logger.Info("Cleaned up empty connection list", 
+		logger.Info("Cleaned up empty connection list",
 			slog.String("site", siteName))
 	}
 }
@@ -446,9 +446,9 @@ func (am *AnalyticsManager) recordVisitor(siteName string, sessionID string) {
 	now := time.Now()
 
 	// Check if this is a new unique session for this hour
-	if lastVisit, exists := siteData.uniqueSessions[sessionID]; !exists || 
+	if lastVisit, exists := siteData.uniqueSessions[sessionID]; !exists ||
 		time.Since(lastVisit).Hours() >= 1 {
-		
+
 		// Update current hour index
 		currentHour := getCurrentHourIndex()
 		if currentHour != siteData.currentHour {
@@ -458,12 +458,12 @@ func (am *AnalyticsManager) recordVisitor(siteName string, sessionID string) {
 
 		// Increment visitor count for current hour
 		siteData.hourlyVisitors[siteData.currentHour]++
-		
+
 		// Record session visit time
 		siteData.uniqueSessions[sessionID] = now
 		siteData.lastUpdate = now
 
-		logger.Info("Recorded unique visitor", 
+		logger.Info("Recorded unique visitor",
 			slog.String("site", siteName),
 			slog.String("session", sessionID),
 			slog.Int("hourly_count", siteData.hourlyVisitors[siteData.currentHour]),
@@ -475,7 +475,7 @@ func (am *AnalyticsManager) recordVisitor(siteName string, sessionID string) {
 func (am *AnalyticsManager) GetActiveViewers(siteName string) int {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	return len(am.connections[siteName])
 }
 
@@ -483,12 +483,12 @@ func (am *AnalyticsManager) GetActiveViewers(siteName string) int {
 func (am *AnalyticsManager) GetAllSiteViewers() map[string]int {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	result := make(map[string]int)
 	for siteName, connections := range am.connections {
 		result[siteName] = len(connections)
 	}
-	
+
 	return result
 }
 
@@ -496,7 +496,7 @@ func (am *AnalyticsManager) GetAllSiteViewers() map[string]int {
 func (am *AnalyticsManager) GetWeeklyVisitors(siteName string) int {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	siteData := am.weeklyData[siteName]
 	if siteData == nil {
 		return 0
@@ -507,7 +507,7 @@ func (am *AnalyticsManager) GetWeeklyVisitors(siteName string) int {
 	for _, count := range siteData.hourlyVisitors {
 		total += count
 	}
-	
+
 	return total
 }
 
@@ -515,7 +515,7 @@ func (am *AnalyticsManager) GetWeeklyVisitors(siteName string) int {
 func (am *AnalyticsManager) GetAllSiteWeeklyStats() map[string]WeeklyStats {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	result := make(map[string]WeeklyStats)
 	for siteName, siteData := range am.weeklyData {
 		// Calculate weekly total
@@ -523,13 +523,13 @@ func (am *AnalyticsManager) GetAllSiteWeeklyStats() map[string]WeeklyStats {
 		for _, count := range siteData.hourlyVisitors {
 			total += count
 		}
-		
+
 		result[siteName] = WeeklyStats{
 			WeeklyTotal: total,
 			LastSeen:    siteData.lastUpdate,
 		}
 	}
-	
+
 	return result
 }
 
@@ -537,11 +537,11 @@ func (am *AnalyticsManager) GetAllSiteWeeklyStats() map[string]WeeklyStats {
 func (am *AnalyticsManager) GetSiteAnalytics(siteName string) SiteAnalytics {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	activeCount := len(am.connections[siteName])
 	weeklyTotal := 0
 	lastSeen := time.Time{}
-	
+
 	if siteData := am.weeklyData[siteName]; siteData != nil {
 		// Calculate weekly total
 		for _, count := range siteData.hourlyVisitors {
@@ -549,7 +549,7 @@ func (am *AnalyticsManager) GetSiteAnalytics(siteName string) SiteAnalytics {
 		}
 		lastSeen = siteData.lastUpdate
 	}
-	
+
 	return SiteAnalytics{
 		SiteName:    siteName,
 		ActiveCount: activeCount,
@@ -566,9 +566,9 @@ func GetAllSiteAnalytics() map[string]SiteAnalytics {
 
 	manager.mutex.RLock()
 	defer manager.mutex.RUnlock()
-	
+
 	result := make(map[string]SiteAnalytics)
-	
+
 	// Get all sites from both active connections and weekly data
 	allSites := make(map[string]bool)
 	for siteName := range manager.connections {
@@ -577,12 +577,12 @@ func GetAllSiteAnalytics() map[string]SiteAnalytics {
 	for siteName := range manager.weeklyData {
 		allSites[siteName] = true
 	}
-	
+
 	// Build analytics for each site
 	for siteName := range allSites {
 		result[siteName] = manager.GetSiteAnalytics(siteName)
 	}
-	
+
 	return result
 }
 
@@ -594,17 +594,17 @@ func (am *AnalyticsManager) rotateHourlyDataForSite(siteName string) {
 	}
 
 	newHour := getCurrentHourIndex()
-	
+
 	// If we've moved forward in time, clear old data
 	if newHour != siteData.currentHour {
 		hoursAdvanced := (newHour - siteData.currentHour + 168) % 168
-		
+
 		// Clear the buckets we're moving into
 		for i := 0; i < hoursAdvanced && i < 168; i++ {
 			bucketIndex := (siteData.currentHour + i + 1) % 168
 			siteData.hourlyVisitors[bucketIndex] = 0
 		}
-		
+
 		// Clean up old sessions (older than 7 days)
 		cutoff := time.Now().Add(-7 * 24 * time.Hour)
 		for sessionID, visitTime := range siteData.uniqueSessions {
@@ -612,9 +612,9 @@ func (am *AnalyticsManager) rotateHourlyDataForSite(siteName string) {
 				delete(siteData.uniqueSessions, sessionID)
 			}
 		}
-		
+
 		siteData.currentHour = newHour
-		logger.Info("Rotated hourly data", 
+		logger.Info("Rotated hourly data",
 			slog.String("site", siteName),
 			slog.Int("new_hour_index", newHour),
 			slog.Int("hours_advanced", hoursAdvanced),
@@ -657,7 +657,7 @@ func (am *AnalyticsManager) cleanupStaleConnectionsForSite(siteName string) {
 	for _, conn := range connections {
 		// Test connection with a ping
 		if err := conn.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-			logger.Warn("Removing stale analytics connection", 
+			logger.Warn("Removing stale analytics connection",
 				slog.String("site", siteName),
 				slog.String("session", conn.sessionID),
 				slog.String("error", err.Error()))
@@ -673,7 +673,7 @@ func (am *AnalyticsManager) cleanupStaleConnectionsForSite(siteName string) {
 		if len(activeConnections) == 0 {
 			delete(am.connections, siteName)
 		}
-		logger.Info("Cleaned up stale connections", 
+		logger.Info("Cleaned up stale connections",
 			slog.String("site", siteName),
 			slog.Int("active_remaining", len(activeConnections)),
 			slog.Int("stale_removed", staleCount))
@@ -724,7 +724,7 @@ func detectTorFriendlyRegion(userAgent, acceptLanguage, timezone string) string 
 		languages := strings.Split(acceptLanguage, ",")
 		if len(languages) > 0 {
 			primaryLang := strings.TrimSpace(strings.Split(languages[0], ";")[0])
-			
+
 			// Map languages to general regions (privacy-friendly)
 			switch {
 			case strings.HasPrefix(primaryLang, "en"):
@@ -756,7 +756,7 @@ func detectTorFriendlyRegion(userAgent, acceptLanguage, timezone string) string 
 			}
 		}
 	}
-	
+
 	// Fallback to "Unknown" for maximum privacy
 	return "Unknown"
 }
@@ -769,12 +769,12 @@ func GetTotalActiveViewers() int {
 
 	manager.mutex.RLock()
 	defer manager.mutex.RUnlock()
-	
+
 	total := 0
 	for _, connections := range manager.connections {
 		total += len(connections)
 	}
-	
+
 	return total
 }
 
@@ -786,14 +786,14 @@ func GetTotalWeeklyVisitors() int {
 
 	manager.mutex.RLock()
 	defer manager.mutex.RUnlock()
-	
+
 	total := 0
 	for _, siteData := range manager.weeklyData {
 		for _, count := range siteData.hourlyVisitors {
 			total += count
 		}
 	}
-	
+
 	return total
 }
 
@@ -805,7 +805,7 @@ func GetActiveSitesCount() int {
 
 	manager.mutex.RLock()
 	defer manager.mutex.RUnlock()
-	
+
 	return len(manager.connections)
 }
 
@@ -817,7 +817,7 @@ func (am *AnalyticsManager) recordHistoricalData(siteName string) {
 			currentHour: getCurrentHistoricalHour(),
 			lastUpdate:  time.Now(),
 		}
-		
+
 		// Initialize timestamps for the circular buffer
 		now := time.Now()
 		for i := 0; i < 720; i++ {
@@ -828,7 +828,7 @@ func (am *AnalyticsManager) recordHistoricalData(siteName string) {
 	siteData := am.historicalData[siteName]
 	now := time.Now()
 	currentHour := getCurrentHistoricalHour()
-	
+
 	// Rotate data if hour has changed
 	if currentHour != siteData.currentHour {
 		// Clear hours between last update and current hour
@@ -840,7 +840,7 @@ func (am *AnalyticsManager) recordHistoricalData(siteName string) {
 		}
 		siteData.currentHour = currentHour
 	}
-	
+
 	// Increment current hour's visitor count
 	siteData.hourlyData[currentHour] = len(am.connections[siteName])
 	siteData.timestamps[currentHour] = now
@@ -858,7 +858,7 @@ func (am *AnalyticsManager) recordPageView(siteName, pagePath, sessionID string)
 	}
 
 	sitePageData := am.pageData[siteName]
-	
+
 	// Initialize page data if needed
 	if sitePageData.pageViews[pagePath] == nil {
 		sitePageData.pageViews[pagePath] = &PageViewData{
@@ -870,16 +870,16 @@ func (am *AnalyticsManager) recordPageView(siteName, pagePath, sessionID string)
 
 	pageData := sitePageData.pageViews[pagePath]
 	now := time.Now()
-	
+
 	// Check if this is a new unique session for this page (within last hour)
-	if lastVisit, exists := pageData.uniqueSessions[sessionID]; !exists || 
+	if lastVisit, exists := pageData.uniqueSessions[sessionID]; !exists ||
 		time.Since(lastVisit).Hours() >= 1 {
 		pageData.uniqueSessions[sessionID] = now
 	}
-	
+
 	pageData.viewCount++
 	pageData.lastAccess = now
-	
+
 	// Cleanup old page data every 24 hours
 	if time.Since(sitePageData.lastCleanup).Hours() >= 24 {
 		am.cleanupOldPageData(siteName)
@@ -895,7 +895,7 @@ func (am *AnalyticsManager) cleanupOldPageData(siteName string) {
 	}
 
 	cutoff := time.Now().Add(-7 * 24 * time.Hour) // Keep 7 days of data
-	
+
 	for pagePath, pageData := range sitePageData.pageViews {
 		// Clean up old sessions
 		for sessionID, visitTime := range pageData.uniqueSessions {
@@ -903,7 +903,7 @@ func (am *AnalyticsManager) cleanupOldPageData(siteName string) {
 				delete(pageData.uniqueSessions, sessionID)
 			}
 		}
-		
+
 		// Remove pages with no recent activity
 		if pageData.lastAccess.Before(cutoff) {
 			delete(sitePageData.pageViews, pagePath)
@@ -915,20 +915,20 @@ func (am *AnalyticsManager) cleanupOldPageData(siteName string) {
 func (am *AnalyticsManager) GetSiteHistoricalData(siteName string, hours int) []HistoricalDataPoint {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	siteData := am.historicalData[siteName]
 	if siteData == nil {
 		return []HistoricalDataPoint{}
 	}
-	
+
 	// Limit hours to available data (max 720)
 	if hours > 720 || hours <= 0 {
 		hours = 720
 	}
-	
+
 	result := make([]HistoricalDataPoint, 0, hours)
 	currentHour := siteData.currentHour
-	
+
 	// Get last N hours of data
 	for i := hours - 1; i >= 0; i-- {
 		bucketIndex := (currentHour - i + 720) % 720
@@ -937,7 +937,7 @@ func (am *AnalyticsManager) GetSiteHistoricalData(siteName string, hours int) []
 			Viewers:   siteData.hourlyData[bucketIndex],
 		})
 	}
-	
+
 	return result
 }
 
@@ -945,12 +945,12 @@ func (am *AnalyticsManager) GetSiteHistoricalData(siteName string, hours int) []
 func (am *AnalyticsManager) GetSitePageStats(siteName string, limit int) []PageStats {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	sitePageData := am.pageData[siteName]
 	if sitePageData == nil {
 		return []PageStats{}
 	}
-	
+
 	// Build page stats
 	pageStats := make([]PageStats, 0, len(sitePageData.pageViews))
 	for _, pageData := range sitePageData.pageViews {
@@ -961,7 +961,7 @@ func (am *AnalyticsManager) GetSitePageStats(siteName string, limit int) []PageS
 			LastSeen: pageData.lastAccess,
 		})
 	}
-	
+
 	// Sort by view count (descending)
 	for i := 0; i < len(pageStats)-1; i++ {
 		for j := i + 1; j < len(pageStats); j++ {
@@ -970,12 +970,12 @@ func (am *AnalyticsManager) GetSitePageStats(siteName string, limit int) []PageS
 			}
 		}
 	}
-	
+
 	// Limit results
 	if limit > 0 && len(pageStats) > limit {
 		pageStats = pageStats[:limit]
 	}
-	
+
 	return pageStats
 }
 
@@ -983,18 +983,18 @@ func (am *AnalyticsManager) GetSitePageStats(siteName string, limit int) []PageS
 func (am *AnalyticsManager) GetSiteRegionStats(siteName string) []RegionStats {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
-	
+
 	connections := am.connections[siteName]
 	if len(connections) == 0 {
 		return []RegionStats{}
 	}
-	
+
 	// Count connections by region
 	regionCounts := make(map[string]int)
 	for _, conn := range connections {
 		regionCounts[conn.region]++
 	}
-	
+
 	// Convert to slice and sort
 	regionStats := make([]RegionStats, 0, len(regionCounts))
 	for region, count := range regionCounts {
@@ -1003,7 +1003,7 @@ func (am *AnalyticsManager) GetSiteRegionStats(siteName string) []RegionStats {
 			Count:  count,
 		})
 	}
-	
+
 	// Sort by count (descending)
 	for i := 0; i < len(regionStats)-1; i++ {
 		for j := i + 1; j < len(regionStats); j++ {
@@ -1012,7 +1012,7 @@ func (am *AnalyticsManager) GetSiteRegionStats(siteName string) []RegionStats {
 			}
 		}
 	}
-	
+
 	return regionStats
 }
 
@@ -1021,10 +1021,10 @@ func ExportSiteData(siteName string, period string) *SiteExportData {
 	if manager == nil {
 		return nil
 	}
-	
+
 	manager.mutex.RLock()
 	defer manager.mutex.RUnlock()
-	
+
 	// Get hours based on period
 	hours := 720 // Default: 30 days
 	switch period {
@@ -1035,16 +1035,16 @@ func ExportSiteData(siteName string, period string) *SiteExportData {
 	case "30d":
 		hours = 720
 	}
-	
+
 	// Get all data
 	summary := manager.GetSiteAnalytics(siteName)
 	summary.TopPages = manager.GetSitePageStats(siteName, 10)
 	summary.Regions = manager.GetSiteRegionStats(siteName)
-	
+
 	historicalData := manager.GetSiteHistoricalData(siteName, hours)
 	pageStats := manager.GetSitePageStats(siteName, 0) // All pages
 	regionStats := manager.GetSiteRegionStats(siteName)
-	
+
 	return &SiteExportData{
 		SiteName:        siteName,
 		ExportTimestamp: time.Now(),
@@ -1088,7 +1088,7 @@ func (am *AnalyticsManager) checkRateLimit(clientIP string) bool {
 
 	// Check if within limits
 	if rateLimit.attempts >= maxAttempts {
-		logger.Warn("Rate limit exceeded", 
+		logger.Warn("Rate limit exceeded",
 			slog.String("client_ip", clientIP),
 			slog.Int("attempts", rateLimit.attempts),
 			slog.Duration("window_age", now.Sub(rateLimit.windowStart)))
@@ -1107,7 +1107,7 @@ func (am *AnalyticsManager) cleanupRateLimits() {
 
 	now := time.Now()
 	staleTimeout := 1 * time.Hour // Remove entries older than 1 hour
-	
+
 	cleaned := 0
 	for ip, rateLimit := range am.rateLimiter {
 		if now.Sub(rateLimit.lastAccess) > staleTimeout {
@@ -1117,7 +1117,7 @@ func (am *AnalyticsManager) cleanupRateLimits() {
 	}
 
 	if cleaned > 0 {
-		logger.Info("Cleaned up stale rate limit entries", 
+		logger.Info("Cleaned up stale rate limit entries",
 			slog.Int("cleaned", cleaned),
 			slog.Int("remaining", len(am.rateLimiter)))
 	}

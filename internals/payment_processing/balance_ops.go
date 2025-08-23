@@ -286,7 +286,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 
 				// Send WebSocket and SSE notification immediately
 				BroadcastBalanceUpdateAll(address, "confirmed", balanceUSD, btcAmount, email)
-				
+
 				// Update session status to completed via callback if available
 				if SessionStatusUpdater != nil {
 					SessionStatusUpdater(address, "completed")

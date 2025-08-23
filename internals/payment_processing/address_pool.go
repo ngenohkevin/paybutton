@@ -92,7 +92,7 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 	// This prevents users from generating multiple addresses
 	var existingReservedAddr string
 	var mostRecentReservation *time.Time
-	
+
 	for addr, poolAddr := range p.reservedAddrs {
 		if poolAddr.ReservedFor == email && poolAddr.ReservedAt != nil {
 			// Track the most recent reservation
@@ -102,7 +102,7 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 			}
 		}
 	}
-	
+
 	// If user has a reserved address within 72 hours, return that same address
 	if mostRecentReservation != nil && time.Since(*mostRecentReservation) < 72*time.Hour {
 		// Update the reservation time and amount
@@ -110,7 +110,7 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 			now := time.Now()
 			poolAddr.ReservedAt = &now
 			poolAddr.Amount = amount
-			log.Printf("User %s already has reserved address %s (reserved %v ago), returning same address", 
+			log.Printf("User %s already has reserved address %s (reserved %v ago), returning same address",
 				email, existingReservedAddr, time.Since(*mostRecentReservation).Round(time.Minute))
 			return existingReservedAddr, nil
 		}
@@ -145,7 +145,7 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 	// Take address from pool, but ensure it's not already used
 	var poolAddr PoolAddress
 	var foundCleanAddress bool
-	
+
 	for i, addr := range p.availableAddrs {
 		// Check if this address is NOT in usedAddrs
 		if _, isUsed := p.usedAddrs[addr.Address]; !isUsed {
@@ -158,7 +158,7 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 			log.Printf("WARNING: Found used address %s in available pool, skipping", addr.Address)
 		}
 	}
-	
+
 	if !foundCleanAddress {
 		log.Printf("No clean addresses available in pool for user %s", email)
 		return "", fmt.Errorf("no clean addresses available in pool")
@@ -666,7 +666,7 @@ func (p *AddressPool) checkAddressBalance(address string) bool {
 		log.Printf("Warning: Could not check balance for address %s during recycling: %v", address, err)
 		return true
 	}
-	
+
 	// Consider any balance > 0 satoshis as "has funds"
 	return balance > 0
 }

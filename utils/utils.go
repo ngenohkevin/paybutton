@@ -101,7 +101,7 @@ func GetBTCRate() (float64, error) {
 			// Cache the successful rate
 			cache.rate = rate
 			cache.expiration = time.Now().Add(5 * time.Minute) // cache for 5 minutes
-			
+
 			if i > 0 {
 				log.Printf("BTC rate fetched from fallback provider #%d: $%.2f", i+1, rate)
 			}

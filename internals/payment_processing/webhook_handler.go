@@ -88,7 +88,7 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 
 	// Send instant WebSocket and SSE notification
 	BroadcastBalanceUpdateAll(payload.Address, "confirmed", balanceUSDRounded, btcAmount, email)
-	
+
 	// Update session status to completed via callback if available
 	if SessionStatusUpdater != nil {
 		SessionStatusUpdater(payload.Address, "completed")

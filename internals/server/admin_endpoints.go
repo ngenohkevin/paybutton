@@ -55,7 +55,7 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	// Site Analytics endpoints
 	api.GET("/site-analytics", getSiteAnalyticsData)
 	api.GET("/dashboard-analytics", getDashboardAnalytics)
-	
+
 	// Phase 5: Advanced analytics endpoints
 	api.GET("/site-analytics/:siteName/historical", getSiteHistoricalData)
 	api.GET("/site-analytics/:siteName/pages", getSitePageStats)
@@ -2595,7 +2595,7 @@ func UpdateSessionStatusByAddress(address, status string) {
 			session.Status = status
 			session.LastActive = time.Now()
 			session.Duration = int64(time.Since(session.CreatedAt).Seconds())
-			
+
 			// Update payment status based on session status
 			if status == "completed" {
 				session.PaymentStatus = "paid"
@@ -2654,34 +2654,34 @@ func autoExpireSessions() {
 
 	now := time.Now()
 	expiredSessionIDs := make([]string, 0)
-	
+
 	// Find sessions older than 30 minutes
 	for sessionID, session := range activeSessionsStore {
 		age := now.Sub(session.CreatedAt)
 		lastActiveAge := now.Sub(session.LastActive)
-		
+
 		// Expire if session is older than 30 minutes or hasn't been active for 15 minutes
 		if age > 30*time.Minute || lastActiveAge > 15*time.Minute {
 			expiredSessionIDs = append(expiredSessionIDs, sessionID)
 		}
 	}
-	
+
 	// Move expired sessions to history
 	for _, sessionID := range expiredSessionIDs {
 		if session, exists := activeSessionsStore[sessionID]; exists {
 			session.Status = "expired"
 			session.PaymentStatus = "failed"
 			session.Duration = int64(now.Sub(session.CreatedAt).Seconds())
-			
+
 			// Create a copy for history
 			historySessions := *session
 			sessionHistoryStore = append(sessionHistoryStore, &historySessions)
-			
+
 			// Keep only last 1000 history entries
 			if len(sessionHistoryStore) > 1000 {
 				sessionHistoryStore = sessionHistoryStore[len(sessionHistoryStore)-1000:]
 			}
-			
+
 			// Remove from active sessions
 			delete(activeSessionsStore, sessionID)
 		}
@@ -2708,7 +2708,7 @@ func getSessionsPage(c *gin.Context) {
 func getActiveSessions(c *gin.Context) {
 	// First perform automatic cleanup of expired sessions
 	autoExpireSessions()
-	
+
 	sessionStoreMutex.RLock()
 	defer sessionStoreMutex.RUnlock()
 
@@ -2817,7 +2817,7 @@ func getSessionStats(c *gin.Context) {
 		case "terminated":
 			terminatedCount++
 		}
-		
+
 		switch session.PaymentStatus {
 		case "paid":
 			paidCount++
@@ -2830,14 +2830,14 @@ func getSessionStats(c *gin.Context) {
 		case "pending":
 			pendingCount++
 		}
-		
+
 		// Convert BTC amount to USD for display
 		if rate > 0 {
 			amountUSD := session.Amount
 			historicalAmountTotal += amountUSD
 		}
 	}
-	
+
 	// Add active session payment statuses
 	for _, session := range activeSessionsStore {
 		switch session.PaymentStatus {
@@ -2888,10 +2888,10 @@ func getSessionStats(c *gin.Context) {
 			"total_amount":   historicalAmountTotal,
 		},
 		"payments": gin.H{
-			"paid_count":     paidCount,
-			"failed_count":   failedCount,
-			"pending_count":  pendingCount,
-			"paid_amount":    paidAmountTotal,
+			"paid_count":    paidCount,
+			"failed_count":  failedCount,
+			"pending_count": pendingCount,
+			"paid_amount":   paidAmountTotal,
 		},
 		"metrics": gin.H{
 			"success_rate":         successRate,
@@ -2944,13 +2944,13 @@ func getSessionAnalytics(c *gin.Context) {
 	for _, session := range activeSessionsStore {
 		statusData["active"]++
 		paymentData[session.PaymentStatus]++
-		
+
 		if session.IsWebSocket {
 			wsData["with_websocket"]++
 		} else {
 			wsData["without_websocket"]++
 		}
-		
+
 		// Amount categorization
 		amount := session.Amount
 		switch {
@@ -2971,13 +2971,13 @@ func getSessionAnalytics(c *gin.Context) {
 	for _, session := range sessionHistoryStore {
 		statusData[session.Status]++
 		paymentData[session.PaymentStatus]++
-		
+
 		if session.IsWebSocket {
 			wsData["with_websocket"]++
 		} else {
 			wsData["without_websocket"]++
 		}
-		
+
 		// Amount categorization
 		amount := session.Amount
 		switch {
@@ -2999,7 +2999,7 @@ func getSessionAnalytics(c *gin.Context) {
 		"payment_distribution": paymentData,
 		"amount_ranges":        amountRanges,
 		"websocket_usage":      wsData,
-		"timestamp":           time.Now().Unix(),
+		"timestamp":            time.Now().Unix(),
 	}
 
 	c.JSON(http.StatusOK, analytics)
@@ -3038,14 +3038,14 @@ func getSessionTimeline(c *gin.Context) {
 				index := hours - hoursDiff - 1
 				if index >= 0 && index < len(timeline) {
 					timeline[index]["created"] = timeline[index]["created"].(int) + 1
-					
+
 					switch session.Status {
 					case "completed":
 						timeline[index]["completed"] = timeline[index]["completed"].(int) + 1
 					case "expired":
 						timeline[index]["expired"] = timeline[index]["expired"].(int) + 1
 					}
-					
+
 					switch session.PaymentStatus {
 					case "paid":
 						timeline[index]["paid"] = timeline[index]["paid"].(int) + 1
@@ -3088,18 +3088,18 @@ func getSessionTrends(c *gin.Context) {
 	// Initialize counters
 	trends := gin.H{
 		"last_24h": gin.H{
-			"sessions":   0,
-			"completed":  0,
-			"paid":       0,
-			"amount":     0.0,
+			"sessions":  0,
+			"completed": 0,
+			"paid":      0,
+			"amount":    0.0,
 		},
 		"last_7d": gin.H{
-			"sessions":   0,
-			"completed":  0,
-			"paid":       0,
-			"amount":     0.0,
+			"sessions":  0,
+			"completed": 0,
+			"paid":      0,
+			"amount":    0.0,
 		},
-		"current_active": len(activeSessionsStore),
+		"current_active":     len(activeSessionsStore),
 		"current_websockets": 0,
 		"performance": gin.H{
 			"avg_session_duration": 0.0,
@@ -3209,13 +3209,13 @@ func getDashboardSessionStats(c *gin.Context) {
 	}
 
 	stats := gin.H{
-		"active_sessions":  activeSessions,
-		"websocket_count":  websocketCount,
-		"payment_rate":     paymentRate,
-		"paid_amount":      totalPaidAmount,
-		"total_sessions":   totalSessions,
-		"paid_sessions":    paidSessions,
-		"timestamp":        time.Now().Unix(),
+		"active_sessions": activeSessions,
+		"websocket_count": websocketCount,
+		"payment_rate":    paymentRate,
+		"paid_amount":     totalPaidAmount,
+		"total_sessions":  totalSessions,
+		"paid_sessions":   paidSessions,
+		"timestamp":       time.Now().Unix(),
 	}
 
 	c.JSON(http.StatusOK, stats)
@@ -3227,17 +3227,17 @@ func clearSessionHistory(c *gin.Context) {
 	defer sessionStoreMutex.Unlock()
 
 	historyCount := len(sessionHistoryStore)
-	
+
 	// Clear all session history
 	sessionHistoryStore = []*SessionInfo{}
 
 	log.Printf("Admin cleared all session history. Removed %d historical sessions", historyCount)
 
 	c.JSON(http.StatusOK, gin.H{
-		"success":        true,
-		"message":        fmt.Sprintf("Successfully cleared %d historical sessions", historyCount),
-		"cleared_count":  historyCount,
-		"timestamp":      time.Now().Unix(),
+		"success":       true,
+		"message":       fmt.Sprintf("Successfully cleared %d historical sessions", historyCount),
+		"cleared_count": historyCount,
+		"timestamp":     time.Now().Unix(),
 	})
 }
 
@@ -3486,7 +3486,7 @@ func getDashboardAnalytics(c *gin.Context) {
 	// Get top 5 most active sites for mini chart
 	allSites := analytics.GetAllSiteAnalytics()
 	topSites := make([]gin.H, 0)
-	
+
 	// Convert to slice for sorting
 	siteList := make([]analytics.SiteAnalytics, 0, len(allSites))
 	for _, site := range allSites {
@@ -3519,10 +3519,10 @@ func getDashboardAnalytics(c *gin.Context) {
 
 	response := gin.H{
 		"summary": gin.H{
-			"total_active":  totalActive,
-			"total_weekly":  totalWeekly,
-			"active_sites":  activeSites,
-			"total_sites":   len(allSites),
+			"total_active": totalActive,
+			"total_weekly": totalWeekly,
+			"active_sites": activeSites,
+			"total_sites":  len(allSites),
 		},
 		"top_sites": topSites,
 		"timestamp": time.Now().Format(time.RFC3339),
@@ -3538,7 +3538,7 @@ func getSiteHistoricalData(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
 		return
 	}
-	
+
 	// Get hours parameter (default 24 hours)
 	hours := 24
 	if hoursParam := c.Query("hours"); hoursParam != "" {
@@ -3546,10 +3546,10 @@ func getSiteHistoricalData(c *gin.Context) {
 			hours = h
 		}
 	}
-	
+
 	// Get historical data from analytics manager
 	historicalData := analytics.GetSiteHistoricalData(siteName, hours)
-	
+
 	response := gin.H{
 		"site_name":       siteName,
 		"hours_requested": hours,
@@ -3557,7 +3557,7 @@ func getSiteHistoricalData(c *gin.Context) {
 		"historical_data": historicalData,
 		"timestamp":       time.Now().Format(time.RFC3339),
 	}
-	
+
 	c.JSON(http.StatusOK, response)
 }
 
@@ -3568,7 +3568,7 @@ func getSitePageStats(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
 		return
 	}
-	
+
 	// Get limit parameter (default 10)
 	limit := 10
 	if limitParam := c.Query("limit"); limitParam != "" {
@@ -3576,17 +3576,17 @@ func getSitePageStats(c *gin.Context) {
 			limit = l
 		}
 	}
-	
+
 	// Get page stats from analytics manager
 	pageStats := analytics.GetSitePageStats(siteName, limit)
-	
+
 	response := gin.H{
 		"site_name":   siteName,
 		"total_pages": len(pageStats),
 		"page_stats":  pageStats,
 		"timestamp":   time.Now().Format(time.RFC3339),
 	}
-	
+
 	c.JSON(http.StatusOK, response)
 }
 
@@ -3597,16 +3597,16 @@ func getSiteRegionStats(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
 		return
 	}
-	
+
 	// Get region stats from analytics manager
 	regionStats := analytics.GetSiteRegionStats(siteName)
-	
+
 	// Calculate total active viewers for percentage calculation
 	totalActive := 0
 	for _, region := range regionStats {
 		totalActive += region.Count
 	}
-	
+
 	// Add percentages to region stats
 	enrichedStats := make([]gin.H, len(regionStats))
 	for i, region := range regionStats {
@@ -3614,14 +3614,14 @@ func getSiteRegionStats(c *gin.Context) {
 		if totalActive > 0 {
 			percentage = float64(region.Count) / float64(totalActive) * 100.0
 		}
-		
+
 		enrichedStats[i] = gin.H{
 			"region":     region.Region,
 			"count":      region.Count,
 			"percentage": percentage,
 		}
 	}
-	
+
 	response := gin.H{
 		"site_name":     siteName,
 		"total_active":  totalActive,
@@ -3629,7 +3629,7 @@ func getSiteRegionStats(c *gin.Context) {
 		"region_stats":  enrichedStats,
 		"timestamp":     time.Now().Format(time.RFC3339),
 	}
-	
+
 	c.JSON(http.StatusOK, response)
 }
 
@@ -3640,32 +3640,32 @@ func exportSiteAnalyticsData(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
 		return
 	}
-	
+
 	// Get period parameter (default 30d)
 	period := c.DefaultQuery("period", "30d")
 	if period != "24h" && period != "7d" && period != "30d" {
 		period = "30d"
 	}
-	
+
 	// Get format parameter (default json)
 	format := c.DefaultQuery("format", "json")
-	
+
 	// Export data using analytics manager
 	exportData := analytics.ExportSiteData(siteName, period)
 	if exportData == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Site data not found"})
 		return
 	}
-	
+
 	switch format {
 	case "csv":
 		// Generate CSV response
 		c.Header("Content-Type", "text/csv")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-analytics-%s.csv\"", siteName, period))
-		
+
 		csvData := convertSiteExportToCSV(exportData)
 		c.String(http.StatusOK, csvData)
-		
+
 	case "json":
 		fallthrough
 	default:
@@ -3674,16 +3674,15 @@ func exportSiteAnalyticsData(c *gin.Context) {
 		if c.Query("download") == "true" {
 			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-analytics-%s.json\"", siteName, period))
 		}
-		
+
 		c.JSON(http.StatusOK, exportData)
 	}
 }
 
-
 // Phase 5: convertSiteExportToCSV converts export data to CSV format
 func convertSiteExportToCSV(data *analytics.SiteExportData) string {
 	var csvBuilder strings.Builder
-	
+
 	// Header information
 	csvBuilder.WriteString(fmt.Sprintf("Site Analytics Export,%s\n", data.SiteName))
 	csvBuilder.WriteString(fmt.Sprintf("Export Date,%s\n", data.ExportTimestamp.Format("2006-01-02 15:04:05")))
@@ -3691,17 +3690,17 @@ func convertSiteExportToCSV(data *analytics.SiteExportData) string {
 	csvBuilder.WriteString(fmt.Sprintf("Active Viewers,%d\n", data.Summary.ActiveCount))
 	csvBuilder.WriteString(fmt.Sprintf("Weekly Total,%d\n", data.Summary.WeeklyTotal))
 	csvBuilder.WriteString("\n")
-	
+
 	// Historical data section
 	csvBuilder.WriteString("Historical Data\n")
 	csvBuilder.WriteString("Timestamp,Viewers\n")
 	for _, point := range data.HistoricalData {
-		csvBuilder.WriteString(fmt.Sprintf("%s,%d\n", 
-			point.Timestamp.Format("2006-01-02 15:04:05"), 
+		csvBuilder.WriteString(fmt.Sprintf("%s,%d\n",
+			point.Timestamp.Format("2006-01-02 15:04:05"),
 			point.Viewers))
 	}
 	csvBuilder.WriteString("\n")
-	
+
 	// Page analytics section
 	if len(data.PageAnalytics) > 0 {
 		csvBuilder.WriteString("Page Analytics\n")
@@ -3715,7 +3714,7 @@ func convertSiteExportToCSV(data *analytics.SiteExportData) string {
 		}
 		csvBuilder.WriteString("\n")
 	}
-	
+
 	// Region breakdown section
 	if len(data.RegionBreakdown) > 0 {
 		csvBuilder.WriteString("Region Breakdown\n")
@@ -3724,6 +3723,6 @@ func convertSiteExportToCSV(data *analytics.SiteExportData) string {
 			csvBuilder.WriteString(fmt.Sprintf("%s,%d\n", region.Region, region.Count))
 		}
 	}
-	
+
 	return csvBuilder.String()
 }

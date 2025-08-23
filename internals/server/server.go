@@ -123,7 +123,7 @@ func (s *Server) Start() error {
 
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
-	
+
 	// Analytics SDK endpoint
 	r.GET("/analytics.js", serveAnalyticsSDK)
 
@@ -384,7 +384,7 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
-	
+
 	// Analytics SDK endpoint
 	r.GET("/analytics.js", serveAnalyticsSDK)
 
@@ -612,7 +612,7 @@ func serveAnalyticsSDK(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")      // Allow cross-origin requests
 	c.Header("Access-Control-Allow-Methods", "GET")
 	c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-	
+
 	// Serve the analytics.js file
 	c.File("./static/js/analytics.js")
 }

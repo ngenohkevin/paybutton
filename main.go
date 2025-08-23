@@ -83,7 +83,7 @@ func main() {
 	}()
 
 	logger.Info("server is starting on port " + cfg.Port)
-	
+
 	// Wait for shutdown signal
 	<-ctx.Done()
 	logger.Info("Shutting down gracefully...")
