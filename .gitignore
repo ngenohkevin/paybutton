@@ -15,3 +15,9 @@ tmp
 .playwright
 address_pool.json
 main
+
+# Test files and build artifacts
+test-analytics.html
+test_analytics.html
+test_analytics_production.html
+test_build
