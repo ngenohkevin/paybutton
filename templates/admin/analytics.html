@@ -928,6 +928,91 @@ function setupEventListeners() {
             document.getElementById(tabName + '-tab').classList.add('active');
         });
     });
+    
+    // Sort functionality
+    const sortBy = document.getElementById('sortBy');
+    if (sortBy) {
+        sortBy.addEventListener('change', function() {
+            sortAnalyticsTable(this.value);
+        });
+    }
+}
+
+// Toggle sort order
+function toggleSortOrder() {
+    const btn = document.getElementById('sortOrderBtn');
+    const isAscending = btn.classList.contains('ascending');
+    
+    if (isAscending) {
+        btn.classList.remove('ascending');
+        btn.innerHTML = '<i class="fas fa-sort-amount-down"></i>';
+    } else {
+        btn.classList.add('ascending');
+        btn.innerHTML = '<i class="fas fa-sort-amount-up"></i>';
+    }
+    
+    // Re-sort the table with the new order
+    const sortBy = document.getElementById('sortBy');
+    if (sortBy) {
+        sortAnalyticsTable(sortBy.value);
+    }
+}
+
+// Sort analytics table
+function sortAnalyticsTable(sortType) {
+    if (!analyticsData || !analyticsData.sites) return;
+    
+    const siteEntries = Object.entries(analyticsData.sites);
+    const isAscending = document.getElementById('sortOrderBtn')?.classList.contains('ascending');
+    
+    // Sort based on selected criteria
+    switch(sortType) {
+        case 'active':
+            siteEntries.sort((a, b) => {
+                const diff = (a[1].active_count || 0) - (b[1].active_count || 0);
+                return isAscending ? diff : -diff;
+            });
+            break;
+        case 'weekly':
+            siteEntries.sort((a, b) => {
+                const diff = (a[1].weekly_total || 0) - (b[1].weekly_total || 0);
+                return isAscending ? diff : -diff;
+            });
+            break;
+        case 'name':
+            siteEntries.sort((a, b) => {
+                const diff = a[0].localeCompare(b[0]);
+                return isAscending ? diff : -diff;
+            });
+            break;
+    }
+    
+    // Update the table with sorted data
+    const tbody = document.getElementById('siteAnalyticsTableBody');
+    if (!tbody) return;
+    
+    const rows = siteEntries.map(([siteName, site]) => {
+        const lastSeen = site.last_seen ? new Date(site.last_seen).toLocaleString() : 'Never';
+        const status = site.active_count > 0 ? 
+            '<span class="status-badge healthy">Active</span>' : 
+            '<span class="status-badge warning">Idle</span>';
+        
+        return `
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <td class="text-left font-medium">${siteName}</td>
+                <td class="text-center">
+                    <span class="text-blue-600 font-bold">${site.active_count || 0}</span>
+                </td>
+                <td class="text-center">
+                    <span class="text-emerald-600 font-bold">${site.weekly_total || 0}</span>
+                </td>
+                <td class="text-center text-sm text-gray-600">${lastSeen}</td>
+                <td class="text-center">${status}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    tbody.innerHTML = rows;
 }
 
 // Real-time updates
@@ -1265,7 +1350,48 @@ function updateRegionChart(regionStats) {
     });
 }
 
-// Export functionality
+// Refresh analytics data
+function refreshAnalytics() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Refreshing...';
+    }
+    
+    loadRealAnalyticsData();
+    
+    setTimeout(() => {
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Refresh Data';
+        }
+    }, 1000);
+}
+
+// Export analytics data
+function exportAnalytics() {
+    const period = document.getElementById('timePeriodSelect')?.value || '24h';
+    const format = 'json'; // Default format
+    
+    fetch(`/admin/api/analytics/export?period=${period}&format=${format}`)
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `analytics-${period}-${new Date().toISOString().split('T')[0]}.${format}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        })
+        .catch(error => {
+            console.error('Export error:', error);
+            alert('Failed to export analytics data');
+        });
+}
+
+// Export functionality for individual sites
 function exportSiteData(format) {
     const siteName = document.getElementById('exportSiteSelect')?.value;
     const period = document.getElementById('exportPeriodSelect')?.value || '30d';
@@ -1289,8 +1415,8 @@ function updateChartsWithData(data) {
     // Update active viewers chart
     if (charts.activeViewers && data.sites) {
         const activeData = Object.entries(data.sites)
-            .filter(([_, site]) => site.active > 0)
-            .map(([name, site]) => ({ name, active: site.active }));
+            .filter(([_, site]) => site.active_count > 0)
+            .map(([name, site]) => ({ name, active: site.active_count }));
         
         if (activeData.length > 0) {
             charts.activeViewers.data.labels = activeData.map(s => s.name);
@@ -1302,8 +1428,8 @@ function updateChartsWithData(data) {
     // Update weekly visitors chart
     if (charts.weeklyVisitors && data.sites) {
         const weeklyData = Object.entries(data.sites)
-            .filter(([_, site]) => site.weekly > 0)
-            .map(([name, site]) => ({ name, weekly: site.weekly }))
+            .filter(([_, site]) => site.weekly_total > 0)
+            .map(([name, site]) => ({ name, weekly: site.weekly_total }))
             .sort((a, b) => b.weekly - a.weekly)
             .slice(0, 10); // Top 10 sites
         
@@ -1315,12 +1441,95 @@ function updateChartsWithData(data) {
     }
 }
 
+// Update analytics table with real data
+function updateAnalyticsTable(data) {
+    const tbody = document.getElementById('siteAnalyticsTableBody');
+    if (!tbody || !data.sites) return;
+    
+    const siteEntries = Object.entries(data.sites);
+    
+    if (siteEntries.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-gray-500 py-8">
+                    No site analytics data available
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    // Sort sites by active count by default
+    siteEntries.sort((a, b) => b[1].active_count - a[1].active_count);
+    
+    const rows = siteEntries.map(([siteName, site]) => {
+        const lastSeen = site.last_seen ? new Date(site.last_seen).toLocaleString() : 'Never';
+        const status = site.active_count > 0 ? 
+            '<span class="status-badge healthy">Active</span>' : 
+            '<span class="status-badge warning">Idle</span>';
+        
+        return `
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <td class="text-left font-medium">${siteName}</td>
+                <td class="text-center">
+                    <span class="text-blue-600 font-bold">${site.active_count || 0}</span>
+                </td>
+                <td class="text-center">
+                    <span class="text-emerald-600 font-bold">${site.weekly_total || 0}</span>
+                </td>
+                <td class="text-center text-sm text-gray-600">${lastSeen}</td>
+                <td class="text-center">${status}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    tbody.innerHTML = rows;
+}
+
+// Update analytics summary
+function updateAnalyticsSummary(data) {
+    const summaryDiv = document.getElementById('analyticsSummary');
+    if (!summaryDiv) return;
+    
+    const totalSites = Object.keys(data.sites || {}).length;
+    const activeSites = data.totals?.active_sites || 0;
+    const totalActive = data.totals?.active || 0;
+    const totalWeekly = data.totals?.weekly || 0;
+    
+    let summaryHTML = `
+        <div class="summary-item">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-sm text-gray-600 dark:text-gray-400">Total Sites</span>
+                <span class="text-lg font-bold text-gray-900 dark:text-white">${totalSites}</span>
+            </div>
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-sm text-gray-600 dark:text-gray-400">Active Sites</span>
+                <span class="text-lg font-bold text-blue-600">${activeSites}</span>
+            </div>
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-sm text-gray-600 dark:text-gray-400">Total Active Viewers</span>
+                <span class="text-lg font-bold text-emerald-600">${totalActive}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600 dark:text-gray-400">Weekly Visitors</span>
+                <span class="text-lg font-bold text-purple-600">${totalWeekly}</span>
+            </div>
+        </div>
+    `;
+    
+    summaryDiv.innerHTML = summaryHTML;
+}
+
 // Real analytics data loading
 function loadRealAnalyticsData() {
     fetch('/admin/api/site-analytics')
         .then(response => response.json())
         .then(data => {
             if (data) {
+                // Store the analytics data globally for other functions
+                analyticsData = data;
+                sitesData = data.sites || {};
+                
                 // Update stats cards - using correct element IDs
                 const activeViewersEl = document.getElementById('totalActiveValue');
                 if (activeViewersEl) activeViewersEl.textContent = data.totals?.active || '0';
@@ -1333,6 +1542,12 @@ function loadRealAnalyticsData() {
                 
                 // Update charts
                 updateChartsWithData(data);
+                
+                // Update analytics table
+                updateAnalyticsTable(data);
+                
+                // Update analytics summary
+                updateAnalyticsSummary(data);
                 
                 // Update site dropdowns for Phase 5 features
                 updateSiteDropdowns();
