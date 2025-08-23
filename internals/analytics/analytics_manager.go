@@ -44,6 +44,11 @@ type AnalyticsManager struct {
 	// Rate limiting
 	rateLimiter map[string]*AnalyticsRateLimit // IP -> rate limit info
 
+	// Analytics data caching
+	cachedAnalytics map[string]SiteAnalytics // siteName -> cached analytics
+	cacheTimestamp  time.Time                // last cache update
+	cacheDuration   time.Duration            // cache validity duration
+
 	mutex      sync.RWMutex
 	cleanup    chan string  // for connection cleanup
 	ticker     *time.Ticker // hourly rotation
@@ -159,14 +164,17 @@ func Initialize() {
 	})).With("component", "analytics")
 
 	manager = &AnalyticsManager{
-		connections:    make(map[string][]*AnalyticsConnection),
-		weeklyData:     make(map[string]*SiteWeeklyData),
-		historicalData: make(map[string]*SiteHistoricalData), // Phase 5
-		pageData:       make(map[string]*SitePageData),       // Phase 5
-		rateLimiter:    make(map[string]*AnalyticsRateLimit),
-		cleanup:        make(chan string, 100),
-		ticker:         time.NewTicker(time.Hour), // Rotate hourly data every hour
-		isShutdown:     false,                     // Initialize shutdown flag
+		connections:     make(map[string][]*AnalyticsConnection),
+		weeklyData:      make(map[string]*SiteWeeklyData),
+		historicalData:  make(map[string]*SiteHistoricalData), // Phase 5
+		pageData:        make(map[string]*SitePageData),       // Phase 5
+		rateLimiter:     make(map[string]*AnalyticsRateLimit),
+		cachedAnalytics: make(map[string]SiteAnalytics), // Analytics caching
+		cacheTimestamp:  time.Time{},                    // Initialize with zero time
+		cacheDuration:   5 * time.Second,                // Cache for 5 seconds to reduce flickering
+		cleanup:         make(chan string, 100),
+		ticker:          time.NewTicker(time.Hour), // Rotate hourly data every hour
+		isShutdown:      false,                     // Initialize shutdown flag
 	}
 
 	// Start background cleanup routines
@@ -558,7 +566,11 @@ func (am *AnalyticsManager) GetAllSiteWeeklyStats() map[string]WeeklyStats {
 func (am *AnalyticsManager) GetSiteAnalytics(siteName string) SiteAnalytics {
 	am.mutex.RLock()
 	defer am.mutex.RUnlock()
+	return am.getSiteAnalyticsUnsafe(siteName)
+}
 
+// getSiteAnalyticsUnsafe returns analytics without locking (must be called with lock held)
+func (am *AnalyticsManager) getSiteAnalyticsUnsafe(siteName string) SiteAnalytics {
 	activeCount := len(am.connections[siteName])
 	weeklyTotal := 0
 	lastSeen := time.Time{}
@@ -579,14 +591,38 @@ func (am *AnalyticsManager) GetSiteAnalytics(siteName string) SiteAnalytics {
 	}
 }
 
-// GetAllSiteAnalytics returns combined analytics for all sites
+// GetAllSiteAnalytics returns combined analytics for all sites with caching
 func GetAllSiteAnalytics() map[string]SiteAnalytics {
 	if manager == nil {
 		return make(map[string]SiteAnalytics)
 	}
 
 	manager.mutex.RLock()
-	defer manager.mutex.RUnlock()
+	
+	// Check if cache is still valid
+	if time.Since(manager.cacheTimestamp) < manager.cacheDuration && len(manager.cachedAnalytics) > 0 {
+		result := make(map[string]SiteAnalytics)
+		for siteName, analytics := range manager.cachedAnalytics {
+			result[siteName] = analytics
+		}
+		manager.mutex.RUnlock()
+		return result
+	}
+	
+	manager.mutex.RUnlock()
+
+	// Cache is stale or empty, need to rebuild
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+
+	// Double-check cache after acquiring write lock
+	if time.Since(manager.cacheTimestamp) < manager.cacheDuration && len(manager.cachedAnalytics) > 0 {
+		result := make(map[string]SiteAnalytics)
+		for siteName, analytics := range manager.cachedAnalytics {
+			result[siteName] = analytics
+		}
+		return result
+	}
 
 	result := make(map[string]SiteAnalytics)
 
@@ -601,8 +637,17 @@ func GetAllSiteAnalytics() map[string]SiteAnalytics {
 
 	// Build analytics for each site
 	for siteName := range allSites {
-		result[siteName] = manager.GetSiteAnalytics(siteName)
+		analytics := manager.getSiteAnalyticsUnsafe(siteName)
+		result[siteName] = analytics
+		manager.cachedAnalytics[siteName] = analytics
 	}
+
+	// Update cache timestamp
+	manager.cacheTimestamp = time.Now()
+
+	logger.Info("Analytics cache refreshed",
+		slog.Int("sites_cached", len(result)),
+		slog.Time("cache_timestamp", manager.cacheTimestamp))
 
 	return result
 }
@@ -785,6 +830,7 @@ func detectTorFriendlyRegion(userAgent, acceptLanguage, timezone string) string 
 // GetTotalActiveViewers returns the total number of active viewers across all sites
 func GetTotalActiveViewers() int {
 	if manager == nil {
+		logger.Warn("Analytics manager is nil")
 		return 0
 	}
 
@@ -792,9 +838,19 @@ func GetTotalActiveViewers() int {
 	defer manager.mutex.RUnlock()
 
 	total := 0
-	for _, connections := range manager.connections {
+	for siteName, connections := range manager.connections {
 		total += len(connections)
+		if len(connections) > 0 {
+			logger.Info("Active viewers found",
+				slog.String("site", siteName),
+				slog.Int("active_connections", len(connections)))
+		}
 	}
+
+	logger.Info("Total active viewers calculated",
+		slog.Int("total_active", total),
+		slog.Int("total_sites_with_connections", len(manager.connections)),
+		slog.Int("total_sites_with_weekly_data", len(manager.weeklyData)))
 
 	return total
 }
@@ -818,7 +874,7 @@ func GetTotalWeeklyVisitors() int {
 	return total
 }
 
-// GetActiveSitesCount returns the number of sites with active connections
+// GetActiveSitesCount returns the number of sites with active connections OR recent activity
 func GetActiveSitesCount() int {
 	if manager == nil {
 		return 0
@@ -827,7 +883,23 @@ func GetActiveSitesCount() int {
 	manager.mutex.RLock()
 	defer manager.mutex.RUnlock()
 
-	return len(manager.connections)
+	// Get all sites from both active connections and weekly data
+	activeSites := make(map[string]bool)
+	
+	// Sites with active connections
+	for siteName := range manager.connections {
+		activeSites[siteName] = true
+	}
+	
+	// Sites with recent weekly activity (within last 24 hours)
+	cutoff := time.Now().Add(-24 * time.Hour)
+	for siteName, siteData := range manager.weeklyData {
+		if siteData.lastUpdate.After(cutoff) {
+			activeSites[siteName] = true
+		}
+	}
+
+	return len(activeSites)
 }
 
 // Phase 5: recordHistoricalData records hourly visitor count data

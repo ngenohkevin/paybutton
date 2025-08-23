@@ -3464,6 +3464,10 @@ func getSiteAnalyticsData(c *gin.Context) {
 	totalWeekly := analytics.GetTotalWeeklyVisitors()
 	activeSites := analytics.GetActiveSitesCount()
 
+	// Debug logging
+	log.Printf("Analytics API called: active=%d, weekly=%d, active_sites=%d, total_sites=%d", 
+		totalActive, totalWeekly, activeSites, len(allSites))
+
 	response := gin.H{
 		"sites": allSites,
 		"totals": gin.H{
