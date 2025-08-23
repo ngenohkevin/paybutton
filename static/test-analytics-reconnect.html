@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Reconnection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .log {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Analytics Reconnection Test</h1>
+    
+    <div id="status" class="status disconnected">
+        Status: Loading...
+    </div>
+    
+    <div>
+        <button onclick="testReconnect()">Force Reconnect</button>
+        <button onclick="simulatePageHide()">Simulate Page Hide</button>
+        <button onclick="simulatePageShow()">Simulate Page Show</button>
+        <button onclick="checkStatus()">Check Status</button>
+    </div>
+    
+    <h3>Connection Log:</h3>
+    <div id="log" class="log"></div>
+    
+    <!-- Load analytics script -->
+    <script src="http://localhost:8080/analytics.js?site=reconnect-test" async></script>
+    
+    <script>
+        const logDiv = document.getElementById('log');
+        const statusDiv = document.getElementById('status');
+        let logCounter = 0;
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] <span style="color: ${type === 'error' ? 'red' : type === 'success' ? 'green' : 'black'}">${message}</span>`;
+            logDiv.insertBefore(logEntry, logDiv.firstChild);
+            logCounter++;
+            if (logCounter > 50) {
+                logDiv.removeChild(logDiv.lastChild);
+            }
+        }
+        
+        function updateStatus() {
+            if (window.PayButtonAnalytics) {
+                const isConnected = window.PayButtonAnalytics.isConnected();
+                const sessionId = window.PayButtonAnalytics.getSessionId();
+                const siteName = window.PayButtonAnalytics.getSiteName();
+                
+                if (isConnected) {
+                    statusDiv.className = 'status connected';
+                    statusDiv.innerHTML = `
+                        <strong>Status: Connected ✓</strong><br>
+                        Site: ${siteName}<br>
+                        Session: ${sessionId || 'N/A'}
+                    `;
+                } else {
+                    statusDiv.className = 'status disconnected';
+                    statusDiv.innerHTML = `<strong>Status: Disconnected ✗</strong>`;
+                }
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.innerHTML = `<strong>Status: Analytics Not Loaded</strong>`;
+            }
+        }
+        
+        function testReconnect() {
+            addLog('Testing manual reconnect...', 'info');
+            if (window.PayButtonAnalytics && window.PayButtonAnalytics.reconnect) {
+                window.PayButtonAnalytics.reconnect();
+                addLog('Reconnect triggered', 'success');
+            } else {
+                addLog('Reconnect function not available', 'error');
+            }
+        }
+        
+        function simulatePageHide() {
+            addLog('Simulating page hide event...', 'info');
+            document.dispatchEvent(new Event('visibilitychange'));
+            Object.defineProperty(document, 'visibilityState', {
+                value: 'hidden',
+                writable: true
+            });
+            addLog('Page hidden', 'info');
+            updateStatus();
+        }
+        
+        function simulatePageShow() {
+            addLog('Simulating page show event...', 'info');
+            Object.defineProperty(document, 'visibilityState', {
+                value: 'visible',
+                writable: true
+            });
+            document.dispatchEvent(new Event('visibilitychange'));
+            window.dispatchEvent(new Event('focus'));
+            addLog('Page shown and focused', 'info');
+            setTimeout(updateStatus, 1000);
+        }
+        
+        function checkStatus() {
+            if (window.PayButtonAnalytics) {
+                window.PayButtonAnalytics.debug();
+            }
+            updateStatus();
+            addLog('Status checked', 'info');
+        }
+        
+        // Monitor analytics loading
+        let checkInterval = setInterval(() => {
+            if (window.PayButtonAnalytics) {
+                addLog('PayButton Analytics loaded!', 'success');
+                clearInterval(checkInterval);
+                
+                // Monitor connection status
+                setInterval(updateStatus, 1000);
+            }
+        }, 100);
+        
+        // Initial status check
+        setTimeout(() => {
+            updateStatus();
+            if (!window.PayButtonAnalytics) {
+                addLog('Analytics failed to load after 3 seconds', 'error');
+            }
+        }, 3000);
+        
+        // Log visibility changes
+        document.addEventListener('visibilitychange', () => {
+            addLog(`Visibility changed to: ${document.visibilityState}`, 'info');
+        });
+        
+        window.addEventListener('focus', () => {
+            addLog('Window focused', 'info');
+        });
+        
+        window.addEventListener('blur', () => {
+            addLog('Window blurred', 'info');
+        });
+    </script>
+</body>
+</html>
