@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/ngenohkevin/paybutton/internals/analytics"
 	"github.com/ngenohkevin/paybutton/internals/config"
 	"github.com/ngenohkevin/paybutton/internals/monitoring"
 	"github.com/ngenohkevin/paybutton/internals/payment_processing"
@@ -50,6 +51,16 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	// JSON endpoints for direct API access
 	admin.GET("/status", getSystemStatus)
 	api.GET("/dashboard-sessions", getDashboardSessionStats)
+
+	// Site Analytics endpoints
+	api.GET("/site-analytics", getSiteAnalyticsData)
+	api.GET("/dashboard-analytics", getDashboardAnalytics)
+	
+	// Phase 5: Advanced analytics endpoints
+	api.GET("/site-analytics/:siteName/historical", getSiteHistoricalData)
+	api.GET("/site-analytics/:siteName/pages", getSitePageStats)
+	api.GET("/site-analytics/:siteName/regions", getSiteRegionStats)
+	api.GET("/site-analytics/:siteName/export", exportSiteAnalyticsData)
 
 	// Management endpoints
 	admin.GET("/pool", getPoolManagementPage)
@@ -477,6 +488,63 @@ func getSystemStatusHTML(c *gin.Context) {
 			<div class="mt-4 text-center">
 				<button onclick="window.location.href='/admin/sessions'" class="btn-primary">
 					<i class="fas fa-chart-line mr-2"></i>View Full Analytics
+				</button>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Site Analytics Widget -->
+	<div class="card mb-8" id="site-analytics-widget">
+		<div class="card-header">
+			<h3 class="text-lg font-semibold text-gray-900">
+				<i class="fas fa-globe text-emerald-500 mr-2"></i>Site Analytics
+			</h3>
+		</div>
+		<div class="card-body">
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="site-analytics-overview">
+				<!-- Active Viewers -->
+				<div class="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+					<div class="flex items-center">
+						<div class="p-2 rounded-full bg-emerald-100">
+							<i class="fas fa-eye text-emerald-600"></i>
+						</div>
+						<div class="ml-3">
+							<p class="text-sm font-medium text-emerald-600">Active Viewers</p>
+							<p class="text-xl font-bold text-emerald-900" id="dashboard-active-viewers">-</p>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Weekly Visitors -->
+				<div class="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+					<div class="flex items-center">
+						<div class="p-2 rounded-full bg-indigo-100">
+							<i class="fas fa-calendar-week text-indigo-600"></i>
+						</div>
+						<div class="ml-3">
+							<p class="text-sm font-medium text-indigo-600">Weekly Visitors</p>
+							<p class="text-xl font-bold text-indigo-900" id="dashboard-weekly-visitors">-</p>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Active Sites -->
+				<div class="bg-teal-50 p-4 rounded-lg border border-teal-200">
+					<div class="flex items-center">
+						<div class="p-2 rounded-full bg-teal-100">
+							<i class="fas fa-server text-teal-600"></i>
+						</div>
+						<div class="ml-3">
+							<p class="text-sm font-medium text-teal-600">Active Sites</p>
+							<p class="text-xl font-bold text-teal-900" id="dashboard-active-sites">-</p>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="mt-4 text-center">
+				<button onclick="window.location.href='/admin/analytics'" class="btn-secondary">
+					<i class="fas fa-chart-bar mr-2"></i>View Site Analytics
 				</button>
 			</div>
 		</div>
@@ -3255,4 +3323,277 @@ func convertSessionsToCSV(activeSessions map[string]*SessionInfo, historySession
 	}
 
 	return csv
+}
+
+// Analytics endpoint handlers
+
+// getSiteAnalyticsData returns full site analytics data
+func getSiteAnalyticsData(c *gin.Context) {
+	allSites := analytics.GetAllSiteAnalytics()
+	totalActive := analytics.GetTotalActiveViewers()
+	totalWeekly := analytics.GetTotalWeeklyVisitors()
+	activeSites := analytics.GetActiveSitesCount()
+
+	response := gin.H{
+		"sites": allSites,
+		"totals": gin.H{
+			"active":       totalActive,
+			"weekly":       totalWeekly,
+			"active_sites": activeSites,
+		},
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// getDashboardAnalytics returns summary analytics data for dashboard widget
+func getDashboardAnalytics(c *gin.Context) {
+	totalActive := analytics.GetTotalActiveViewers()
+	totalWeekly := analytics.GetTotalWeeklyVisitors()
+	activeSites := analytics.GetActiveSitesCount()
+
+	// Get top 5 most active sites for mini chart
+	allSites := analytics.GetAllSiteAnalytics()
+	topSites := make([]gin.H, 0)
+	
+	// Convert to slice for sorting
+	siteList := make([]analytics.SiteAnalytics, 0, len(allSites))
+	for _, site := range allSites {
+		siteList = append(siteList, site)
+	}
+
+	// Sort by active count (simple bubble sort for small dataset)
+	for i := 0; i < len(siteList)-1; i++ {
+		for j := 0; j < len(siteList)-i-1; j++ {
+			if siteList[j].ActiveCount < siteList[j+1].ActiveCount {
+				siteList[j], siteList[j+1] = siteList[j+1], siteList[j]
+			}
+		}
+	}
+
+	// Take top 5 sites
+	maxSites := 5
+	if len(siteList) < maxSites {
+		maxSites = len(siteList)
+	}
+
+	for i := 0; i < maxSites; i++ {
+		site := siteList[i]
+		topSites = append(topSites, gin.H{
+			"name":   site.SiteName,
+			"active": site.ActiveCount,
+			"weekly": site.WeeklyTotal,
+		})
+	}
+
+	response := gin.H{
+		"summary": gin.H{
+			"total_active":  totalActive,
+			"total_weekly":  totalWeekly,
+			"active_sites":  activeSites,
+			"total_sites":   len(allSites),
+		},
+		"top_sites": topSites,
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// Phase 5: getSiteHistoricalData returns historical data for a specific site
+func getSiteHistoricalData(c *gin.Context) {
+	siteName := c.Param("siteName")
+	if siteName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
+		return
+	}
+	
+	// Get hours parameter (default 24 hours)
+	hours := 24
+	if hoursParam := c.Query("hours"); hoursParam != "" {
+		if h, err := strconv.Atoi(hoursParam); err == nil && h > 0 && h <= 720 {
+			hours = h
+		}
+	}
+	
+	// Get historical data from analytics manager
+	historicalData := analytics.GetSiteHistoricalData(siteName, hours)
+	
+	response := gin.H{
+		"site_name":       siteName,
+		"hours_requested": hours,
+		"data_points":     len(historicalData),
+		"historical_data": historicalData,
+		"timestamp":       time.Now().Format(time.RFC3339),
+	}
+	
+	c.JSON(http.StatusOK, response)
+}
+
+// Phase 5: getSitePageStats returns popular page statistics for a specific site
+func getSitePageStats(c *gin.Context) {
+	siteName := c.Param("siteName")
+	if siteName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
+		return
+	}
+	
+	// Get limit parameter (default 10)
+	limit := 10
+	if limitParam := c.Query("limit"); limitParam != "" {
+		if l, err := strconv.Atoi(limitParam); err == nil && l > 0 {
+			limit = l
+		}
+	}
+	
+	// Get page stats from analytics manager
+	pageStats := analytics.GetSitePageStats(siteName, limit)
+	
+	response := gin.H{
+		"site_name":   siteName,
+		"total_pages": len(pageStats),
+		"page_stats":  pageStats,
+		"timestamp":   time.Now().Format(time.RFC3339),
+	}
+	
+	c.JSON(http.StatusOK, response)
+}
+
+// Phase 5: getSiteRegionStats returns region statistics for a specific site
+func getSiteRegionStats(c *gin.Context) {
+	siteName := c.Param("siteName")
+	if siteName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
+		return
+	}
+	
+	// Get region stats from analytics manager
+	regionStats := analytics.GetSiteRegionStats(siteName)
+	
+	// Calculate total active viewers for percentage calculation
+	totalActive := 0
+	for _, region := range regionStats {
+		totalActive += region.Count
+	}
+	
+	// Add percentages to region stats
+	enrichedStats := make([]gin.H, len(regionStats))
+	for i, region := range regionStats {
+		percentage := 0.0
+		if totalActive > 0 {
+			percentage = float64(region.Count) / float64(totalActive) * 100.0
+		}
+		
+		enrichedStats[i] = gin.H{
+			"region":     region.Region,
+			"count":      region.Count,
+			"percentage": percentage,
+		}
+	}
+	
+	response := gin.H{
+		"site_name":     siteName,
+		"total_active":  totalActive,
+		"total_regions": len(regionStats),
+		"region_stats":  enrichedStats,
+		"timestamp":     time.Now().Format(time.RFC3339),
+	}
+	
+	c.JSON(http.StatusOK, response)
+}
+
+// Phase 5: exportSiteAnalyticsData exports comprehensive analytics data for a site
+func exportSiteAnalyticsData(c *gin.Context) {
+	siteName := c.Param("siteName")
+	if siteName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Site name is required"})
+		return
+	}
+	
+	// Get period parameter (default 30d)
+	period := c.DefaultQuery("period", "30d")
+	if period != "24h" && period != "7d" && period != "30d" {
+		period = "30d"
+	}
+	
+	// Get format parameter (default json)
+	format := c.DefaultQuery("format", "json")
+	
+	// Export data using analytics manager
+	exportData := analytics.ExportSiteData(siteName, period)
+	if exportData == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Site data not found"})
+		return
+	}
+	
+	switch format {
+	case "csv":
+		// Generate CSV response
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-analytics-%s.csv\"", siteName, period))
+		
+		csvData := convertSiteExportToCSV(exportData)
+		c.String(http.StatusOK, csvData)
+		
+	case "json":
+		fallthrough
+	default:
+		// Generate JSON response
+		c.Header("Content-Type", "application/json")
+		if c.Query("download") == "true" {
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-analytics-%s.json\"", siteName, period))
+		}
+		
+		c.JSON(http.StatusOK, exportData)
+	}
+}
+
+
+// Phase 5: convertSiteExportToCSV converts export data to CSV format
+func convertSiteExportToCSV(data *analytics.SiteExportData) string {
+	var csvBuilder strings.Builder
+	
+	// Header information
+	csvBuilder.WriteString(fmt.Sprintf("Site Analytics Export,%s\n", data.SiteName))
+	csvBuilder.WriteString(fmt.Sprintf("Export Date,%s\n", data.ExportTimestamp.Format("2006-01-02 15:04:05")))
+	csvBuilder.WriteString(fmt.Sprintf("Period,%s\n", data.Period))
+	csvBuilder.WriteString(fmt.Sprintf("Active Viewers,%d\n", data.Summary.ActiveCount))
+	csvBuilder.WriteString(fmt.Sprintf("Weekly Total,%d\n", data.Summary.WeeklyTotal))
+	csvBuilder.WriteString("\n")
+	
+	// Historical data section
+	csvBuilder.WriteString("Historical Data\n")
+	csvBuilder.WriteString("Timestamp,Viewers\n")
+	for _, point := range data.HistoricalData {
+		csvBuilder.WriteString(fmt.Sprintf("%s,%d\n", 
+			point.Timestamp.Format("2006-01-02 15:04:05"), 
+			point.Viewers))
+	}
+	csvBuilder.WriteString("\n")
+	
+	// Page analytics section
+	if len(data.PageAnalytics) > 0 {
+		csvBuilder.WriteString("Page Analytics\n")
+		csvBuilder.WriteString("Path,Views,Unique Visitors,Last Seen\n")
+		for _, page := range data.PageAnalytics {
+			csvBuilder.WriteString(fmt.Sprintf("%s,%d,%d,%s\n",
+				page.Path,
+				page.Views,
+				page.Unique,
+				page.LastSeen.Format("2006-01-02 15:04:05")))
+		}
+		csvBuilder.WriteString("\n")
+	}
+	
+	// Region breakdown section
+	if len(data.RegionBreakdown) > 0 {
+		csvBuilder.WriteString("Region Breakdown\n")
+		csvBuilder.WriteString("Region,Active Viewers\n")
+		for _, region := range data.RegionBreakdown {
+			csvBuilder.WriteString(fmt.Sprintf("%s,%d\n", region.Region, region.Count))
+		}
+	}
+	
+	return csvBuilder.String()
 }

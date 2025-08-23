@@ -28,274 +28,389 @@
         </div>
     </div>
 
-    <!-- Key Performance Indicators -->
-    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <!-- Uptime KPI -->
+    <!-- Site Analytics KPI Cards -->
+    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Total Active Users KPI -->
         <div class="kpi-card card hover:scale-105 transition-transform">
             <div class="card-body text-center">
                 <div class="kpi-icon mb-4">
-                    <i class="fas fa-clock text-4xl text-green-500"></i>
+                    <i class="fas fa-users text-4xl text-blue-500"></i>
                 </div>
-                <div class="kpi-value text-3xl font-bold text-green-600 dark:text-green-400 mb-2" id="uptimeValue">
-                    99.9%
+                <div class="kpi-value text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2" id="totalActiveValue">
+                    0
                 </div>
                 <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
-                    System Uptime
+                    Active Viewers
                 </div>
-                <div class="kpi-change text-xs text-green-600 mt-2">
-                    <i class="fas fa-arrow-up mr-1"></i>+0.1% from yesterday
+                <div class="kpi-change text-xs text-blue-600 mt-2" id="activeChange">
+                    <i class="fas fa-circle mr-1 animate-pulse"></i>Live Updates
                 </div>
             </div>
         </div>
 
-        <!-- Address Generation Rate KPI -->
+        <!-- Total Weekly Visitors KPI -->
         <div class="kpi-card card hover:scale-105 transition-transform">
             <div class="card-body text-center">
                 <div class="kpi-icon mb-4">
-                    <i class="fas fa-plus-circle text-4xl text-blue-500"></i>
+                    <i class="fas fa-chart-bar text-4xl text-emerald-500"></i>
                 </div>
-                <div class="kpi-value text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2" id="addressGenValue">
-                    8.5
+                <div class="kpi-value text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-2" id="totalWeeklyValue">
+                    0
                 </div>
                 <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
-                    Addresses/Min
+                    Weekly Visitors
                 </div>
-                <div class="kpi-change text-xs text-blue-600 mt-2">
-                    <i class="fas fa-arrow-up mr-1"></i>+12% from last hour
+                <div class="kpi-change text-xs text-emerald-600 mt-2" id="weeklyChange">
+                    <i class="fas fa-calendar-week mr-1"></i>7 Day Total
                 </div>
             </div>
         </div>
 
-        <!-- Payment Success Rate KPI -->
+        <!-- Active Sites Count KPI -->
         <div class="kpi-card card hover:scale-105 transition-transform">
             <div class="card-body text-center">
                 <div class="kpi-icon mb-4">
-                    <i class="fas fa-check-circle text-4xl text-emerald-500"></i>
+                    <i class="fas fa-globe text-4xl text-purple-500"></i>
                 </div>
-                <div class="kpi-value text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-2" id="paymentSuccessValue">
-                    97.2%
-                </div>
-                <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
-                    Payment Success
-                </div>
-                <div class="kpi-change text-xs text-emerald-600 mt-2">
-                    <i class="fas fa-arrow-up mr-1"></i>+1.5% improvement
-                </div>
-            </div>
-        </div>
-
-        <!-- Error Rate KPI -->
-        <div class="kpi-card card hover:scale-105 transition-transform">
-            <div class="card-body text-center">
-                <div class="kpi-icon mb-4">
-                    <i class="fas fa-exclamation-triangle text-4xl text-amber-500"></i>
-                </div>
-                <div class="kpi-value text-3xl font-bold text-amber-600 dark:text-amber-400 mb-2" id="errorRateValue">
-                    0.8%
+                <div class="kpi-value text-3xl font-bold text-purple-600 dark:text-purple-400 mb-2" id="activeSitesValue">
+                    0
                 </div>
                 <div class="kpi-label text-sm text-gray-600 dark:text-gray-400 font-medium">
-                    Error Rate
+                    Active Sites
                 </div>
-                <div class="kpi-change text-xs text-green-600 mt-2">
-                    <i class="fas fa-arrow-down mr-1"></i>-0.3% improvement
+                <div class="kpi-change text-xs text-purple-600 mt-2" id="sitesChange">
+                    <i class="fas fa-server mr-1"></i>Sites Online
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Main Charts Section -->
-    <div class="charts-section grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Address Generation Trend -->
-        <div class="chart-card card">
+    <!-- Phase 5: Historical Data Chart Section -->
+    <div class="historical-chart-section mb-8">
+        <div class="card">
             <div class="card-header">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <i class="fas fa-chart-area text-blue-500 mr-3"></i>
-                    Address Generation Trend
+                    <i class="fas fa-chart-area text-indigo-500 mr-3"></i>
+                    Historical Viewer Trends (30 Days)
                 </h3>
                 <div class="chart-controls">
-                    <button class="chart-toggle active" data-chart="area">Area</button>
-                    <button class="chart-toggle" data-chart="line">Line</button>
+                    <select id="historicalPeriod" class="filter-control bg-white dark:bg-gray-800">
+                        <option value="24">Last 24 Hours</option>
+                        <option value="168">Last Week</option>
+                        <option value="720" selected>Last 30 Days</option>
+                    </select>
                 </div>
             </div>
             <div class="card-body">
-                <div class="chart-container h-64">
-                    <canvas id="addressGenChart"></canvas>
+                <div class="chart-container h-80">
+                    <canvas id="historicalChart"></canvas>
                 </div>
-                <div class="chart-stats mt-4 grid grid-cols-3 gap-4 text-center">
+                <div class="chart-stats mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                     <div>
-                        <div class="text-lg font-bold text-blue-600" id="avgGenRate">8.5</div>
-                        <div class="text-xs text-gray-500">Avg Rate</div>
+                        <div class="text-lg font-bold text-blue-600" id="avgViewersText">0</div>
+                        <div class="text-xs text-gray-600">Average Viewers</div>
                     </div>
                     <div>
-                        <div class="text-lg font-bold text-green-600" id="peakGenRate">12.3</div>
-                        <div class="text-xs text-gray-500">Peak Rate</div>
+                        <div class="text-lg font-bold text-green-600" id="peakViewersText">0</div>
+                        <div class="text-xs text-gray-600">Peak Viewers</div>
                     </div>
                     <div>
-                        <div class="text-lg font-bold text-purple-600" id="totalGenerated">1,247</div>
-                        <div class="text-xs text-gray-500">Total Generated</div>
+                        <div class="text-lg font-bold text-purple-600" id="trendText">N/A</div>
+                        <div class="text-xs text-gray-600">Trend</div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Payment Success Trend -->
+    <!-- Site Analytics Chart Section -->
+    <div class="charts-section grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Active Viewers Chart -->
         <div class="chart-card card">
             <div class="card-header">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <i class="fas fa-chart-line text-emerald-500 mr-3"></i>
-                    Payment Success Trend
+                    <i class="fas fa-chart-line text-blue-500 mr-3"></i>
+                    Active Viewers by Site
                 </h3>
                 <div class="chart-controls">
-                    <button class="chart-toggle active" data-chart="line">Line</button>
+                    <button class="chart-toggle active" data-chart="doughnut">Doughnut</button>
                     <button class="chart-toggle" data-chart="bar">Bar</button>
                 </div>
             </div>
             <div class="card-body">
                 <div class="chart-container h-64">
-                    <canvas id="paymentTrendChart"></canvas>
+                    <canvas id="activeViewersChart"></canvas>
                 </div>
-                <div class="chart-stats mt-4 grid grid-cols-3 gap-4 text-center">
-                    <div>
-                        <div class="text-lg font-bold text-emerald-600" id="avgSuccessRate">97.2%</div>
-                        <div class="text-xs text-gray-500">Avg Success</div>
-                    </div>
-                    <div>
-                        <div class="text-lg font-bold text-blue-600" id="totalPayments">523</div>
-                        <div class="text-xs text-gray-500">Total Payments</div>
-                    </div>
-                    <div>
-                        <div class="text-lg font-bold text-purple-600" id="failedPayments">15</div>
-                        <div class="text-xs text-gray-500">Failed</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- System Performance & Errors -->
-    <div class="performance-section grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        <!-- System Performance Chart -->
-        <div class="chart-card card lg:col-span-2">
-            <div class="card-header">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <i class="fas fa-tachometer-alt text-purple-500 mr-3"></i>
-                    System Performance Score
-                </h3>
-            </div>
-            <div class="card-body">
-                <div class="chart-container h-64">
-                    <canvas id="performanceChart"></canvas>
-                </div>
-                <div class="performance-details mt-4 space-y-3">
-                    <div class="performance-metric flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Response Time</span>
-                        <div class="flex items-center">
-                            <span class="text-sm font-medium mr-2" id="responseTime">75ms</span>
-                            <div class="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-                                <div class="h-2 bg-green-500 rounded-full" style="width: 85%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="performance-metric flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Memory Usage</span>
-                        <div class="flex items-center">
-                            <span class="text-sm font-medium mr-2" id="memoryUsage">156MB</span>
-                            <div class="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-                                <div class="h-2 bg-blue-500 rounded-full" style="width: 62%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="performance-metric flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">CPU Usage</span>
-                        <div class="flex items-center">
-                            <span class="text-sm font-medium mr-2" id="cpuUsage">23%</span>
-                            <div class="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-                                <div class="h-2 bg-yellow-500 rounded-full" style="width: 23%"></div>
-                            </div>
-                        </div>
+                <div class="chart-stats mt-4 text-center">
+                    <div class="text-sm text-gray-600 dark:text-gray-400" id="activeStatsText">
+                        Real-time active viewer distribution across sites
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Error Rate Distribution -->
+        <!-- Weekly Visitors Chart -->
         <div class="chart-card card">
             <div class="card-header">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <i class="fas fa-bug text-red-500 mr-3"></i>
-                    Error Distribution
+                    <i class="fas fa-chart-bar text-emerald-500 mr-3"></i>
+                    Weekly Visitors by Site
                 </h3>
+                <div class="chart-controls">
+                    <button class="chart-toggle active" data-chart="bar">Bar</button>
+                    <button class="chart-toggle" data-chart="line">Line</button>
+                </div>
             </div>
             <div class="card-body">
                 <div class="chart-container h-64">
-                    <canvas id="errorDistributionChart"></canvas>
+                    <canvas id="weeklyVisitorsChart"></canvas>
                 </div>
-                <div class="error-legend mt-4 space-y-2">
-                    <div class="flex justify-between items-center text-sm">
-                        <div class="flex items-center">
-                            <div class="w-3 h-3 bg-red-500 rounded mr-2"></div>
-                            <span>Critical</span>
-                        </div>
-                        <span class="font-medium">2</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm">
-                        <div class="flex items-center">
-                            <div class="w-3 h-3 bg-yellow-500 rounded mr-2"></div>
-                            <span>Warning</span>
-                        </div>
-                        <span class="font-medium">8</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm">
-                        <div class="flex items-center">
-                            <div class="w-3 h-3 bg-blue-500 rounded mr-2"></div>
-                            <span>Info</span>
-                        </div>
-                        <span class="font-medium">5</span>
+                <div class="chart-stats mt-4 text-center">
+                    <div class="text-sm text-gray-600 dark:text-gray-400" id="weeklyStatsText">
+                        7-day visitor totals per site
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Real-time Activity & Insights -->
-    <div class="insights-section grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Real-time Activity Feed -->
+    <!-- Site Analytics Table Section -->
+    <div class="table-section mb-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-table text-gray-500 mr-3"></i>
+                    Site Analytics Overview
+                </h3>
+                <div class="table-controls flex gap-2">
+                    <select id="sortBy" class="filter-control bg-white dark:bg-gray-800">
+                        <option value="active">Sort by Active</option>
+                        <option value="weekly">Sort by Weekly</option>
+                        <option value="name">Sort by Name</option>
+                    </select>
+                    <button onclick="toggleSortOrder()" class="btn btn-secondary" id="sortOrderBtn">
+                        <i class="fas fa-sort-amount-down"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="overflow-x-auto">
+                    <table class="analytics-table w-full">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Site Name</th>
+                                <th class="text-center">Active Now</th>
+                                <th class="text-center">Weekly Total</th>
+                                <th class="text-center">Last Activity</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="siteAnalyticsTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-gray-500 py-8">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                                    Loading site analytics data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 5: Advanced Analytics Sections -->
+    <div class="advanced-analytics-section grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Popular Pages Section -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-file-alt text-orange-500 mr-3"></i>
+                    Popular Pages
+                </h3>
+                <div class="controls">
+                    <select id="siteFilterPages" class="filter-control bg-white dark:bg-gray-800">
+                        <option value="">All Sites</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="pagesTableContainer" class="overflow-y-auto max-h-64">
+                    <table class="pages-table w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 dark:border-gray-700">
+                                <th class="text-left py-2">Page Path</th>
+                                <th class="text-center py-2">Views</th>
+                                <th class="text-center py-2">Unique</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pagesTableBody">
+                            <tr>
+                                <td colspan="3" class="text-center text-gray-500 py-4">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Geographic Regions Section -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-globe-americas text-teal-500 mr-3"></i>
+                    Language Regions
+                </h3>
+                <div class="controls">
+                    <select id="siteFilterRegions" class="filter-control bg-white dark:bg-gray-800">
+                        <option value="">All Sites</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="regions-container">
+                    <div class="chart-container h-32 mb-4">
+                        <canvas id="regionsChart"></canvas>
+                    </div>
+                    <div id="regionsTableContainer" class="overflow-y-auto max-h-32">
+                        <table class="regions-table w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-200 dark:border-gray-700">
+                                    <th class="text-left py-2">Region</th>
+                                    <th class="text-center py-2">Count</th>
+                                    <th class="text-center py-2">%</th>
+                                </tr>
+                            </thead>
+                            <tbody id="regionsTableBody">
+                                <tr>
+                                    <td colspan="3" class="text-center text-gray-500 py-4">
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>Loading...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 5: Export Section -->
+    <div class="export-section mb-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-download text-green-500 mr-3"></i>
+                    Data Export
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="export-controls grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Select Site
+                        </label>
+                        <select id="exportSiteSelect" class="filter-control bg-white dark:bg-gray-800 w-full">
+                            <option value="">Select a site...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Time Period
+                        </label>
+                        <select id="exportPeriodSelect" class="filter-control bg-white dark:bg-gray-800 w-full">
+                            <option value="24h">Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d" selected>Last 30 Days</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Format
+                        </label>
+                        <div class="flex gap-2">
+                            <button onclick="exportSiteData('json')" class="btn btn-primary flex-1">
+                                <i class="fas fa-code mr-2"></i>JSON
+                            </button>
+                            <button onclick="exportSiteData('csv')" class="btn btn-secondary flex-1">
+                                <i class="fas fa-table mr-2"></i>CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="export-status mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" id="exportStatus" style="display: none;">
+                    <div class="flex items-center">
+                        <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                        <span class="text-sm">Export status will appear here...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Updates & Status Section -->
+    <div class="status-section grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Live Status Card -->
         <div class="activity-card card">
             <div class="card-header">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <i class="fas fa-stream text-indigo-500 mr-3"></i>
-                    Real-time Activity
+                    <i class="fas fa-broadcast-tower text-green-500 mr-3"></i>
+                    Live Analytics Status
                 </h3>
                 <div class="activity-status">
-                    <span class="flex items-center text-sm text-green-600 dark:text-green-400">
+                    <span class="flex items-center text-sm text-green-600 dark:text-green-400" id="liveStatus">
                         <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                        Live
+                        Connected
                     </span>
                 </div>
             </div>
             <div class="card-body">
-                <div class="activity-feed h-64 overflow-y-auto space-y-3" id="activityFeed">
-                    <!-- Real-time activities will be populated here -->
+                <div class="status-grid space-y-4">
+                    <div class="status-item flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Update Frequency</span>
+                        <span class="text-sm font-medium text-blue-600">5 seconds</span>
+                    </div>
+                    <div class="status-item flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Data Coverage</span>
+                        <span class="text-sm font-medium text-emerald-600">7 days rolling</span>
+                    </div>
+                    <div class="status-item flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Privacy Mode</span>
+                        <span class="text-sm font-medium text-purple-600">Tor-friendly</span>
+                    </div>
+                    <div class="status-item flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Last Updated</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300" id="lastUpdated">
+                            Never
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- AI Insights -->
+        <!-- Analytics Summary -->
         <div class="insights-card card">
             <div class="card-header">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <i class="fas fa-lightbulb text-yellow-500 mr-3"></i>
-                    AI Insights & Recommendations
+                    <i class="fas fa-chart-pie text-purple-500 mr-3"></i>
+                    Analytics Summary
                 </h3>
             </div>
             <div class="card-body">
-                <div class="insights-list space-y-4" id="insightsList">
-                    <!-- Insights will be populated here -->
+                <div class="summary-stats space-y-4" id="analyticsSummary">
+                    <div class="summary-item">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-gray-500 mb-2">No Data</div>
+                            <div class="text-sm text-gray-400">Waiting for site analytics...</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div class="text-center">
-                        <button onclick="generateInsights()" class="btn btn-primary">
-                            <i class="fas fa-magic mr-2"></i>Generate New Insights
+                        <button onclick="refreshAnalytics()" class="btn btn-primary" id="refreshBtn">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh Data
                         </button>
                     </div>
                 </div>
@@ -303,80 +418,53 @@
         </div>
     </div>
 
-    <!-- Detailed Analytics Tables -->
-    <div class="tables-section">
+    <!-- Analytics Integration Info -->
+    <div class="integration-section">
         <div class="card">
             <div class="card-header">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <i class="fas fa-table text-gray-500 mr-3"></i>
-                    Detailed Analytics
+                    <i class="fas fa-code text-blue-500 mr-3"></i>
+                    Integration Guide
                 </h3>
-                <div class="table-controls flex gap-2">
-                    <button class="table-tab active" data-tab="overview">Overview</button>
-                    <button class="table-tab" data-tab="performance">Performance</button>
-                    <button class="table-tab" data-tab="errors">Errors</button>
-                </div>
             </div>
             <div class="card-body">
-                <!-- Overview Tab -->
-                <div class="tab-content active" id="overview-tab">
-                    <div class="overflow-x-auto">
-                        <table class="analytics-table w-full">
-                            <thead>
-                                <tr>
-                                    <th>Metric</th>
-                                    <th>Current</th>
-                                    <th>1h Ago</th>
-                                    <th>24h Ago</th>
-                                    <th>Change</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="overviewTableBody">
-                                <!-- Table data will be populated -->
-                            </tbody>
-                        </table>
+                <div class="integration-info space-y-6">
+                    <div class="info-section">
+                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                            <i class="fas fa-globe mr-2 text-green-500"></i>Add Analytics to Your Website
+                        </h4>
+                        <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                            <code class="text-sm text-gray-700 dark:text-gray-300">
+                                &lt;script src="https://your-paybutton-service.com/static/js/analytics.js?site=<span class="text-blue-600">your-site-name</span>" async&gt;&lt;/script&gt;
+                            </code>
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                            Replace <span class="font-mono text-blue-600">your-site-name</span> with your unique site identifier.
+                        </p>
                     </div>
-                </div>
-
-                <!-- Performance Tab -->
-                <div class="tab-content" id="performance-tab">
-                    <div class="overflow-x-auto">
-                        <table class="analytics-table w-full">
-                            <thead>
-                                <tr>
-                                    <th>Component</th>
-                                    <th>Response Time</th>
-                                    <th>Throughput</th>
-                                    <th>Error Rate</th>
-                                    <th>Health Score</th>
-                                </tr>
-                            </thead>
-                            <tbody id="performanceTableBody">
-                                <!-- Performance data will be populated -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Errors Tab -->
-                <div class="tab-content" id="errors-tab">
-                    <div class="overflow-x-auto">
-                        <table class="analytics-table w-full">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Component</th>
-                                    <th>Error Type</th>
-                                    <th>Severity</th>
-                                    <th>Count</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="errorsTableBody">
-                                <!-- Error data will be populated -->
-                            </tbody>
-                        </table>
+                    
+                    <div class="info-section">
+                        <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                            <i class="fas fa-shield-alt mr-2 text-purple-500"></i>Privacy-First Design
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                            <div class="flex items-center">
+                                <i class="fas fa-check text-green-500 mr-2"></i>
+                                No IP tracking
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-check text-green-500 mr-2"></i>
+                                No cookies stored
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-check text-green-500 mr-2"></i>
+                                Tor network compatible
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-check text-green-500 mr-2"></i>
+                                Real-time WebSocket updates
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -759,10 +847,12 @@
 </style>
 
 <script>
-// Analytics Dashboard JavaScript
+// Phase 5: Analytics Dashboard JavaScript with Advanced Features
 let analyticsData = {};
 let charts = {};
 let currentPeriod = '24h';
+let refreshInterval = null;
+let sitesData = {};
 
 // Initialize analytics dashboard
 document.addEventListener('DOMContentLoaded', function() {
@@ -774,9 +864,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeAnalytics() {
     loadAnalyticsData();
     initializeCharts();
-    populateTablesData();
-    generateInsights();
-    startActivityFeed();
+    setupPhase5Features();
 }
 
 function setupEventListeners() {
@@ -785,6 +873,29 @@ function setupEventListeners() {
         currentPeriod = e.target.value;
         refreshAnalytics();
     });
+    
+    // Historical period selector (Phase 5)
+    const historicalSelect = document.getElementById('historicalPeriod');
+    if (historicalSelect) {
+        historicalSelect.addEventListener('change', function(e) {
+            updateHistoricalChart(e.target.value);
+        });
+    }
+    
+    // Site filters for advanced features (Phase 5)
+    const siteFilterPages = document.getElementById('siteFilterPages');
+    if (siteFilterPages) {
+        siteFilterPages.addEventListener('change', function(e) {
+            updatePageStats(e.target.value);
+        });
+    }
+    
+    const siteFilterRegions = document.getElementById('siteFilterRegions');
+    if (siteFilterRegions) {
+        siteFilterRegions.addEventListener('change', function(e) {
+            updateRegionStats(e.target.value);
+        });
+    }
     
     // Chart toggles
     document.querySelectorAll('.chart-toggle').forEach(button => {
@@ -928,220 +1039,229 @@ function initializeCharts() {
     });
 }
 
-function getChartOptions(yAxisLabel) {
-    return {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            }
-        },
-        scales: {
-            x: {
-                display: false
-            },
-            y: {
-                display: false
-            }
-        },
-        elements: {
-            point: {
-                radius: 3,
-                hoverRadius: 6
-            }
-        }
-    };
+
+
+
+
+
 }
 
-function generateTimeLabels() {
-    const labels = [];
-    for (let i = 19; i >= 0; i--) {
-        const time = new Date(Date.now() - i * 60000);
-        labels.push(time.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
+// Phase 5: Advanced Analytics Functions
+
+function setupPhase5Features() {
+    // Initialize historical chart
+    if (document.getElementById('historicalChart')) {
+        updateHistoricalChart('720'); // 30 days default
     }
-    return labels;
+    
+    // Initialize empty states for advanced features
+    updatePageStats('');
+    updateRegionStats('');
+    
+    // Update site dropdowns
+    updateSiteDropdowns();
 }
 
-function generateSampleData(count, min, max) {
-    const data = [];
-    for (let i = 0; i < count; i++) {
-        data.push(Math.random() * (max - min) + min);
-    }
-    return data;
-}
-
-function populateTablesData() {
-    // Overview Table
-    const overviewData = [
-        { metric: 'System Uptime', current: '99.9%', hour: '99.8%', day: '99.7%', change: '+0.2%', status: 'healthy' },
-        { metric: 'Address Generation', current: '8.5/min', hour: '7.6/min', day: '8.1/min', change: '+11.8%', status: 'healthy' },
-        { metric: 'Payment Success', current: '97.2%', hour: '96.8%', day: '95.7%', change: '+1.5%', status: 'healthy' },
-        { metric: 'Error Rate', current: '0.8%', hour: '1.1%', day: '1.1%', change: '-0.3%', status: 'healthy' },
-        { metric: 'Response Time', current: '75ms', hour: '78ms', day: '82ms', change: '-8.5%', status: 'healthy' }
-    ];
+function updateSiteDropdowns() {
+    const siteNames = Object.keys(analyticsData?.sites || {});
     
-    populateTable('overviewTableBody', overviewData, ['metric', 'current', 'hour', 'day', 'change', 'status']);
-    
-    // Performance Table
-    const performanceData = [
-        { component: 'Address Pool', responseTime: '45ms', throughput: '8.5/min', errorRate: '0.2%', healthScore: '98%' },
-        { component: 'Gap Monitor', responseTime: '12ms', throughput: '120/min', errorRate: '0.1%', healthScore: '99%' },
-        { component: 'Rate Limiter', responseTime: '8ms', throughput: '200/min', errorRate: '0.0%', healthScore: '100%' },
-        { component: 'WebSocket', responseTime: '25ms', throughput: '50/min', errorRate: '0.5%', healthScore: '95%' }
-    ];
-    
-    populateTable('performanceTableBody', performanceData, ['component', 'responseTime', 'throughput', 'errorRate', 'healthScore']);
-    
-    // Errors Table
-    const errorsData = [
-        { time: '14:23:15', component: 'Pool', errorType: 'Generation Timeout', severity: 'warning', count: '3', actions: 'view' },
-        { time: '14:18:42', component: 'API', errorType: 'Rate Limit Hit', severity: 'info', count: '5', actions: 'view' },
-        { time: '14:15:33', component: 'WebSocket', errorType: 'Connection Drop', severity: 'warning', count: '2', actions: 'view' },
-        { time: '14:12:18', component: 'Gap', errorType: 'Threshold Warning', severity: 'critical', count: '1', actions: 'view' }
-    ];
-    
-    populateTable('errorsTableBody', errorsData, ['time', 'component', 'errorType', 'severity', 'count', 'actions']);
-}
-
-function populateTable(tableId, data, columns) {
-    const tbody = document.getElementById(tableId);
-    tbody.innerHTML = '';
-    
-    data.forEach(row => {
-        const tr = document.createElement('tr');
-        columns.forEach(col => {
-            const td = document.createElement('td');
-            
-            if (col === 'status' || col === 'severity') {
-                td.innerHTML = `<span class="status-badge ${row[col]}">${row[col]}</span>`;
-            } else if (col === 'actions') {
-                td.innerHTML = `<button class="btn-secondary text-xs">View Details</button>`;
-            } else if (col === 'change') {
-                const isPositive = row[col].startsWith('+');
-                const color = isPositive ? 'text-green-600' : 'text-red-600';
-                const icon = isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
-                td.innerHTML = `<span class="${color}"><i class="fas ${icon} mr-1"></i>${row[col]}</span>`;
-            } else {
-                td.textContent = row[col];
-            }
-            
-            tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-    });
-}
-
-function startActivityFeed() {
-    const feed = document.getElementById('activityFeed');
-    const activities = [
-        { icon: 'fas fa-plus-circle', text: 'Generated 5 new addresses', time: '2 minutes ago', type: 'success' },
-        { icon: 'fas fa-check-circle', text: 'Payment confirmed: 0.0025 BTC', time: '3 minutes ago', type: 'success' },
-        { icon: 'fas fa-exclamation-triangle', text: 'Rate limit warning for IP 192.168.1.100', time: '5 minutes ago', type: 'warning' },
-        { icon: 'fas fa-sync-alt', text: 'Pool refill completed successfully', time: '8 minutes ago', type: 'info' },
-        { icon: 'fas fa-user-shield', text: 'Admin login from new location', time: '12 minutes ago', type: 'info' }
-    ];
-    
-    feed.innerHTML = '';
-    activities.forEach(activity => {
-        const div = document.createElement('div');
-        div.className = 'activity-item';
-        div.innerHTML = `
-            <div class="flex items-center w-full">
-                <i class="${activity.icon} text-lg mr-3 ${getActivityColor(activity.type)}"></i>
-                <div class="flex-1">
-                    <div class="text-sm font-medium">${activity.text}</div>
-                    <div class="text-xs text-gray-500">${activity.time}</div>
-                </div>
-            </div>
-        `;
-        feed.appendChild(div);
-    });
-}
-
-function getActivityColor(type) {
-    switch (type) {
-        case 'success': return 'text-green-500';
-        case 'warning': return 'text-yellow-500';
-        case 'error': return 'text-red-500';
-        default: return 'text-blue-500';
-    }
-}
-
-function generateInsights() {
-    const insightsList = document.getElementById('insightsList');
-    insightsList.innerHTML = '';
-    
-    analyticsData.insights.forEach(insight => {
-        const div = document.createElement('div');
-        div.className = 'insight-item';
-        div.innerHTML = `
-            <div class="flex items-start">
-                <i class="fas fa-lightbulb text-yellow-500 mr-3 mt-1"></i>
-                <div class="flex-1">
-                    <p class="text-sm text-gray-700 dark:text-gray-300">${insight}</p>
-                </div>
-            </div>
-        `;
-        insightsList.appendChild(div);
-    });
-}
-
-function startRealTimeUpdates() {
-    setInterval(() => {
-        // Simulate real-time updates
-        analyticsData.addressGenRate = (Math.random() * 10 + 5).toFixed(1);
-        analyticsData.responseTime = Math.floor(Math.random() * 50 + 50);
-        updateKPIs();
+    ['exportSiteSelect', 'siteFilterPages', 'siteFilterRegions'].forEach(selectId => {
+        const select = document.getElementById(selectId);
+        if (!select) return;
         
-        // Update charts with new data
-        Object.values(charts).forEach(chart => {
-            if (chart.data.datasets[0].data) {
-                chart.data.datasets[0].data.shift();
-                chart.data.datasets[0].data.push(Math.random() * 20 + 80);
-                chart.update('none');
-            }
+        const currentValue = select.value;
+        select.innerHTML = selectId === 'exportSiteSelect' ? 
+            '<option value="">Select a site...</option>' :
+            '<option value="">All Sites</option>';
+            
+        siteNames.forEach(siteName => {
+            const option = document.createElement('option');
+            option.value = siteName;
+            option.textContent = siteName;
+            select.appendChild(option);
         });
-    }, 5000);
+        
+        select.value = currentValue;
+    });
 }
 
-function refreshAnalytics() {
-    const loading = document.getElementById('analyticsLoading');
-    loading.classList.remove('hidden');
+// Historical chart update
+function updateHistoricalChart(hours) {
+    if (!analyticsData?.sites || Object.keys(analyticsData.sites).length === 0) return;
     
-    setTimeout(() => {
-        loadAnalyticsData();
-        populateTablesData();
-        startActivityFeed();
-        loading.classList.add('hidden');
-    }, 1000);
+    const siteName = Object.keys(analyticsData.sites)[0];
+    fetch(`/admin/api/site-analytics/${siteName}/historical?hours=${hours}`)
+        .then(response => response.json())
+        .then(data => {
+            const canvas = document.getElementById('historicalChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            if (charts.historical) {
+                charts.historical.destroy();
+            }
+            
+            const labels = data.historical_data?.map(point => 
+                new Date(point.timestamp).toLocaleTimeString()
+            ) || [];
+            const values = data.historical_data?.map(point => point.viewers) || [];
+            
+            charts.historical = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Active Viewers',
+                        data: values,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+            
+            // Update stats
+            if (values.length > 0) {
+                const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+                const max = Math.max(...values);
+                document.getElementById('avgViewersText').textContent = avg;
+                document.getElementById('peakViewersText').textContent = max;
+                document.getElementById('trendText').textContent = 
+                    values[values.length - 1] > values[0] ? '↗ Rising' : '↘ Declining';
+            }
+        })
+        .catch(error => console.error('Historical chart error:', error));
 }
 
-function exportAnalytics() {
-    const data = {
-        timestamp: new Date().toISOString(),
-        period: currentPeriod,
-        analytics: analyticsData
-    };
+// Page statistics
+function updatePageStats(siteName) {
+    const tbody = document.getElementById('pagesTableBody');
+    if (!tbody) return;
     
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    if (!siteName) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500 py-4">Select a site to view page statistics</td></tr>';
+        return;
+    }
     
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analytics-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    showNotification('success', 'Analytics data exported successfully');
+    fetch(`/admin/api/site-analytics/${siteName}/pages?limit=10`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.page_stats || data.page_stats.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500 py-4">No page data available</td></tr>';
+                return;
+            }
+            
+            const rows = data.page_stats.map(page => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td class="py-2 px-3 font-mono text-sm">${page.path}</td>
+                    <td class="py-2 px-3 text-center">${page.views}</td>
+                    <td class="py-2 px-3 text-center">${page.unique}</td>
+                </tr>
+            `).join('');
+            
+            tbody.innerHTML = rows;
+        })
+        .catch(error => console.error('Page stats error:', error));
 }
 
-// Utility function for notifications
-function showNotification(type, message) {
-    // Implement notification system
-    console.log(`${type.toUpperCase()}: ${message}`);
+// Region statistics
+function updateRegionStats(siteName) {
+    const tbody = document.getElementById('regionsTableBody');
+    if (!tbody) return;
+    
+    if (!siteName) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500 py-4">Select a site to view region statistics</td></tr>';
+        return;
+    }
+    
+    fetch(`/admin/api/site-analytics/${siteName}/regions`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.region_stats || data.region_stats.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500 py-4">No region data available</td></tr>';
+                return;
+            }
+            
+            const rows = data.region_stats.map(region => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td class="py-2 px-3">${region.region}</td>
+                    <td class="py-2 px-3 text-center">${region.count}</td>
+                    <td class="py-2 px-3 text-center">${region.percentage.toFixed(1)}%</td>
+                </tr>
+            `).join('');
+            
+            tbody.innerHTML = rows;
+            
+            // Update chart
+            updateRegionChart(data.region_stats);
+        })
+        .catch(error => console.error('Region stats error:', error));
+}
+
+function updateRegionChart(regionStats) {
+    const canvas = document.getElementById('regionsChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (charts.regions) {
+        charts.regions.destroy();
+    }
+    
+    charts.regions = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: regionStats.map(r => r.region),
+            datasets: [{
+                data: regionStats.map(r => r.count),
+                backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// Export functionality
+function exportSiteData(format) {
+    const siteName = document.getElementById('exportSiteSelect')?.value;
+    const period = document.getElementById('exportPeriodSelect')?.value || '30d';
+    
+    if (!siteName) {
+        alert('Please select a site first');
+        return;
+    }
+    
+    const url = `/admin/api/site-analytics/${siteName}/export?period=${period}&format=${format}&download=true`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${siteName}-analytics-${period}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Update loadAnalyticsData to include Phase 5 features
+const originalLoadAnalyticsData = loadAnalyticsData;
+loadAnalyticsData = function() {
+    fetch('/admin/api/site-analytics')
+        .then(response => response.json())
+        .then(data => {
+            analyticsData = data;
+            updateSiteDropdowns();
+            setupPhase5Features();
+        })
+        .catch(error => console.error('Error loading analytics:', error));
+};
+
 }
 </script>
 {{end}}

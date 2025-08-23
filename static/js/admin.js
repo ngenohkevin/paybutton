@@ -357,3 +357,120 @@ document.addEventListener('visibilitychange', function() {
         }
     }
 });
+
+// Site Analytics Helper Functions
+// These functions provide utility for analytics pages
+
+function exportSiteAnalytics() {
+    fetch('/admin/api/site-analytics')
+        .then(response => response.json())
+        .then(data => {
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                siteAnalytics: data
+            };
+            
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'site-analytics-' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            showNotification('success', 'Site analytics exported successfully');
+        })
+        .catch(error => {
+            showNotification('error', 'Error exporting site analytics: ' + error.message);
+        });
+}
+
+function refreshSiteAnalytics() {
+    // Trigger refresh for site analytics data
+    if (typeof loadSiteAnalyticsData === 'function') {
+        loadSiteAnalyticsData();
+        showNotification('info', 'Site analytics refreshed');
+    } else {
+        // Fallback: reload the page
+        window.location.reload();
+    }
+}
+
+// Analytics utility functions
+function formatTimeAgo(date) {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function generateAnalyticsColors(count) {
+    const colors = [
+        '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444',
+        '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1'
+    ];
+    
+    return Array.from({ length: count }, (_, i) => colors[i % colors.length]);
+}
+
+// Enhanced keyboard shortcuts for analytics pages
+document.addEventListener('keydown', function(e) {
+    // Check if we're on an analytics page
+    const isAnalyticsPage = window.location.pathname.includes('/admin/analytics');
+    
+    if (isAnalyticsPage) {
+        // Ctrl/Cmd + E: Export analytics
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            exportSiteAnalytics();
+        }
+        
+        // Ctrl/Cmd + R: Refresh analytics (override default)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            refreshSiteAnalytics();
+        }
+    }
+});
+
+// Global analytics status tracking
+window.analyticsStatus = {
+    lastUpdate: null,
+    isConnected: false,
+    updateCount: 0
+};
+
+// Function to update analytics status
+function updateAnalyticsStatus(connected = true) {
+    window.analyticsStatus.lastUpdate = new Date();
+    window.analyticsStatus.isConnected = connected;
+    window.analyticsStatus.updateCount++;
+    
+    // Update status indicator if it exists
+    const statusEl = document.getElementById('liveStatus');
+    if (statusEl) {
+        if (connected) {
+            statusEl.innerHTML = '<div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>Connected';
+        } else {
+            statusEl.innerHTML = '<div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>Disconnected';
+        }
+    }
+    
+    // Update last updated time
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    if (lastUpdatedEl) {
+        lastUpdatedEl.textContent = new Date().toLocaleTimeString();
+    }
+}

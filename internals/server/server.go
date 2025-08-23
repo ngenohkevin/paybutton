@@ -4,17 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/ngenohkevin/paybutton/internals/config"
-	"github.com/ngenohkevin/paybutton/internals/monitoring"
-	"github.com/ngenohkevin/paybutton/internals/payment_processing"
-	"github.com/ngenohkevin/paybutton/utils"
 	"log"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/ngenohkevin/paybutton/internals/analytics"
+	"github.com/ngenohkevin/paybutton/internals/config"
+	"github.com/ngenohkevin/paybutton/internals/monitoring"
+	"github.com/ngenohkevin/paybutton/internals/payment_processing"
+	"github.com/ngenohkevin/paybutton/utils"
 )
 
 type Server struct {
@@ -62,6 +64,10 @@ func (s *Server) Start() error {
 	// Initialize alert management system
 	monitoring.InitializeAlertManager()
 	s.logger.Info("Alert management system initialized")
+
+	// Initialize analytics system
+	analytics.Initialize()
+	s.logger.Info("Analytics system initialized")
 
 	bot, err := tgbotapi.NewBotAPI(botToken.BotApiKey)
 	if err != nil {
@@ -114,6 +120,12 @@ func (s *Server) Start() error {
 	r.GET("/events/balance/:address", payment_processing.HandleSSE)                                       // SSE endpoint for real-time updates (lightweight)
 	r.POST("/webhook/btc", func(c *gin.Context) { payment_processing.HandleBlockonomicsWebhook(c, bot) }) // Blockonomics webhook
 	r.GET("/balance/:address", payment_processing.GetBalance)
+
+	// Analytics WebSocket endpoint for site visitor tracking
+	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
+	
+	// Analytics SDK endpoint
+	r.GET("/analytics.js", serveAnalyticsSDK)
 
 	// Initialize admin authentication and UI
 	adminAuth := NewAdminAuth()
@@ -309,6 +321,10 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 	monitoring.InitializeAlertManager()
 	s.logger.Info("Alert management system initialized")
 
+	// Initialize analytics system
+	analytics.Initialize()
+	s.logger.Info("Analytics system initialized")
+
 	bot, err := tgbotapi.NewBotAPI(botToken.BotApiKey)
 	if err != nil {
 		s.logger.Error("Error initializing bot:", err)
@@ -365,6 +381,12 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 	r.GET("/events/balance/:address", s.handleSSEWithLimit)
 	r.POST("/webhook/btc", func(c *gin.Context) { payment_processing.HandleBlockonomicsWebhook(c, bot) })
 	r.GET("/balance/:address", payment_processing.GetBalance)
+
+	// Analytics WebSocket endpoint for site visitor tracking
+	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
+	
+	// Analytics SDK endpoint
+	r.GET("/analytics.js", serveAnalyticsSDK)
 
 	// Initialize admin authentication and UI
 	adminAuth := NewAdminAuth()
@@ -549,6 +571,10 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("Shutting down server...")
 
+	// Shutdown analytics system first to close connections gracefully
+	analytics.Shutdown()
+	s.logger.Info("Analytics system shutdown completed")
+
 	if s.httpServer == nil {
 		return nil
 	}
@@ -576,4 +602,17 @@ func handleFastPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		payment_processing.ProcessFastPaymentRequest(c, bot, true, false)
 	}
+}
+
+// serveAnalyticsSDK serves the analytics JavaScript SDK
+func serveAnalyticsSDK(c *gin.Context) {
+	// Set appropriate headers for JavaScript
+	c.Header("Content-Type", "application/javascript; charset=utf-8")
+	c.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+	c.Header("Access-Control-Allow-Origin", "*")      // Allow cross-origin requests
+	c.Header("Access-Control-Allow-Methods", "GET")
+	c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	
+	// Serve the analytics.js file
+	c.File("./static/js/analytics.js")
 }

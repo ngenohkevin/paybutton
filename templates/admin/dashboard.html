@@ -331,18 +331,66 @@ function startSessionUpdates() {
     updateSessionStats();
 }
 
-// Start session updates when dashboard loads
+// Site Analytics Functions
+let siteAnalyticsUpdateInterval;
+
+function updateSiteAnalyticsStats() {
+    fetch('/admin/api/dashboard-analytics')
+        .then(response => response.json())
+        .then(data => {
+            // Update site analytics metrics
+            const activeViewersEl = document.getElementById('dashboard-active-viewers');
+            const weeklyVisitorsEl = document.getElementById('dashboard-weekly-visitors');
+            const activeSitesEl = document.getElementById('dashboard-active-sites');
+            
+            if (activeViewersEl) activeViewersEl.textContent = data.totalActive || 0;
+            if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.totalWeekly || 0;
+            if (activeSitesEl) activeSitesEl.textContent = data.activeSites || 0;
+        })
+        .catch(error => {
+            console.error('Error updating site analytics stats:', error);
+            // Set fallback values on error
+            const activeViewersEl = document.getElementById('dashboard-active-viewers');
+            const weeklyVisitorsEl = document.getElementById('dashboard-weekly-visitors');  
+            const activeSitesEl = document.getElementById('dashboard-active-sites');
+            
+            if (activeViewersEl) activeViewersEl.textContent = '0';
+            if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = '0';
+            if (activeSitesEl) activeSitesEl.textContent = '0';
+        });
+}
+
+function startSiteAnalyticsUpdates() {
+    // Clear any existing interval
+    if (siteAnalyticsUpdateInterval) {
+        clearInterval(siteAnalyticsUpdateInterval);
+    }
+    
+    // Update site analytics stats every 5 seconds (faster than session stats for live feel)
+    siteAnalyticsUpdateInterval = setInterval(updateSiteAnalyticsStats, 5000);
+    
+    // Initial update
+    updateSiteAnalyticsStats();
+}
+
+// Start session and site analytics updates when dashboard loads
 document.body.addEventListener('htmx:afterSettle', function(event) {
     if (event.target.id === 'dashboard-content') {
         // Start session updates along with chart updates
         setTimeout(startSessionUpdates, 500);
+        
+        // Start site analytics updates
+        setTimeout(startSiteAnalyticsUpdates, 600);
     }
 });
 
-// Clean up session interval when navigating away
+// Clean up intervals when navigating away
 window.addEventListener('beforeunload', () => {
     if (sessionUpdateInterval) {
         clearInterval(sessionUpdateInterval);
+    }
+    if (siteAnalyticsUpdateInterval) {
+        clearInterval(siteAnalyticsUpdateInterval);
     }
 });
 </script>
