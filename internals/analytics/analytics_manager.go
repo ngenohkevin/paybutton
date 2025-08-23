@@ -249,7 +249,6 @@ func HandleWebSocket(c *gin.Context) {
 
 	// Note: Rate limiting removed to allow normal user browsing behavior
 	// Users frequently open/close pages and this shouldn't be restricted
-	clientIP := c.ClientIP()
 
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
