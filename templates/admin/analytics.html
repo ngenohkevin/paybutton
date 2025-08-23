@@ -862,8 +862,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeAnalytics() {
-    loadAnalyticsData();
     initializeCharts();
+    loadRealAnalyticsData();
     setupPhase5Features();
 }
 
@@ -952,91 +952,121 @@ function loadAnalyticsData() {
 }
 
 function updateKPIs() {
-    document.getElementById('uptimeValue').textContent = analyticsData.uptime + '%';
-    document.getElementById('addressGenValue').textContent = analyticsData.addressGenRate;
-    document.getElementById('paymentSuccessValue').textContent = analyticsData.paymentSuccessRate + '%';
-    document.getElementById('errorRateValue').textContent = analyticsData.errorRate + '%';
-    document.getElementById('responseTime').textContent = analyticsData.responseTime + 'ms';
-    document.getElementById('memoryUsage').textContent = analyticsData.memoryUsage + 'MB';
-    document.getElementById('cpuUsage').textContent = analyticsData.cpuUsage + '%';
+    // These elements don't exist in the current template, skip updating them
+    const uptimeEl = document.getElementById('uptimeValue');
+    if (uptimeEl) uptimeEl.textContent = analyticsData.uptime + '%';
+    
+    const addressGenEl = document.getElementById('addressGenValue');
+    if (addressGenEl) addressGenEl.textContent = analyticsData.addressGenRate;
+    
+    const paymentSuccessEl = document.getElementById('paymentSuccessValue');
+    if (paymentSuccessEl) paymentSuccessEl.textContent = analyticsData.paymentSuccessRate + '%';
+    
+    const errorRateEl = document.getElementById('errorRateValue');
+    if (errorRateEl) errorRateEl.textContent = analyticsData.errorRate + '%';
+    
+    const responseTimeEl = document.getElementById('responseTime');
+    if (responseTimeEl) responseTimeEl.textContent = analyticsData.responseTime + 'ms';
+    
+    const memoryUsageEl = document.getElementById('memoryUsage');
+    if (memoryUsageEl) memoryUsageEl.textContent = analyticsData.memoryUsage + 'MB';
+    
+    const cpuUsageEl = document.getElementById('cpuUsage');
+    if (cpuUsageEl) cpuUsageEl.textContent = analyticsData.cpuUsage + '%';
 }
 
 function initializeCharts() {
-    // Address Generation Chart
-    const addressGenCtx = document.getElementById('addressGenChart').getContext('2d');
-    charts.addressGen = new Chart(addressGenCtx, {
-        type: 'line',
-        data: {
-            labels: generateTimeLabels(),
-            datasets: [{
-                label: 'Addresses/Min',
-                data: generateSampleData(20, 5, 15),
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: getChartOptions('Addresses per Minute')
-    });
-    
-    // Payment Trend Chart
-    const paymentTrendCtx = document.getElementById('paymentTrendChart').getContext('2d');
-    charts.paymentTrend = new Chart(paymentTrendCtx, {
-        type: 'line',
-        data: {
-            labels: generateTimeLabels(),
-            datasets: [{
-                label: 'Success Rate %',
-                data: generateSampleData(20, 95, 100),
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: getChartOptions('Success Rate (%)')
-    });
-    
-    // Performance Chart
-    const performanceCtx = document.getElementById('performanceChart').getContext('2d');
-    charts.performance = new Chart(performanceCtx, {
-        type: 'line',
-        data: {
-            labels: generateTimeLabels(),
-            datasets: [{
-                label: 'Performance Score',
-                data: generateSampleData(20, 85, 100),
-                borderColor: '#8b5cf6',
-                backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: getChartOptions('Performance Score')
-    });
-    
-    // Error Distribution Chart
-    const errorCtx = document.getElementById('errorDistributionChart').getContext('2d');
-    charts.errorDistribution = new Chart(errorCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Critical', 'Warning', 'Info'],
-            datasets: [{
-                data: [2, 8, 5],
-                backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6']
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
+    // Active Viewers Chart
+    const activeViewersCanvas = document.getElementById('activeViewersChart');
+    if (activeViewersCanvas) {
+        const ctx = activeViewersCanvas.getContext('2d');
+        charts.activeViewers = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: [
+                        '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+                        '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 11 }
+                        }
+                    }
                 }
             }
-        }
-    });
+        });
+    }
+    
+    // Weekly Visitors Chart
+    const weeklyVisitorsCanvas = document.getElementById('weeklyVisitorsChart');
+    if (weeklyVisitorsCanvas) {
+        const ctx = weeklyVisitorsCanvas.getContext('2d');
+        charts.weeklyVisitors = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Weekly Visitors',
+                    data: [],
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    // Historical Chart (Phase 5)
+    const historicalCanvas = document.getElementById('historicalChart');
+    if (historicalCanvas) {
+        const ctx = historicalCanvas.getContext('2d');
+        charts.historical = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Viewers',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
 }
 
 // Phase 5: Advanced Analytics Functions
@@ -1242,18 +1272,62 @@ function exportSiteData(format) {
     document.body.removeChild(link);
 }
 
-// Update loadAnalyticsData to include Phase 5 features
-const originalLoadAnalyticsData = loadAnalyticsData;
-loadAnalyticsData = function() {
+// Update charts with analytics data
+function updateChartsWithData(data) {
+    // Update active viewers chart
+    if (charts.activeViewers && data.sites) {
+        const activeData = Object.entries(data.sites)
+            .filter(([_, site]) => site.active > 0)
+            .map(([name, site]) => ({ name, active: site.active }));
+        
+        if (activeData.length > 0) {
+            charts.activeViewers.data.labels = activeData.map(s => s.name);
+            charts.activeViewers.data.datasets[0].data = activeData.map(s => s.active);
+            charts.activeViewers.update();
+        }
+    }
+    
+    // Update weekly visitors chart
+    if (charts.weeklyVisitors && data.sites) {
+        const weeklyData = Object.entries(data.sites)
+            .filter(([_, site]) => site.weekly > 0)
+            .map(([name, site]) => ({ name, weekly: site.weekly }))
+            .sort((a, b) => b.weekly - a.weekly)
+            .slice(0, 10); // Top 10 sites
+        
+        if (weeklyData.length > 0) {
+            charts.weeklyVisitors.data.labels = weeklyData.map(s => s.name);
+            charts.weeklyVisitors.data.datasets[0].data = weeklyData.map(s => s.weekly);
+            charts.weeklyVisitors.update();
+        }
+    }
+}
+
+// Real analytics data loading
+function loadRealAnalyticsData() {
     fetch('/admin/api/site-analytics')
         .then(response => response.json())
         .then(data => {
-            analyticsData = data;
-            updateSiteDropdowns();
-            setupPhase5Features();
+            if (data) {
+                // Update stats cards
+                const activeViewersEl = document.getElementById('activeViewersCount');
+                if (activeViewersEl) activeViewersEl.textContent = data.total_active || '0';
+                
+                const weeklyVisitorsEl = document.getElementById('weeklyVisitorsCount');
+                if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.total_weekly || '0';
+                
+                const activeSitesEl = document.getElementById('activeSitesCount');
+                if (activeSitesEl) activeSitesEl.textContent = data.active_sites || '0';
+                
+                // Update charts
+                updateChartsWithData(data);
+                
+                // Update site dropdowns for Phase 5 features
+                updateSiteDropdowns();
+            }
         })
         .catch(error => console.error('Error loading analytics:', error));
-};
+}
 
 </script>
 {{end}}

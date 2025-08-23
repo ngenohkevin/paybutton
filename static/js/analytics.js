@@ -146,12 +146,11 @@
     }
 
     /**
-     * Log debug messages (only in development)
+     * Log debug messages (always log important events)
      */
     function debug(...args) {
-        if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
-            console.log('PayButton Analytics:', ...args);
-        }
+        // Always log in console for debugging
+        console.log('PayButton Analytics:', ...args);
     }
 
     /**
@@ -215,6 +214,7 @@
 
         try {
             const wsUrl = getWebSocketUrl();
+            console.log(`PayButton Analytics: Attempting connection to ${wsUrl}`);
             websocket = new WebSocket(wsUrl);
 
             // Connection timeout
@@ -228,7 +228,6 @@
 
             websocket.onopen = function(event) {
                 clearTimeout(connectionTimer);
-                debug('Connected to analytics WebSocket');
                 isConnected = true;
                 reconnectAttempts = 0;
                 
@@ -239,7 +238,7 @@
                 startHeartbeat();
                 
                 // Log successful connection
-                console.log(`PayButton Analytics: Connected for ${siteName}`);
+                console.log(`PayButton Analytics: ✅ Connected for ${siteName} (session: ${sessionId})`);
             };
 
             websocket.onmessage = function(event) {
@@ -258,13 +257,13 @@
 
             websocket.onclose = function(event) {
                 clearTimeout(connectionTimer);
-                debug('WebSocket closed:', event.code, event.reason);
+                console.log(`PayButton Analytics: WebSocket closed - code: ${event.code}, reason: ${event.reason || 'none'}`);
                 handleDisconnection();
             };
 
             websocket.onerror = function(error) {
                 clearTimeout(connectionTimer);
-                debug('WebSocket error:', error);
+                console.error('PayButton Analytics: WebSocket error:', error);
                 handleDisconnection();
             };
 
@@ -336,15 +335,17 @@
      * Initialize analytics tracking
      */
     function initialize() {
+        console.log('PayButton Analytics: Starting initialization');
+        
         // Extract site name from script parameters
         siteName = extractSiteName();
         
         if (!siteName) {
-            console.warn('PayButton Analytics: Unable to determine site name');
+            console.error('PayButton Analytics: Unable to determine site name - analytics will not work');
             return;
         }
 
-        debug(`Initializing analytics for site: ${siteName}`);
+        console.log(`PayButton Analytics: Initializing for site: ${siteName}`);
         
         // Reset connection state on page load
         isConnected = false;
@@ -352,16 +353,17 @@
         reconnectAttempts = 0;
         sessionId = null;
 
-        // Start connection when page is loaded
+        // Start connection immediately or when DOM is ready
         if (document.readyState === 'loading') {
+            console.log('PayButton Analytics: Waiting for DOM...');
             document.addEventListener('DOMContentLoaded', function() {
-                debug('DOM ready, connecting...');
+                console.log('PayButton Analytics: DOM ready, connecting...');
                 connect();
             });
         } else {
-            // Page already loaded
-            debug('Page already loaded, connecting...');
-            setTimeout(connect, 100);
+            // Page already loaded - connect immediately
+            console.log('PayButton Analytics: Page ready, connecting immediately...');
+            connect();
         }
 
         // Phase 5: Track navigation changes (for SPAs)
@@ -468,7 +470,8 @@
         }
     };
 
-    // Auto-initialize
+    // Auto-initialize when script loads
+    console.log('PayButton Analytics: Script loaded, auto-initializing...');
     initialize();
 
 })();

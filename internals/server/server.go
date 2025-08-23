@@ -608,8 +608,10 @@ func handleFastPayment(bot *tgbotapi.BotAPI) gin.HandlerFunc {
 func serveAnalyticsSDK(c *gin.Context) {
 	// Set appropriate headers for JavaScript
 	c.Header("Content-Type", "application/javascript; charset=utf-8")
-	c.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour
-	c.Header("Access-Control-Allow-Origin", "*")      // Allow cross-origin requests
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate") // No caching during development
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+	c.Header("Access-Control-Allow-Origin", "*") // Allow cross-origin requests
 	c.Header("Access-Control-Allow-Methods", "GET")
 	c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 
