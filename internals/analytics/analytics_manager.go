@@ -44,9 +44,11 @@ type AnalyticsManager struct {
 	// Rate limiting
 	rateLimiter map[string]*AnalyticsRateLimit // IP -> rate limit info
 
-	mutex   sync.RWMutex
-	cleanup chan string  // for connection cleanup
-	ticker  *time.Ticker // hourly rotation
+	mutex        sync.RWMutex
+	cleanup      chan string  // for connection cleanup
+	ticker       *time.Ticker // hourly rotation
+	shutdown     chan struct{} // shutdown signal
+	shutdownOnce sync.Once    // ensure shutdown only happens once
 }
 
 // AnalyticsRateLimit tracks connection attempts per IP
@@ -165,6 +167,7 @@ func Initialize() {
 		rateLimiter:    make(map[string]*AnalyticsRateLimit),
 		cleanup:        make(chan string, 100),
 		ticker:         time.NewTicker(time.Hour), // Rotate hourly data every hour
+		shutdown:       make(chan struct{}),
 	}
 
 	// Start background cleanup routines
@@ -183,48 +186,51 @@ func Shutdown() {
 		return
 	}
 
-	logger.Info("Analytics Manager: Starting graceful shutdown")
+	// Ensure shutdown only happens once
+	manager.shutdownOnce.Do(func() {
+		logger.Info("Analytics Manager: Starting graceful shutdown")
 
-	manager.mutex.Lock()
-	defer manager.mutex.Unlock()
+		// Signal shutdown to background routines
+		close(manager.shutdown)
 
-	// Close all active connections
-	totalConnections := 0
-	siteCount := 0
-	for siteName, connections := range manager.connections {
-		siteCount++
-		for _, conn := range connections {
-			if conn.conn != nil {
-				// Send close message to client
-				closeMsg := map[string]interface{}{
-					"status":    "shutdown",
-					"reason":    "Server is shutting down",
-					"timestamp": time.Now().Format(time.RFC3339),
-				}
-
-				if err := conn.conn.WriteJSON(closeMsg); err == nil {
-					// Give client time to receive the message
-					time.Sleep(100 * time.Millisecond)
-				}
-
-				conn.conn.Close()
-				totalConnections++
-			}
+		// Stop the ticker
+		if manager.ticker != nil {
+			manager.ticker.Stop()
 		}
-		delete(manager.connections, siteName)
-	}
 
-	// Stop background routines
-	if manager.ticker != nil {
-		manager.ticker.Stop()
-	}
+		manager.mutex.Lock()
+		defer manager.mutex.Unlock()
 
-	// Close cleanup channel
-	close(manager.cleanup)
+		// Close all active connections
+		totalConnections := 0
+		siteCount := 0
+		for siteName, connections := range manager.connections {
+			siteCount++
+			for _, conn := range connections {
+				if conn.conn != nil {
+					// Send close message to client
+					closeMsg := map[string]interface{}{
+						"status":    "shutdown",
+						"reason":    "Server is shutting down",
+						"timestamp": time.Now().Format(time.RFC3339),
+					}
 
-	logger.Info("Analytics Manager: Graceful shutdown completed",
-		slog.Int("connections_closed", totalConnections),
-		slog.Int("sites_affected", siteCount))
+					if err := conn.conn.WriteJSON(closeMsg); err == nil {
+						// Give client time to receive the message
+						time.Sleep(100 * time.Millisecond)
+					}
+
+					conn.conn.Close()
+					totalConnections++
+				}
+			}
+			delete(manager.connections, siteName)
+		}
+
+		logger.Info("Analytics Manager: Graceful shutdown completed",
+			slog.Int("connections_closed", totalConnections),
+			slog.Int("sites_affected", siteCount))
+	})
 }
 
 // HandleWebSocket handles WebSocket connections for analytics tracking
@@ -619,10 +625,17 @@ func (am *AnalyticsManager) cleanupRoutine() {
 
 	for {
 		select {
+		case <-am.shutdown:
+			// Graceful shutdown
+			return
 		case <-ticker.C:
 			am.cleanupStaleConnections()
 			am.cleanupRateLimits() // Clean up rate limit entries as well
-		case siteName := <-am.cleanup:
+		case siteName, ok := <-am.cleanup:
+			if !ok {
+				// Channel closed, exit
+				return
+			}
 			// Manual cleanup trigger
 			am.cleanupStaleConnectionsForSite(siteName)
 		}
@@ -672,12 +685,18 @@ func (am *AnalyticsManager) cleanupStaleConnectionsForSite(siteName string) {
 
 // hourlyRotation runs hourly data rotation for all sites
 func (am *AnalyticsManager) hourlyRotation() {
-	for range am.ticker.C {
-		am.mutex.Lock()
-		for siteName := range am.weeklyData {
-			am.rotateHourlyDataForSite(siteName)
+	for {
+		select {
+		case <-am.shutdown:
+			// Graceful shutdown
+			return
+		case <-am.ticker.C:
+			am.mutex.Lock()
+			for siteName := range am.weeklyData {
+				am.rotateHourlyDataForSite(siteName)
+			}
+			am.mutex.Unlock()
 		}
-		am.mutex.Unlock()
 	}
 }
 
