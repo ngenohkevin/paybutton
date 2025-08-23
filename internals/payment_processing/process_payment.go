@@ -21,6 +21,10 @@ var (
 
 	// SessionTracker Session tracking callback - set by server package to avoid circular imports
 	SessionTracker        func(sessionID, address, userAgent, ipAddress, email string, amount float64, paymentID string)
+	// SessionStatusUpdater Session status update callback - set by server package to avoid circular imports  
+	SessionStatusUpdater  func(address, status string)
+	// SessionWebSocketUpdater WebSocket connection status callback - set by server package to avoid circular imports
+	SessionWebSocketUpdater func(address string, connected bool)
 	addressExpiry         = 72 * time.Hour // Set address expiry time to 72 hours
 	blockCypherToken      string
 	blockonomicsAPIKey    string

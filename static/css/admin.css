@@ -2033,6 +2033,54 @@ h1.text-3xl {
   color: var(--text-primary);
 }
 
+/* Input field styles for sessions page */
+.input-field {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: var(--bg-secondary);
+}
+
+.input-field:hover {
+  border-color: var(--accent-blue);
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Dark theme for input fields */
+[data-theme="dark"] .input-field {
+  background: var(--bg-tertiary);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .input-field:focus {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-blue);
+}
+
+[data-theme="dark"] .input-field::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
 [data-theme="dark"] .form-label {
   color: var(--text-primary);
 }

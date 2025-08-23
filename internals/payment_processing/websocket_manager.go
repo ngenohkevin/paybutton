@@ -62,6 +62,12 @@ func HandleWebSocket(c *gin.Context) {
 	wsManager.addConnection(address, conn)
 	defer wsManager.removeConnection(address, conn)
 
+	// Update session tracking to show WebSocket connection
+	if SessionWebSocketUpdater != nil {
+		SessionWebSocketUpdater(address, true)
+		defer SessionWebSocketUpdater(address, false)
+	}
+
 	log.Printf("WebSocket connected for address: %s", address)
 
 	// Send initial waiting status

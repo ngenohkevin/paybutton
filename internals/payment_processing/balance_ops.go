@@ -2,16 +2,17 @@ package payment_processing
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/ngenohkevin/paybutton/internals/database"
-	payments2 "github.com/ngenohkevin/paybutton/internals/payments"
-	"github.com/ngenohkevin/paybutton/utils"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/ngenohkevin/paybutton/internals/database"
+	payments2 "github.com/ngenohkevin/paybutton/internals/payments"
+	"github.com/ngenohkevin/paybutton/utils"
 )
 
 // Regular expressions for Bitcoin and USDT addresses
@@ -285,6 +286,11 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 
 				// Send WebSocket and SSE notification immediately
 				BroadcastBalanceUpdateAll(address, "confirmed", balanceUSD, btcAmount, email)
+				
+				// Update session status to completed via callback if available
+				if SessionStatusUpdater != nil {
+					SessionStatusUpdater(address, "completed")
+				}
 
 				// Try to get username from the database, but don't fail if not found
 				var userName string

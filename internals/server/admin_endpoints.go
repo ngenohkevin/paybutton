@@ -49,6 +49,7 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 
 	// JSON endpoints for direct API access
 	admin.GET("/status", getSystemStatus)
+	api.GET("/dashboard-sessions", getDashboardSessionStats)
 
 	// Management endpoints
 	admin.GET("/pool", getPoolManagementPage)
@@ -131,8 +132,12 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	sessionAPI.GET("/active", getActiveSessions)
 	sessionAPI.GET("/history", getSessionHistory)
 	sessionAPI.GET("/stats", getSessionStats)
+	sessionAPI.GET("/analytics", getSessionAnalytics)
+	sessionAPI.GET("/timeline", getSessionTimeline)
+	sessionAPI.GET("/trends", getSessionTrends)
 	sessionAPI.POST("/terminate", terminateSession)
 	sessionAPI.POST("/cleanup", cleanupSessions)
+	sessionAPI.POST("/clear-history", clearSessionHistory)
 	sessionAPI.GET("/export", exportSessionData)
 }
 
@@ -407,6 +412,76 @@ func getSystemStatusHTML(c *gin.Context) {
 		</div>
 	</div>
 	
+	<!-- Session Analytics Section -->
+	<div class="card mb-8">
+		<div class="card-header">
+			<h3 class="text-lg font-semibold text-gray-900">
+				<i class="fas fa-users text-blue-500 mr-2"></i>Session Overview
+			</h3>
+		</div>
+		<div class="card-body">
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="session-overview">
+				<!-- Active Sessions -->
+				<div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+					<div class="flex items-center">
+						<div class="p-2 rounded-full bg-blue-100">
+							<i class="fas fa-play text-blue-600"></i>
+						</div>
+						<div class="ml-3">
+							<p class="text-sm font-medium text-blue-600">Active Sessions</p>
+							<p class="text-xl font-bold text-blue-900" id="dashboard-active-sessions">-</p>
+						</div>
+					</div>
+				</div>
+				
+				<!-- WebSocket Connections -->
+				<div class="bg-green-50 p-4 rounded-lg border border-green-200">
+					<div class="flex items-center">
+						<div class="p-2 rounded-full bg-green-100">
+							<i class="fas fa-wifi text-green-600"></i>
+						</div>
+						<div class="ml-3">
+							<p class="text-sm font-medium text-green-600">WebSocket</p>
+							<p class="text-xl font-bold text-green-900" id="dashboard-websocket-count">-</p>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Payment Rate -->
+				<div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+					<div class="flex items-center">
+						<div class="p-2 rounded-full bg-purple-100">
+							<i class="fas fa-percentage text-purple-600"></i>
+						</div>
+						<div class="ml-3">
+							<p class="text-sm font-medium text-purple-600">Payment Rate</p>
+							<p class="text-xl font-bold text-purple-900" id="dashboard-payment-rate">-</p>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Total Revenue -->
+				<div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+					<div class="flex items-center">
+						<div class="p-2 rounded-full bg-yellow-100">
+							<i class="fas fa-dollar-sign text-yellow-600"></i>
+						</div>
+						<div class="ml-3">
+							<p class="text-sm font-medium text-yellow-600">Paid Amount</p>
+							<p class="text-xl font-bold text-yellow-900" id="dashboard-paid-amount">-</p>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="mt-4 text-center">
+				<button onclick="window.location.href='/admin/sessions'" class="btn-primary">
+					<i class="fas fa-chart-line mr-2"></i>View Full Analytics
+				</button>
+			</div>
+		</div>
+	</div>
+
 	<!-- Quick Actions -->
 	<div class="card mb-8">
 		<div class="card-header">
@@ -416,14 +491,14 @@ func getSystemStatusHTML(c *gin.Context) {
 		</div>
 		<div class="card-body">
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-				<button onclick="window.location.href='/admin/pool'" class="btn-primary text-center">
-					<i class="fas fa-swimming-pool mr-2"></i>Manage Pool
+				<button onclick="window.location.href='/admin/sessions'" class="btn-primary text-center">
+					<i class="fas fa-users mr-2"></i>Sessions
+				</button>
+				<button onclick="window.location.href='/admin/pool'" class="btn-secondary text-center">
+					<i class="fas fa-swimming-pool mr-2"></i>Pool
 				</button>
 				<button onclick="window.location.href='/admin/gap-monitor'" class="btn-secondary text-center">
 					<i class="fas fa-exclamation-triangle mr-2"></i>Gap Monitor
-				</button>
-				<button onclick="viewLogs()" class="btn-secondary text-center">
-					<i class="fas fa-file-alt mr-2"></i>View Logs
 				</button>
 				<button onclick="window.location.href='/admin/analytics'" class="btn-secondary text-center">
 					<i class="fas fa-chart-bar mr-2"></i>Analytics
@@ -2239,18 +2314,19 @@ func rollbackConfiguration(c *gin.Context) {
 
 // SessionInfo represents information about a user payment session
 type SessionInfo struct {
-	ID          string    `json:"id"`
-	Address     string    `json:"address"`
-	UserAgent   string    `json:"user_agent"`
-	IPAddress   string    `json:"ip_address"`
-	Email       string    `json:"email,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	LastActive  time.Time `json:"last_active"`
-	Status      string    `json:"status"` // "active", "completed", "expired", "terminated"
-	Amount      float64   `json:"amount,omitempty"`
-	PaymentID   string    `json:"payment_id,omitempty"`
-	Duration    int64     `json:"duration_seconds"`
-	IsWebSocket bool      `json:"is_websocket"`
+	ID            string    `json:"id"`
+	Address       string    `json:"address"`
+	UserAgent     string    `json:"user_agent"`
+	IPAddress     string    `json:"ip_address"`
+	Email         string    `json:"email,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	LastActive    time.Time `json:"last_active"`
+	Status        string    `json:"status"`         // "active", "completed", "expired", "terminated"
+	PaymentStatus string    `json:"payment_status"` // "pending", "paid", "failed"
+	Amount        float64   `json:"amount,omitempty"`
+	PaymentID     string    `json:"payment_id,omitempty"`
+	Duration      int64     `json:"duration_seconds"`
+	IsWebSocket   bool      `json:"is_websocket"`
 }
 
 // Global session store for tracking active sessions
@@ -2266,18 +2342,19 @@ func AddSession(sessionID, address, userAgent, ipAddress, email string, amount f
 	defer sessionStoreMutex.Unlock()
 
 	session := &SessionInfo{
-		ID:          sessionID,
-		Address:     address,
-		UserAgent:   userAgent,
-		IPAddress:   ipAddress,
-		Email:       email,
-		CreatedAt:   time.Now(),
-		LastActive:  time.Now(),
-		Status:      "active",
-		Amount:      amount,
-		PaymentID:   paymentID,
-		Duration:    0,
-		IsWebSocket: false,
+		ID:            sessionID,
+		Address:       address,
+		UserAgent:     userAgent,
+		IPAddress:     ipAddress,
+		Email:         email,
+		CreatedAt:     time.Now(),
+		LastActive:    time.Now(),
+		Status:        "active",
+		PaymentStatus: "pending",
+		Amount:        amount,
+		PaymentID:     paymentID,
+		Duration:      0,
+		IsWebSocket:   false,
 	}
 
 	activeSessionsStore[sessionID] = session
@@ -2310,6 +2387,43 @@ func UpdateSessionStatus(sessionID, status string) {
 	}
 }
 
+// UpdateSessionStatusByAddress finds and updates session status by address
+func UpdateSessionStatusByAddress(address, status string) {
+	sessionStoreMutex.Lock()
+	defer sessionStoreMutex.Unlock()
+
+	for sessionID, session := range activeSessionsStore {
+		if session.Address == address {
+			session.Status = status
+			session.LastActive = time.Now()
+			session.Duration = int64(time.Since(session.CreatedAt).Seconds())
+			
+			// Update payment status based on session status
+			if status == "completed" {
+				session.PaymentStatus = "paid"
+			} else if status == "expired" || status == "terminated" {
+				session.PaymentStatus = "failed"
+			}
+
+			// Move completed/expired/terminated sessions to history
+			if status != "active" {
+				// Create a copy for history
+				historySessions := *session
+				sessionHistoryStore = append(sessionHistoryStore, &historySessions)
+
+				// Keep only last 1000 history entries
+				if len(sessionHistoryStore) > 1000 {
+					sessionHistoryStore = sessionHistoryStore[len(sessionHistoryStore)-1000:]
+				}
+
+				// Remove from active sessions
+				delete(activeSessionsStore, sessionID)
+			}
+			break
+		}
+	}
+}
+
 // UpdateSessionWebSocket marks a session as having WebSocket connection
 func UpdateSessionWebSocket(sessionID string, hasWebSocket bool) {
 	sessionStoreMutex.RLock()
@@ -2318,6 +2432,61 @@ func UpdateSessionWebSocket(sessionID string, hasWebSocket bool) {
 	if session, exists := activeSessionsStore[sessionID]; exists {
 		session.IsWebSocket = hasWebSocket
 		session.LastActive = time.Now()
+	}
+}
+
+// UpdateSessionWebSocketByAddress finds and updates WebSocket status by address
+func UpdateSessionWebSocketByAddress(address string, connected bool) {
+	sessionStoreMutex.Lock()
+	defer sessionStoreMutex.Unlock()
+
+	for _, session := range activeSessionsStore {
+		if session.Address == address {
+			session.IsWebSocket = connected
+			session.LastActive = time.Now()
+			// Don't break - multiple sessions could have same address
+		}
+	}
+}
+
+// autoExpireSessions automatically expires sessions older than 30 minutes
+func autoExpireSessions() {
+	sessionStoreMutex.Lock()
+	defer sessionStoreMutex.Unlock()
+
+	now := time.Now()
+	expiredSessionIDs := make([]string, 0)
+	
+	// Find sessions older than 30 minutes
+	for sessionID, session := range activeSessionsStore {
+		age := now.Sub(session.CreatedAt)
+		lastActiveAge := now.Sub(session.LastActive)
+		
+		// Expire if session is older than 30 minutes or hasn't been active for 15 minutes
+		if age > 30*time.Minute || lastActiveAge > 15*time.Minute {
+			expiredSessionIDs = append(expiredSessionIDs, sessionID)
+		}
+	}
+	
+	// Move expired sessions to history
+	for _, sessionID := range expiredSessionIDs {
+		if session, exists := activeSessionsStore[sessionID]; exists {
+			session.Status = "expired"
+			session.PaymentStatus = "failed"
+			session.Duration = int64(now.Sub(session.CreatedAt).Seconds())
+			
+			// Create a copy for history
+			historySessions := *session
+			sessionHistoryStore = append(sessionHistoryStore, &historySessions)
+			
+			// Keep only last 1000 history entries
+			if len(sessionHistoryStore) > 1000 {
+				sessionHistoryStore = sessionHistoryStore[len(sessionHistoryStore)-1000:]
+			}
+			
+			// Remove from active sessions
+			delete(activeSessionsStore, sessionID)
+		}
 	}
 }
 
@@ -2339,6 +2508,9 @@ func getSessionsPage(c *gin.Context) {
 
 // getActiveSessions returns currently active user sessions
 func getActiveSessions(c *gin.Context) {
+	// First perform automatic cleanup of expired sessions
+	autoExpireSessions()
+	
 	sessionStoreMutex.RLock()
 	defer sessionStoreMutex.RUnlock()
 
@@ -2420,9 +2592,11 @@ func getSessionStats(c *gin.Context) {
 		if session.IsWebSocket {
 			webSocketCount++
 		}
-		// Convert BTC amount to USD
-		amountUSD := session.Amount * rate
-		activeAmountTotal += amountUSD
+		// Convert BTC amount to USD for display
+		if rate > 0 {
+			amountUSD := session.Amount * rate
+			activeAmountTotal += amountUSD
+		}
 	}
 
 	// Historical stats
@@ -2430,7 +2604,11 @@ func getSessionStats(c *gin.Context) {
 	completedCount := 0
 	expiredCount := 0
 	terminatedCount := 0
+	paidCount := 0
+	failedCount := 0
+	pendingCount := 0
 	historicalAmountTotal := 0.0
+	paidAmountTotal := 0.0
 
 	for _, session := range sessionHistoryStore {
 		switch session.Status {
@@ -2441,15 +2619,45 @@ func getSessionStats(c *gin.Context) {
 		case "terminated":
 			terminatedCount++
 		}
-		// Convert BTC amount to USD
-		amountUSD := session.Amount * rate
-		historicalAmountTotal += amountUSD
+		
+		switch session.PaymentStatus {
+		case "paid":
+			paidCount++
+			if rate > 0 {
+				amountUSD := session.Amount
+				paidAmountTotal += amountUSD
+			}
+		case "failed":
+			failedCount++
+		case "pending":
+			pendingCount++
+		}
+		
+		// Convert BTC amount to USD for display
+		if rate > 0 {
+			amountUSD := session.Amount
+			historicalAmountTotal += amountUSD
+		}
+	}
+	
+	// Add active session payment statuses
+	for _, session := range activeSessionsStore {
+		switch session.PaymentStatus {
+		case "pending":
+			pendingCount++
+		case "paid":
+			paidCount++
+		case "failed":
+			failedCount++
+		}
 	}
 
-	// Success rate calculation
+	// Success rate calculation (based on completed payments)
 	successRate := 0.0
+	paymentSuccessRate := 0.0
 	if totalSessions > 0 {
 		successRate = (float64(completedCount) / float64(totalSessions)) * 100
+		paymentSuccessRate = (float64(paidCount) / float64(totalSessions)) * 100
 	}
 
 	// Average session duration from history
@@ -2460,6 +2668,12 @@ func getSessionStats(c *gin.Context) {
 			totalDuration += session.Duration
 		}
 		avgDuration = float64(totalDuration) / float64(len(sessionHistoryStore))
+	}
+
+	// Conversion rate (sessions that result in payments)
+	conversionRate := 0.0
+	if totalSessions > 0 {
+		conversionRate = (float64(paidCount) / float64(totalSessions)) * 100
 	}
 
 	stats := gin.H{
@@ -2475,14 +2689,358 @@ func getSessionStats(c *gin.Context) {
 			"terminated":     terminatedCount,
 			"total_amount":   historicalAmountTotal,
 		},
+		"payments": gin.H{
+			"paid_count":     paidCount,
+			"failed_count":   failedCount,
+			"pending_count":  pendingCount,
+			"paid_amount":    paidAmountTotal,
+		},
 		"metrics": gin.H{
 			"success_rate":         successRate,
+			"payment_success_rate": paymentSuccessRate,
+			"conversion_rate":      conversionRate,
 			"avg_duration_seconds": avgDuration,
 		},
 		"timestamp": time.Now().Unix(),
 	}
 
 	c.JSON(http.StatusOK, stats)
+}
+
+// getSessionAnalytics returns detailed analytics data for charts
+func getSessionAnalytics(c *gin.Context) {
+	sessionStoreMutex.RLock()
+	defer sessionStoreMutex.RUnlock()
+
+	// Status distribution
+	statusData := map[string]int{
+		"active":     0,
+		"completed":  0,
+		"expired":    0,
+		"terminated": 0,
+	}
+
+	// Payment status distribution
+	paymentData := map[string]int{
+		"pending": 0,
+		"paid":    0,
+		"failed":  0,
+	}
+
+	// Amount ranges
+	amountRanges := map[string]int{
+		"0-10":    0,
+		"10-50":   0,
+		"50-100":  0,
+		"100-500": 0,
+		"500+":    0,
+	}
+
+	// WebSocket usage
+	wsData := map[string]int{
+		"with_websocket":    0,
+		"without_websocket": 0,
+	}
+
+	// Process active sessions
+	for _, session := range activeSessionsStore {
+		statusData["active"]++
+		paymentData[session.PaymentStatus]++
+		
+		if session.IsWebSocket {
+			wsData["with_websocket"]++
+		} else {
+			wsData["without_websocket"]++
+		}
+		
+		// Amount categorization
+		amount := session.Amount
+		switch {
+		case amount <= 10:
+			amountRanges["0-10"]++
+		case amount <= 50:
+			amountRanges["10-50"]++
+		case amount <= 100:
+			amountRanges["50-100"]++
+		case amount <= 500:
+			amountRanges["100-500"]++
+		default:
+			amountRanges["500+"]++
+		}
+	}
+
+	// Process historical sessions
+	for _, session := range sessionHistoryStore {
+		statusData[session.Status]++
+		paymentData[session.PaymentStatus]++
+		
+		if session.IsWebSocket {
+			wsData["with_websocket"]++
+		} else {
+			wsData["without_websocket"]++
+		}
+		
+		// Amount categorization
+		amount := session.Amount
+		switch {
+		case amount <= 10:
+			amountRanges["0-10"]++
+		case amount <= 50:
+			amountRanges["10-50"]++
+		case amount <= 100:
+			amountRanges["50-100"]++
+		case amount <= 500:
+			amountRanges["100-500"]++
+		default:
+			amountRanges["500+"]++
+		}
+	}
+
+	analytics := gin.H{
+		"status_distribution":  statusData,
+		"payment_distribution": paymentData,
+		"amount_ranges":        amountRanges,
+		"websocket_usage":      wsData,
+		"timestamp":           time.Now().Unix(),
+	}
+
+	c.JSON(http.StatusOK, analytics)
+}
+
+// getSessionTimeline returns hourly session data for the last 24 hours
+func getSessionTimeline(c *gin.Context) {
+	sessionStoreMutex.RLock()
+	defer sessionStoreMutex.RUnlock()
+
+	now := time.Now()
+	hours := 24
+	timeline := make([]gin.H, hours)
+
+	// Initialize timeline with empty data
+	for i := 0; i < hours; i++ {
+		hourStart := now.Add(-time.Duration(hours-i-1) * time.Hour)
+		timeline[i] = gin.H{
+			"hour":      hourStart.Format("15:04"),
+			"timestamp": hourStart.Unix(),
+			"created":   0,
+			"completed": 0,
+			"expired":   0,
+			"paid":      0,
+			"failed":    0,
+		}
+	}
+
+	// Process historical sessions
+	for _, session := range sessionHistoryStore {
+		// Check if session falls within our 24-hour window
+		if session.CreatedAt.After(now.Add(-24 * time.Hour)) {
+			// Find which hour this session belongs to
+			hoursDiff := int(now.Sub(session.CreatedAt).Hours())
+			if hoursDiff >= 0 && hoursDiff < hours {
+				index := hours - hoursDiff - 1
+				if index >= 0 && index < len(timeline) {
+					timeline[index]["created"] = timeline[index]["created"].(int) + 1
+					
+					switch session.Status {
+					case "completed":
+						timeline[index]["completed"] = timeline[index]["completed"].(int) + 1
+					case "expired":
+						timeline[index]["expired"] = timeline[index]["expired"].(int) + 1
+					}
+					
+					switch session.PaymentStatus {
+					case "paid":
+						timeline[index]["paid"] = timeline[index]["paid"].(int) + 1
+					case "failed":
+						timeline[index]["failed"] = timeline[index]["failed"].(int) + 1
+					}
+				}
+			}
+		}
+	}
+
+	// Process active sessions (only for creation count)
+	for _, session := range activeSessionsStore {
+		if session.CreatedAt.After(now.Add(-24 * time.Hour)) {
+			hoursDiff := int(now.Sub(session.CreatedAt).Hours())
+			if hoursDiff >= 0 && hoursDiff < hours {
+				index := hours - hoursDiff - 1
+				if index >= 0 && index < len(timeline) {
+					timeline[index]["created"] = timeline[index]["created"].(int) + 1
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"timeline":  timeline,
+		"timestamp": time.Now().Unix(),
+	})
+}
+
+// getSessionTrends returns trend data and insights
+func getSessionTrends(c *gin.Context) {
+	sessionStoreMutex.RLock()
+	defer sessionStoreMutex.RUnlock()
+
+	now := time.Now()
+	last24h := now.Add(-24 * time.Hour)
+	last7d := now.Add(-7 * 24 * time.Hour)
+
+	// Initialize counters
+	trends := gin.H{
+		"last_24h": gin.H{
+			"sessions":   0,
+			"completed":  0,
+			"paid":       0,
+			"amount":     0.0,
+		},
+		"last_7d": gin.H{
+			"sessions":   0,
+			"completed":  0,
+			"paid":       0,
+			"amount":     0.0,
+		},
+		"current_active": len(activeSessionsStore),
+		"current_websockets": 0,
+		"performance": gin.H{
+			"avg_session_duration": 0.0,
+			"conversion_rate":      0.0,
+			"success_rate":         0.0,
+		},
+	}
+
+	// Count current WebSocket connections
+	for _, session := range activeSessionsStore {
+		if session.IsWebSocket {
+			trends["current_websockets"] = trends["current_websockets"].(int) + 1
+		}
+	}
+
+	var last24hDurations []int64
+	var last7dDurations []int64
+
+	// Process historical sessions
+	for _, session := range sessionHistoryStore {
+		// Last 24 hours
+		if session.CreatedAt.After(last24h) {
+			trends["last_24h"].(gin.H)["sessions"] = trends["last_24h"].(gin.H)["sessions"].(int) + 1
+			if session.Status == "completed" {
+				trends["last_24h"].(gin.H)["completed"] = trends["last_24h"].(gin.H)["completed"].(int) + 1
+			}
+			if session.PaymentStatus == "paid" {
+				trends["last_24h"].(gin.H)["paid"] = trends["last_24h"].(gin.H)["paid"].(int) + 1
+				trends["last_24h"].(gin.H)["amount"] = trends["last_24h"].(gin.H)["amount"].(float64) + session.Amount
+			}
+			last24hDurations = append(last24hDurations, session.Duration)
+		}
+
+		// Last 7 days
+		if session.CreatedAt.After(last7d) {
+			trends["last_7d"].(gin.H)["sessions"] = trends["last_7d"].(gin.H)["sessions"].(int) + 1
+			if session.Status == "completed" {
+				trends["last_7d"].(gin.H)["completed"] = trends["last_7d"].(gin.H)["completed"].(int) + 1
+			}
+			if session.PaymentStatus == "paid" {
+				trends["last_7d"].(gin.H)["paid"] = trends["last_7d"].(gin.H)["paid"].(int) + 1
+				trends["last_7d"].(gin.H)["amount"] = trends["last_7d"].(gin.H)["amount"].(float64) + session.Amount
+			}
+			last7dDurations = append(last7dDurations, session.Duration)
+		}
+	}
+
+	// Calculate performance metrics
+	if len(last24hDurations) > 0 {
+		var totalDuration int64
+		for _, d := range last24hDurations {
+			totalDuration += d
+		}
+		trends["performance"].(gin.H)["avg_session_duration"] = float64(totalDuration) / float64(len(last24hDurations))
+	}
+
+	// Calculate rates
+	if trends["last_24h"].(gin.H)["sessions"].(int) > 0 {
+		conversionRate := (float64(trends["last_24h"].(gin.H)["paid"].(int)) / float64(trends["last_24h"].(gin.H)["sessions"].(int))) * 100
+		successRate := (float64(trends["last_24h"].(gin.H)["completed"].(int)) / float64(trends["last_24h"].(gin.H)["sessions"].(int))) * 100
+		trends["performance"].(gin.H)["conversion_rate"] = conversionRate
+		trends["performance"].(gin.H)["success_rate"] = successRate
+	}
+
+	trends["timestamp"] = time.Now().Unix()
+	c.JSON(http.StatusOK, trends)
+}
+
+// getDashboardSessionStats returns basic session statistics for dashboard overview
+func getDashboardSessionStats(c *gin.Context) {
+	sessionStoreMutex.RLock()
+	defer sessionStoreMutex.RUnlock()
+
+	// Count active sessions and websocket connections
+	activeSessions := 0
+	websocketCount := 0
+	paidSessions := 0
+	totalPaidAmount := 0.0
+
+	// Count active sessions
+	for _, session := range activeSessionsStore {
+		if session.Status == "active" {
+			activeSessions++
+		}
+		if session.IsWebSocket {
+			websocketCount++
+		}
+		if session.PaymentStatus == "paid" {
+			paidSessions++
+			totalPaidAmount += session.Amount
+		}
+	}
+
+	// Count paid sessions from history as well
+	for _, session := range sessionHistoryStore {
+		if session.PaymentStatus == "paid" {
+			paidSessions++
+			totalPaidAmount += session.Amount
+		}
+	}
+
+	// Calculate payment rate based on all sessions (active + history)
+	totalSessions := len(activeSessionsStore) + len(sessionHistoryStore)
+	paymentRate := 0.0
+	if totalSessions > 0 {
+		paymentRate = (float64(paidSessions) / float64(totalSessions)) * 100
+	}
+
+	stats := gin.H{
+		"active_sessions":  activeSessions,
+		"websocket_count":  websocketCount,
+		"payment_rate":     paymentRate,
+		"paid_amount":      totalPaidAmount,
+		"total_sessions":   totalSessions,
+		"paid_sessions":    paidSessions,
+		"timestamp":        time.Now().Unix(),
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
+// clearSessionHistory clears all session history data
+func clearSessionHistory(c *gin.Context) {
+	sessionStoreMutex.Lock()
+	defer sessionStoreMutex.Unlock()
+
+	historyCount := len(sessionHistoryStore)
+	
+	// Clear all session history
+	sessionHistoryStore = []*SessionInfo{}
+
+	log.Printf("Admin cleared all session history. Removed %d historical sessions", historyCount)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":        true,
+		"message":        fmt.Sprintf("Successfully cleared %d historical sessions", historyCount),
+		"cleared_count":  historyCount,
+		"timestamp":      time.Now().Unix(),
+	})
 }
 
 // terminateSession forcefully terminates an active session

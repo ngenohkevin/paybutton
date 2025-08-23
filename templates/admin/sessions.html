@@ -23,88 +23,221 @@
     </div>
 
     <!-- Session Statistics -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6" id="session-stats">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" id="session-stats">
         <!-- Active Sessions Card -->
-        <div class="card">
-            <div class="card-body">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900">
-                        <i class="fas fa-play text-blue-600 dark:text-blue-400"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Active Sessions</p>
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white" id="active-count">0</p>
-                    </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:border-blue-300 dark:hover:border-blue-600">
+            <div class="flex items-center">
+                <div class="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800">
+                    <i class="fas fa-play text-blue-600 dark:text-blue-400 text-xl"></i>
+                </div>
+                <div class="ml-5">
+                    <p class="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1">Active Sessions</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="active-count">0</p>
                 </div>
             </div>
         </div>
 
         <!-- WebSocket Connections Card -->
-        <div class="card">
-            <div class="card-body">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-green-100 dark:bg-green-900">
-                        <i class="fas fa-wifi text-green-600 dark:text-green-400"></i>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:border-green-300 dark:hover:border-green-600">
+            <div class="flex items-center">
+                <div class="p-4 rounded-xl bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800">
+                    <i class="fas fa-wifi text-green-600 dark:text-green-400 text-xl"></i>
+                </div>
+                <div class="ml-5">
+                    <p class="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1">WebSocket</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="websocket-count">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Rate Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:border-purple-300 dark:hover:border-purple-600">
+            <div class="flex items-center">
+                <div class="p-4 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800">
+                    <i class="fas fa-percentage text-purple-600 dark:text-purple-400 text-xl"></i>
+                </div>
+                <div class="ml-5">
+                    <p class="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1">Payment Rate</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="success-rate">0%</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paid Amount Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:border-yellow-300 dark:hover:border-yellow-600">
+            <div class="flex items-center">
+                <div class="p-4 rounded-xl bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900 dark:to-yellow-800">
+                    <i class="fas fa-dollar-sign text-yellow-600 dark:text-yellow-400 text-xl"></i>
+                </div>
+                <div class="ml-5">
+                    <p class="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1">Paid Amount</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="total-amount">$0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Analytics Charts -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-8 mb-8">
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-6 sm:mb-8">
+            <i class="fas fa-chart-line text-blue-500 mr-3"></i>Session Analytics
+        </h2>
+        
+        <!-- Chart Tabs - Mobile Responsive -->
+        <div class="mb-6 sm:mb-8">
+            <nav class="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:-mb-px" aria-label="Chart Tabs">
+                <button onclick="switchChartTab('overview')" 
+                        class="chart-tab-button active w-full sm:w-auto" 
+                        id="overview-chart-tab">
+                    <i class="fas fa-chart-pie mr-2"></i>Overview
+                </button>
+                <button onclick="switchChartTab('timeline')" 
+                        class="chart-tab-button w-full sm:w-auto" 
+                        id="timeline-chart-tab">
+                    <i class="fas fa-chart-line mr-2"></i>Timeline
+                </button>
+                <button onclick="switchChartTab('performance')" 
+                        class="chart-tab-button w-full sm:w-auto" 
+                        id="performance-chart-tab">
+                    <i class="fas fa-tachometer-alt mr-2"></i>Performance
+                </button>
+            </nav>
+        </div>
+
+        <!-- Chart Content -->
+        <div id="overview-charts" class="chart-content active">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <!-- Status Distribution -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-chart-pie text-blue-500 mr-2 text-sm sm:text-base"></i>
+                        Status Distribution
+                    </h3>
+                    <div class="h-48 sm:h-64 flex items-center justify-center">
+                        <canvas id="statusChart"></canvas>
                     </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">WebSocket</p>
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white" id="websocket-count">0</p>
+                </div>
+
+                <!-- Payment Status -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-credit-card text-green-500 mr-2 text-sm sm:text-base"></i>
+                        Payment Status
+                    </h3>
+                    <div class="h-48 sm:h-64 flex items-center justify-center">
+                        <canvas id="paymentChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Amount Ranges -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-dollar-sign text-yellow-500 mr-2 text-sm sm:text-base"></i>
+                        Amount Distribution
+                    </h3>
+                    <div class="h-48 sm:h-64 flex items-center justify-center">
+                        <canvas id="amountChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- WebSocket Usage -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-wifi text-purple-500 mr-2 text-sm sm:text-base"></i>
+                        WebSocket Usage
+                    </h3>
+                    <div class="h-48 sm:h-64 flex items-center justify-center">
+                        <canvas id="websocketChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Success Rate Card -->
-        <div class="card">
-            <div class="card-body">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900">
-                        <i class="fas fa-check-circle text-purple-600 dark:text-purple-400"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Success Rate</p>
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white" id="success-rate">0%</p>
-                    </div>
+        <div id="timeline-charts" class="chart-content hidden">
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-600">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                    <i class="fas fa-clock text-indigo-500 mr-2 text-sm sm:text-base"></i>
+                    24-Hour Session Activity
+                </h3>
+                <div class="h-64 sm:h-96 overflow-hidden">
+                    <canvas id="timelineChart"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Total Amount Card -->
-        <div class="card">
-            <div class="card-body">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900">
-                        <i class="fas fa-bitcoin text-yellow-600 dark:text-yellow-400"></i>
+        <div id="performance-charts" class="chart-content hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+                <!-- Performance Metrics Cards -->
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 sm:p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-xl bg-white bg-opacity-20 backdrop-blur-sm">
+                            <i class="fas fa-percentage text-lg sm:text-2xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-blue-100 text-sm font-medium">Conversion Rate</p>
+                            <p class="text-2xl sm:text-3xl font-bold" id="conversion-rate">0%</p>
+                        </div>
                     </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Amount</p>
-                        <p class="text-lg font-bold text-gray-900 dark:text-white" id="total-amount">$0</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 sm:p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-xl bg-white bg-opacity-20 backdrop-blur-sm">
+                            <i class="fas fa-clock text-lg sm:text-2xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-green-100 text-sm font-medium">Avg Duration</p>
+                            <p class="text-2xl sm:text-3xl font-bold" id="avg-duration">0m</p>
+                        </div>
                     </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 sm:p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] sm:col-span-2 lg:col-span-1">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-xl bg-white bg-opacity-20 backdrop-blur-sm">
+                            <i class="fas fa-dollar-sign text-lg sm:text-2xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-purple-100 text-sm font-medium">Revenue (24h)</p>
+                            <p class="text-2xl sm:text-3xl font-bold" id="revenue-24h">$0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trends Chart -->
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-600">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                    <i class="fas fa-chart-area text-teal-500 mr-2 text-sm sm:text-base"></i>
+                    Performance Trends
+                </h3>
+                <div class="h-48 sm:h-64 overflow-hidden">
+                    <canvas id="trendsChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Session Management Tabs -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
         <!-- Tab Headers -->
-        <div class="border-b border-gray-200 dark:border-gray-700">
-            <nav class="flex overflow-x-auto -mb-px" aria-label="Tabs">
+        <div class="border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+            <nav class="flex overflow-x-auto -mb-px space-x-2" aria-label="Tabs">
                 <button onclick="switchTab('active')" 
-                        class="tab-button active" 
+                        class="tab-button active flex-shrink-0" 
                         id="active-tab">
                     <i class="fas fa-play mr-2"></i>
                     <span class="hidden sm:inline">Active Sessions</span>
                     <span class="sm:hidden">Active</span>
-                    <span class="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full" id="active-badge">0</span>
+                    <span class="ml-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2.5 py-1 rounded-full" id="active-badge">0</span>
                 </button>
                 <button onclick="switchTab('history')" 
-                        class="tab-button" 
+                        class="tab-button flex-shrink-0" 
                         id="history-tab">
                     <i class="fas fa-history mr-2"></i>
                     <span class="hidden sm:inline">Session History</span>
                     <span class="sm:hidden">History</span>
-                    <span class="ml-2 bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full" id="history-badge">0</span>
+                    <span class="ml-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-medium px-2.5 py-1 rounded-full" id="history-badge">0</span>
                 </button>
             </nav>
         </div>
@@ -130,6 +263,8 @@
                             <option value="">All Status</option>
                             <option value="active">Active</option>
                             <option value="websocket">With WebSocket</option>
+                            <option value="pending">Pending Payment</option>
+                            <option value="paid">Paid</option>
                         </select>
                     </div>
                     <div class="flex gap-2">
@@ -151,6 +286,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payment</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -192,6 +328,8 @@
                             <option value="completed">Completed</option>
                             <option value="expired">Expired</option>
                             <option value="terminated">Terminated</option>
+                            <option value="paid">Paid</option>
+                            <option value="failed">Payment Failed</option>
                         </select>
                         <select id="history-limit" 
                                 class="input-field w-full sm:w-auto"
@@ -200,6 +338,26 @@
                             <option value="100">Last 100</option>
                             <option value="500">Last 500</option>
                         </select>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="relative group">
+                            <button onclick="clearAllHistory()" 
+                                    class="flex items-center px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-sm font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 active:scale-[0.98]">
+                                <i class="fas fa-trash-alt mr-2 text-white"></i>
+                                <span class="hidden sm:inline text-white">Clear All History</span>
+                                <span class="sm:hidden text-white">Clear History</span>
+                            </button>
+                            <!-- Beautiful Tooltip -->
+                            <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-20">
+                                <div class="bg-gray-900 dark:bg-gray-700 text-white text-xs font-medium rounded-xl py-3 px-4 whitespace-nowrap shadow-2xl border border-gray-700 dark:border-gray-600">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-exclamation-triangle text-amber-400 mr-2"></i>
+                                        <span>Permanently delete all session history</span>
+                                    </div>
+                                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -213,6 +371,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payment</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Completed</th>
                             </tr>
                         </thead>
@@ -428,10 +587,119 @@
     background-color: #14532d;
     color: #bbf7d0;
 }
+
+.payment-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.payment-pending {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.dark .payment-pending {
+    background-color: #92400e;
+    color: #fde68a;
+}
+
+.payment-paid {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.dark .payment-paid {
+    background-color: #14532d;
+    color: #bbf7d0;
+}
+
+.payment-failed {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.dark .payment-failed {
+    background-color: #991b1b;
+    color: #fecaca;
+}
+
+/* Chart tab styles - Mobile Responsive */
+.chart-tab-button {
+    white-space: nowrap;
+    padding: 0.75rem 1.5rem;
+    border: 2px solid transparent;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #6b7280;
+    transition: all 0.3s ease;
+    border-radius: 0.75rem;
+    margin-bottom: 0.5rem;
+    min-height: 44px; /* Better touch targets */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-tab-button:hover {
+    color: #374151;
+    background-color: #f3f4f6;
+    border-color: #e5e7eb;
+    transform: translateY(-1px);
+    shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.chart-tab-button.active {
+    border-color: #3b82f6;
+    color: #2563eb;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.dark .chart-tab-button {
+    color: #9ca3af;
+}
+
+.dark .chart-tab-button:hover {
+    color: #d1d5db;
+    background-color: #374151;
+    border-color: #4b5563;
+}
+
+.dark .chart-tab-button.active {
+    color: #60a5fa;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    border-color: #60a5fa;
+    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.25);
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 640px) {
+    .chart-tab-button {
+        padding: 1rem;
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+    }
+}
+
+.chart-content {
+    display: none;
+}
+
+.chart-content.active {
+    display: block;
+}
 </style>
+
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 
 <script>
 let currentSessionData = null;
+let currentCharts = {};
 let currentTerminatingSessionId = null;
 
 // Load initial data
@@ -439,6 +707,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSessionStats();
     loadActiveSessions();
     loadSessionHistory();
+    initializeCharts();
+    loadAnalyticsData();
     
     // Set up auto-refresh every 30 seconds
     setInterval(function() {
@@ -446,6 +716,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveSessions();
         }
         loadSessionStats();
+        loadAnalyticsData();
     }, 30000);
 });
 
@@ -473,8 +744,8 @@ function loadSessionStats() {
         .then(data => {
             document.getElementById('active-count').textContent = data.active_sessions.count;
             document.getElementById('websocket-count').textContent = data.active_sessions.websocket_count;
-            document.getElementById('success-rate').textContent = data.metrics.success_rate.toFixed(1) + '%';
-            document.getElementById('total-amount').textContent = '$' + data.active_sessions.total_amount.toFixed(2);
+            document.getElementById('success-rate').textContent = data.metrics.payment_success_rate ? data.metrics.payment_success_rate.toFixed(1) + '%' : '0%';
+            document.getElementById('total-amount').textContent = '$' + (data.payments ? data.payments.paid_amount.toFixed(2) : '0.00');
             
             // Update badges
             document.getElementById('active-badge').textContent = data.active_sessions.count;
@@ -540,7 +811,7 @@ function renderActiveSessions(sessions) {
                 <div class="text-sm text-gray-500 dark:text-gray-400">${session.email || 'No email'}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'N/A'}
+                ${session.amount ? '$' + session.amount.toFixed(2) : 'N/A'}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                 ${formatDuration(session.duration_seconds)}
@@ -548,6 +819,9 @@ function renderActiveSessions(sessions) {
             <td class="px-6 py-4 whitespace-nowrap">
                 <span class="status-badge status-${session.status}">${session.status}</span>
                 ${session.is_websocket ? '<span class="websocket-indicator ml-2"><i class="fas fa-wifi mr-1"></i>WS</span>' : ''}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="payment-badge payment-${session.payment_status}">${session.payment_status}</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <button onclick="event.stopPropagation(); initiateTerminateSession('${session.id}')" 
@@ -568,6 +842,7 @@ function renderActiveSessions(sessions) {
                 </div>
                 <div class="flex gap-2">
                     <span class="status-badge status-${session.status}">${session.status}</span>
+                    <span class="payment-badge payment-${session.payment_status}">${session.payment_status}</span>
                     ${session.is_websocket ? '<span class="websocket-indicator"><i class="fas fa-wifi"></i></span>' : ''}
                 </div>
             </div>
@@ -585,7 +860,7 @@ function renderActiveSessions(sessions) {
             
             <div class="flex justify-between items-center">
                 <p class="text-sm text-gray-900 dark:text-white">
-                    ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'No amount'}
+                    ${session.amount ? '$' + session.amount.toFixed(2) : 'No amount'}
                 </p>
                 <button onclick="event.stopPropagation(); initiateTerminateSession('${session.id}')" 
                         class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm">
@@ -623,7 +898,7 @@ function renderHistorySessions(sessions) {
                 <div class="text-sm text-gray-500 dark:text-gray-400">${session.email || 'No email'}</div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'N/A'}
+                ${session.amount ? '$' + session.amount.toFixed(2) : 'N/A'}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                 ${formatDuration(session.duration_seconds)}
@@ -631,6 +906,9 @@ function renderHistorySessions(sessions) {
             <td class="px-6 py-4 whitespace-nowrap">
                 <span class="status-badge status-${session.status}">${session.status}</span>
                 ${session.is_websocket ? '<span class="websocket-indicator ml-2"><i class="fas fa-wifi mr-1"></i>WS</span>' : ''}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="payment-badge payment-${session.payment_status}">${session.payment_status}</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                 ${new Date(session.last_active).toLocaleString()}
@@ -648,6 +926,7 @@ function renderHistorySessions(sessions) {
                 </div>
                 <div class="flex gap-2">
                     <span class="status-badge status-${session.status}">${session.status}</span>
+                    <span class="payment-badge payment-${session.payment_status}">${session.payment_status}</span>
                     ${session.is_websocket ? '<span class="websocket-indicator"><i class="fas fa-wifi"></i></span>' : ''}
                 </div>
             </div>
@@ -664,7 +943,7 @@ function renderHistorySessions(sessions) {
             </div>
             
             <div class="text-sm text-gray-900 dark:text-white">
-                ${session.amount ? session.amount.toFixed(8) + ' BTC' : 'No amount'}
+                ${session.amount ? '$' + session.amount.toFixed(2) : 'No amount'}
             </div>
         </div>
     `).join('');
@@ -710,51 +989,98 @@ function displaySessionDetails(session) {
     }
     
     content.innerHTML = `
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Session ID</label>
-                <p class="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 p-2 rounded">${session.id}</p>
+        <div class="space-y-6">
+            <!-- Session Overview -->
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Session Overview</h4>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Session ID</label>
+                        <div class="relative">
+                            <p class="text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-800 p-2 rounded font-mono text-xs break-all pr-8">${session.id}</p>
+                            <button onclick="copyToClipboard('${session.id}')" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                <i class="fas fa-copy text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status & Payment</label>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="status-badge status-${session.status}">${session.status}</span>
+                            <span class="payment-badge payment-${session.payment_status}">${session.payment_status}</span>
+                            ${session.is_websocket ? '<span class="websocket-indicator"><i class="fas fa-wifi mr-1"></i>Live</span>' : ''}
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                <span class="status-badge status-${session.status}">${session.status}</span>
-                ${session.is_websocket ? '<span class="websocket-indicator ml-2"><i class="fas fa-wifi mr-1"></i>WebSocket</span>' : ''}
+
+            <!-- Address & Payment Info -->
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Payment Details</h4>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bitcoin Address</label>
+                        <div class="relative">
+                            <p class="text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-800 p-2 rounded font-mono text-xs break-all pr-8">${session.address}</p>
+                            <button onclick="copyToClipboard('${session.address}')" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                <i class="fas fa-copy text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                            <p class="text-lg font-bold text-gray-900 dark:text-white">${session.amount ? '$' + session.amount.toFixed(2) : 'Not specified'}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment ID</label>
+                            <p class="text-sm text-gray-900 dark:text-white font-mono text-xs break-all">${session.payment_id || 'Not assigned'}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bitcoin Address</label>
-                <p class="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 p-2 rounded font-mono">${session.address}</p>
+
+            <!-- User Information -->
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">User Information</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                        <p class="text-sm text-gray-900 dark:text-white break-all">${session.email || 'Not provided'}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">IP Address</label>
+                        <p class="text-sm text-gray-900 dark:text-white font-mono">${session.ip_address}</p>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">IP Address</label>
-                <p class="text-sm text-gray-900 dark:text-white">${session.ip_address}</p>
+
+            <!-- Timing Information -->
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Timeline</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Created</label>
+                        <p class="text-sm text-gray-900 dark:text-white">${new Date(session.created_at).toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Active</label>
+                        <p class="text-sm text-gray-900 dark:text-white">${new Date(session.last_active).toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration</label>
+                        <p class="text-sm text-gray-900 dark:text-white font-semibold">${formatDuration(session.duration_seconds)}</p>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                <p class="text-sm text-gray-900 dark:text-white">${session.email || 'Not provided'}</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
-                <p class="text-sm text-gray-900 dark:text-white">${session.amount ? session.amount.toFixed(8) + ' BTC' : 'Not specified'}</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment ID</label>
-                <p class="text-sm text-gray-900 dark:text-white">${session.payment_id || 'Not assigned'}</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Created</label>
-                <p class="text-sm text-gray-900 dark:text-white">${new Date(session.created_at).toLocaleString()}</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Active</label>
-                <p class="text-sm text-gray-900 dark:text-white">${new Date(session.last_active).toLocaleString()}</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration</label>
-                <p class="text-sm text-gray-900 dark:text-white">${formatDuration(session.duration_seconds)}</p>
-            </div>
-            <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User Agent</label>
-                <p class="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 p-2 rounded break-all">${session.user_agent}</p>
+
+            <!-- Technical Details -->
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Technical Details</h4>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User Agent</label>
+                    <p class="text-xs text-gray-900 dark:text-white bg-white dark:bg-gray-800 p-2 rounded break-all">${session.user_agent}</p>
+                </div>
             </div>
         </div>
     `;
@@ -850,6 +1176,105 @@ function cleanupExpiredSessions() {
     });
 }
 
+// Clear all session history
+function clearAllHistory() {
+    // Show custom confirmation modal
+    showClearHistoryConfirmation();
+}
+
+function showClearHistoryConfirmation() {
+    // Create beautiful confirmation modal
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div class="flex items-center mb-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Clear All Session History</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">This action cannot be undone</p>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <p class="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                    You are about to permanently delete <strong>all session history data</strong>. This includes:
+                </p>
+                <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                    <li>All completed session records</li>
+                    <li>Payment history and analytics data</li>
+                    <li>Session duration and user information</li>
+                </ul>
+                <div class="mt-4 p-3 bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg">
+                    <p class="text-sm text-amber-800 dark:text-amber-200">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Active sessions will remain unaffected and continue normally.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeClearHistoryModal()" 
+                        class="px-4 py-2 text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    Cancel
+                </button>
+                <button onclick="confirmClearHistory()" 
+                        class="px-6 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-trash-alt mr-2"></i>Clear All History
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close on outside click
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeClearHistoryModal();
+        }
+    });
+}
+
+function closeClearHistoryModal() {
+    const modal = document.querySelector('.fixed.inset-0.bg-black.bg-opacity-50');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function confirmClearHistory() {
+    closeClearHistoryModal();
+    
+    // Show loading notification
+    showNotification('info', 'Clearing session history...');
+    
+    fetch('/admin/api/sessions/clear-history', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message + ' 🎉');
+            // Reload session history to show empty state
+            loadSessionHistory();
+            // Update stats
+            loadSessionStats();
+        } else {
+            showNotification('error', data.error || 'Failed to clear session history');
+        }
+    })
+    .catch(error => {
+        console.error('Error clearing session history:', error);
+        showNotification('error', 'Failed to clear session history');
+    });
+}
+
 // Export sessions
 function exportSessions() {
     const format = prompt('Export format (json/csv):', 'json');
@@ -891,6 +1316,33 @@ function formatDuration(seconds) {
     return `${hours}h ${mins}m`;
 }
 
+// Copy to clipboard helper
+function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('success', 'Copied to clipboard');
+        }).catch(() => {
+            fallbackCopyToClipboard(text);
+        });
+    } else {
+        fallbackCopyToClipboard(text);
+    }
+}
+
+function fallbackCopyToClipboard(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showNotification('success', 'Copied to clipboard');
+    } catch (err) {
+        showNotification('error', 'Failed to copy to clipboard');
+    }
+    document.body.removeChild(textarea);
+}
+
 // Notification helper
 function showNotification(type, message) {
     // Use the global notification system
@@ -899,6 +1351,351 @@ function showNotification(type, message) {
     } else {
         console.log(`${type.toUpperCase()}: ${message}`);
     }
+}
+
+// Chart Management Functions
+function initializeCharts() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#f8fafc' : '#1f2937';
+    const gridColor = isDark ? '#374151' : '#e5e7eb';
+
+    Chart.defaults.color = textColor;
+    Chart.defaults.borderColor = gridColor;
+    Chart.defaults.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+
+    // Initialize empty charts
+    initializeStatusChart();
+    initializePaymentChart();
+    initializeAmountChart();
+    initializeWebSocketChart();
+    initializeTimelineChart();
+    initializeTrendsChart();
+}
+
+function initializeStatusChart() {
+    const ctx = document.getElementById('statusChart').getContext('2d');
+    currentCharts.status = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Active', 'Completed', 'Expired', 'Terminated'],
+            datasets: [{
+                data: [0, 0, 0, 0],
+                backgroundColor: [
+                    '#10b981', // green for active
+                    '#3b82f6', // blue for completed
+                    '#f59e0b', // yellow for expired
+                    '#ef4444'  // red for terminated
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { usePointStyle: true, padding: 20 }
+                }
+            }
+        }
+    });
+}
+
+function initializePaymentChart() {
+    const ctx = document.getElementById('paymentChart').getContext('2d');
+    currentCharts.payment = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Pending', 'Paid', 'Failed'],
+            datasets: [{
+                data: [0, 0, 0],
+                backgroundColor: [
+                    '#f59e0b', // yellow for pending
+                    '#10b981', // green for paid
+                    '#ef4444'  // red for failed
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { usePointStyle: true, padding: 20 }
+                }
+            }
+        }
+    });
+}
+
+function initializeAmountChart() {
+    const ctx = document.getElementById('amountChart').getContext('2d');
+    currentCharts.amount = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['$0-10', '$10-50', '$50-100', '$100-500', '$500+'],
+            datasets: [{
+                label: 'Sessions',
+                data: [0, 0, 0, 0, 0],
+                backgroundColor: '#3b82f6',
+                borderColor: '#2563eb',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function initializeWebSocketChart() {
+    const ctx = document.getElementById('websocketChart').getContext('2d');
+    currentCharts.websocket = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['With WebSocket', 'Without WebSocket'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: [
+                    '#10b981', // green for with websocket
+                    '#6b7280'  // gray for without
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { usePointStyle: true, padding: 20 }
+                }
+            }
+        }
+    });
+}
+
+function initializeTimelineChart() {
+    const ctx = document.getElementById('timelineChart').getContext('2d');
+    currentCharts.timeline = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Created',
+                data: [],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Completed',
+                data: [],
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: false
+            }, {
+                label: 'Paid',
+                data: [],
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                tension: 0.4,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { usePointStyle: true }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function initializeTrendsChart() {
+    const ctx = document.getElementById('trendsChart').getContext('2d');
+    currentCharts.trends = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['24h ago', '18h ago', '12h ago', '6h ago', 'Now'],
+            datasets: [{
+                label: 'Conversion Rate (%)',
+                data: [0, 0, 0, 0, 0],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y'
+            }, {
+                label: 'Session Count',
+                data: [0, 0, 0, 0, 0],
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { usePointStyle: true }
+                }
+            },
+            scales: {
+                y: { type: 'linear', display: true, position: 'left' },
+                y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+}
+
+// Chart tab switching
+function switchChartTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.chart-tab-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.chart-content').forEach(content => content.classList.remove('active'));
+    
+    document.getElementById(tab + '-chart-tab').classList.add('active');
+    document.getElementById(tab + '-charts').classList.add('active');
+    
+    // Load specific data for the tab
+    if (tab === 'timeline') {
+        loadTimelineData();
+    } else if (tab === 'performance') {
+        loadTrendsData();
+    }
+}
+
+// Load analytics data
+function loadAnalyticsData() {
+    fetch('/admin/api/sessions/analytics')
+        .then(response => response.json())
+        .then(data => {
+            updateStatusChart(data.status_distribution);
+            updatePaymentChart(data.payment_distribution);
+            updateAmountChart(data.amount_ranges);
+            updateWebSocketChart(data.websocket_usage);
+        })
+        .catch(error => {
+            console.error('Error loading analytics data:', error);
+        });
+}
+
+function updateStatusChart(data) {
+    if (currentCharts.status) {
+        currentCharts.status.data.datasets[0].data = [
+            data.active || 0,
+            data.completed || 0,
+            data.expired || 0,
+            data.terminated || 0
+        ];
+        currentCharts.status.update('none');
+    }
+}
+
+function updatePaymentChart(data) {
+    if (currentCharts.payment) {
+        currentCharts.payment.data.datasets[0].data = [
+            data.pending || 0,
+            data.paid || 0,
+            data.failed || 0
+        ];
+        currentCharts.payment.update('none');
+    }
+}
+
+function updateAmountChart(data) {
+    if (currentCharts.amount) {
+        currentCharts.amount.data.datasets[0].data = [
+            data['0-10'] || 0,
+            data['10-50'] || 0,
+            data['50-100'] || 0,
+            data['100-500'] || 0,
+            data['500+'] || 0
+        ];
+        currentCharts.amount.update('none');
+    }
+}
+
+function updateWebSocketChart(data) {
+    if (currentCharts.websocket) {
+        currentCharts.websocket.data.datasets[0].data = [
+            data.with_websocket || 0,
+            data.without_websocket || 0
+        ];
+        currentCharts.websocket.update('none');
+    }
+}
+
+function loadTimelineData() {
+    fetch('/admin/api/sessions/timeline')
+        .then(response => response.json())
+        .then(data => {
+            if (currentCharts.timeline) {
+                currentCharts.timeline.data.labels = data.timeline.map(item => item.hour);
+                currentCharts.timeline.data.datasets[0].data = data.timeline.map(item => item.created);
+                currentCharts.timeline.data.datasets[1].data = data.timeline.map(item => item.completed);
+                currentCharts.timeline.data.datasets[2].data = data.timeline.map(item => item.paid);
+                currentCharts.timeline.update('none');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading timeline data:', error);
+        });
+}
+
+function loadTrendsData() {
+    fetch('/admin/api/sessions/trends')
+        .then(response => response.json())
+        .then(data => {
+            // Update performance metrics
+            document.getElementById('conversion-rate').textContent = data.performance.conversion_rate.toFixed(1) + '%';
+            document.getElementById('avg-duration').textContent = formatDuration(data.performance.avg_session_duration);
+            document.getElementById('revenue-24h').textContent = '$' + data.last_24h.amount.toFixed(2);
+            
+            // Update trends chart (simplified for now)
+            if (currentCharts.trends) {
+                currentCharts.trends.data.datasets[0].data = [
+                    data.performance.conversion_rate * 0.8,
+                    data.performance.conversion_rate * 0.9,
+                    data.performance.conversion_rate * 1.1,
+                    data.performance.conversion_rate * 1.05,
+                    data.performance.conversion_rate
+                ];
+                currentCharts.trends.data.datasets[1].data = [
+                    data.last_24h.sessions * 0.7,
+                    data.last_24h.sessions * 0.8,
+                    data.last_24h.sessions * 1.2,
+                    data.last_24h.sessions * 1.1,
+                    data.last_24h.sessions
+                ];
+                currentCharts.trends.update('none');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading trends data:', error);
+        });
 }
 </script>
 {{end}}

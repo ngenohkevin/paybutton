@@ -294,5 +294,56 @@ window.addEventListener('beforeunload', () => {
         clearInterval(chartUpdateInterval);
     }
 });
+
+// Session Analytics Functions
+let sessionUpdateInterval;
+
+function updateSessionStats() {
+    fetch('/admin/api/dashboard-sessions')
+        .then(response => response.json())
+        .then(data => {
+            // Update dashboard session metrics
+            document.getElementById('dashboard-active-sessions').textContent = data.active_sessions || 0;
+            document.getElementById('dashboard-websocket-count').textContent = data.websocket_count || 0;
+            document.getElementById('dashboard-payment-rate').textContent = data.payment_rate ? data.payment_rate.toFixed(1) + '%' : '0%';
+            document.getElementById('dashboard-paid-amount').textContent = '$' + (data.paid_amount ? data.paid_amount.toFixed(2) : '0.00');
+        })
+        .catch(error => {
+            console.error('Error updating session stats:', error);
+            // Set fallback values on error
+            document.getElementById('dashboard-active-sessions').textContent = '0';
+            document.getElementById('dashboard-websocket-count').textContent = '0';
+            document.getElementById('dashboard-payment-rate').textContent = '0%';
+            document.getElementById('dashboard-paid-amount').textContent = '$0.00';
+        });
+}
+
+function startSessionUpdates() {
+    // Clear any existing interval
+    if (sessionUpdateInterval) {
+        clearInterval(sessionUpdateInterval);
+    }
+    
+    // Update session stats every 10 seconds
+    sessionUpdateInterval = setInterval(updateSessionStats, 10000);
+    
+    // Initial update
+    updateSessionStats();
+}
+
+// Start session updates when dashboard loads
+document.body.addEventListener('htmx:afterSettle', function(event) {
+    if (event.target.id === 'dashboard-content') {
+        // Start session updates along with chart updates
+        setTimeout(startSessionUpdates, 500);
+    }
+});
+
+// Clean up session interval when navigating away
+window.addEventListener('beforeunload', () => {
+    if (sessionUpdateInterval) {
+        clearInterval(sessionUpdateInterval);
+    }
+});
 </script>
 {{end}}

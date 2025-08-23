@@ -123,6 +123,8 @@ func (s *Server) Start() error {
 
 	// Set up session tracking callback to connect payment processing with admin dashboard
 	payment_processing.SessionTracker = AddSession
+	payment_processing.SessionStatusUpdater = UpdateSessionStatusByAddress
+	payment_processing.SessionWebSocketUpdater = UpdateSessionWebSocketByAddress
 
 	// Add the webhook endpoint for Telegram
 	webhookPath := "/bot" + botToken.BotApiKey + "/webhook"
@@ -372,6 +374,8 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	// Set up session tracking callback to connect payment processing with admin dashboard
 	payment_processing.SessionTracker = AddSession
+	payment_processing.SessionStatusUpdater = UpdateSessionStatusByAddress
+	payment_processing.SessionWebSocketUpdater = UpdateSessionWebSocketByAddress
 
 	// Add the webhook endpoint for Telegram
 	webhookPath := "/bot" + botToken.BotApiKey + "/webhook"

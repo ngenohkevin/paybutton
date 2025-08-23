@@ -116,6 +116,9 @@
                         <a href="/admin/dashboard" class="nav-icon-item {{if eq .ActivePage "dashboard"}}active{{end}}" title="Dashboard">
                             <i class="fas fa-tachometer-alt"></i>
                         </a>
+                        <a href="/admin/sessions" class="nav-icon-item {{if eq .ActivePage "sessions"}}active{{end}}" title="Session Management">
+                            <i class="fas fa-users"></i>
+                        </a>
                         <a href="/admin/pool" class="nav-icon-item {{if eq .ActivePage "pool"}}active{{end}}" title="Address Pool">
                             <i class="fas fa-swimming-pool"></i>
                         </a>
@@ -133,9 +136,6 @@
                         </a>
                         <a href="/admin/alerts" class="nav-icon-item {{if eq .ActivePage "alerts"}}active{{end}}" title="Alerts">
                             <i class="fas fa-bell"></i>
-                        </a>
-                        <a href="/admin/sessions" class="nav-icon-item {{if eq .ActivePage "sessions"}}active{{end}}" title="Session Management">
-                            <i class="fas fa-users"></i>
                         </a>
                         <a href="/admin/config" class="nav-icon-item {{if eq .ActivePage "config"}}active{{end}}" title="Configuration">
                             <i class="fas fa-cogs"></i>
@@ -175,6 +175,9 @@
                 <a href="/admin/dashboard" class="nav-item {{if eq .ActivePage "dashboard"}}active{{end}}">
                     <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
                 </a>
+                <a href="/admin/sessions" class="nav-item {{if eq .ActivePage "sessions"}}active{{end}}">
+                    <i class="fas fa-users mr-2"></i>Session Management
+                </a>
                 <a href="/admin/pool" class="nav-item {{if eq .ActivePage "pool"}}active{{end}}">
                     <i class="fas fa-swimming-pool mr-2"></i>Address Pool
                 </a>
@@ -192,9 +195,6 @@
                 </a>
                 <a href="/admin/alerts" class="nav-item {{if eq .ActivePage "alerts"}}active{{end}}">
                     <i class="fas fa-bell mr-2"></i>Alerts
-                </a>
-                <a href="/admin/sessions" class="nav-item {{if eq .ActivePage "sessions"}}active{{end}}">
-                    <i class="fas fa-users mr-2"></i>Session Management
                 </a>
                 <div class="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
                     <form action="/admin/logout" method="post">

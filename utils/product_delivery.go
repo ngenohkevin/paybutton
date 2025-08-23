@@ -5,12 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"fmt"
-	"gopkg.in/gomail.v2"
 	"io"
 	"log"
 	"math/big"
 	"strings"
 	"time"
+
+	"gopkg.in/gomail.v2"
 )
 
 // ProductEmail sends an email with the purchased product as an attachment
