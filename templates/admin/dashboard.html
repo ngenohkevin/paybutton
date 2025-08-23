@@ -83,12 +83,13 @@ function updateCharts(data) {
     }
 }
 
-// Analytics update configuration (WebSocket preferred, polling fallback as per analytics.md)
+// Analytics update configuration (WebSocket feeds to unified polling system)
 let analyticsWS = null;
 let analyticsWSReconnectDelay = 1000;
 let analyticsWSMaxReconnectDelay = 30000;
 let analyticsPollingTimer = null;
-let useWebSocketAnalytics = true; // Prefer WebSocket for instant updates, fallback to 5s polling
+let lastAnalyticsData = null; // Cache for WebSocket data
+let useWebSocketAnalytics = true;
 
 // Initialize analytics WebSocket connection
 function initAnalyticsWebSocket() {
@@ -101,13 +102,22 @@ function initAnalyticsWebSocket() {
         analyticsWS.onopen = function(event) {
             console.log('Analytics WebSocket connected');
             analyticsWSReconnectDelay = 1000; // Reset reconnect delay on successful connection
+            
+            // Stop any polling fallback if WebSocket is now connected
+            if (analyticsPollingTimer) {
+                clearTimeout(analyticsPollingTimer);
+                analyticsPollingTimer = null;
+                console.log('Stopped polling fallback - WebSocket reconnected');
+            }
         };
         
         analyticsWS.onmessage = function(event) {
             try {
                 const message = JSON.parse(event.data);
                 if (message.type === 'analytics_update') {
-                    updateAnalyticsWidget(message.data);
+                    // Cache WebSocket data and trigger unified update
+                    lastAnalyticsData = message.data;
+                    processAnalyticsUpdate(lastAnalyticsData, 'websocket');
                 }
             } catch (error) {
                 console.error('Error parsing analytics WebSocket message:', error);
@@ -115,12 +125,21 @@ function initAnalyticsWebSocket() {
         };
         
         analyticsWS.onclose = function(event) {
-            console.log('Analytics WebSocket closed, falling back to polling as per analytics.md...');
+            console.log('Analytics WebSocket closed, code:', event.code);
             analyticsWS = null;
             
-            // Fall back to 5-second polling as specified in analytics.md
-            if (useWebSocketAnalytics) {
-                console.log('WebSocket failed, switching to 5-second polling fallback');
+            // Only switch to polling on permanent failures (not temporary disconnects)
+            if (event.code !== 1000 && event.code !== 1001 && analyticsWSReconnectDelay < analyticsWSMaxReconnectDelay) {
+                // Attempt reconnection with exponential backoff
+                setTimeout(() => {
+                    if (useWebSocketAnalytics && !analyticsWS) {
+                        console.log('Attempting WebSocket reconnection...');
+                        initAnalyticsWebSocket();
+                    }
+                }, analyticsWSReconnectDelay);
+                analyticsWSReconnectDelay = Math.min(analyticsWSReconnectDelay * 2, analyticsWSMaxReconnectDelay);
+            } else if (useWebSocketAnalytics) {
+                console.log('WebSocket permanently closed, switching to 5-second polling fallback');
                 useWebSocketAnalytics = false;
                 initAnalyticsPolling();
             }
@@ -139,6 +158,17 @@ function initAnalyticsWebSocket() {
     }
 }
 
+// Unified analytics update processor
+function processAnalyticsUpdate(data, source) {
+    console.log(`Processing analytics update from ${source}`);
+    
+    // Always update the cache
+    lastAnalyticsData = data;
+    
+    // Update the UI with the data
+    updateAnalyticsWidget(data);
+}
+
 // Load initial analytics data (fallback for first load)
 function loadInitialAnalytics() {
     fetch('/admin/api/dashboard-analytics')
@@ -149,7 +179,7 @@ function loadInitialAnalytics() {
             return response.json();
         })
         .then(data => {
-            updateAnalyticsWidget(data);
+            processAnalyticsUpdate(data, 'initial_fetch');
         })
         .catch(error => {
             console.error('Error loading initial analytics:', error);
@@ -161,29 +191,42 @@ function loadInitialAnalytics() {
 
 // Polling fallback as specified in analytics.md (5-second updates)
 function initAnalyticsPolling() {
-    // Clear any existing polling
+    // Clear any existing polling to prevent duplicates
     if (analyticsPollingTimer) {
         clearTimeout(analyticsPollingTimer);
+        analyticsPollingTimer = null;
     }
     
     function pollAnalytics() {
-        fetch('/admin/api/dashboard-analytics')
-            .then(response => response.json())
-            .then(data => {
-                updateAnalyticsWidget(data);
-                // Schedule next poll in 5 seconds (as per analytics.md requirement)
-                analyticsPollingTimer = setTimeout(pollAnalytics, 5000);
-            })
-            .catch(error => {
-                console.error('Error polling analytics:', error);
-                // Retry with longer delay on error
-                analyticsPollingTimer = setTimeout(pollAnalytics, 10000);
-            });
+        // Only poll if WebSocket is not active
+        if (!useWebSocketAnalytics && !analyticsWS) {
+            fetch('/admin/api/dashboard-analytics')
+                .then(response => response.json())
+                .then(data => {
+                    // Double-check WebSocket hasn't reconnected during the fetch
+                    if (!useWebSocketAnalytics && !analyticsWS) {
+                        processAnalyticsUpdate(data, 'polling_fallback');
+                    }
+                    // Schedule next poll in 5 seconds (as per analytics.md requirement)
+                    if (!useWebSocketAnalytics && !analyticsWS) {
+                        analyticsPollingTimer = setTimeout(pollAnalytics, 5000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling analytics:', error);
+                    // Retry with longer delay on error, but only if still in polling mode
+                    if (!useWebSocketAnalytics && !analyticsWS) {
+                        analyticsPollingTimer = setTimeout(pollAnalytics, 10000);
+                    }
+                });
+        }
     }
     
-    // Start polling
-    pollAnalytics();
-    console.log('Started 5-second analytics polling as per analytics.md spec');
+    // Start polling only if WebSocket is not active
+    if (!useWebSocketAnalytics && !analyticsWS) {
+        pollAnalytics();
+        console.log('Started 5-second analytics polling as per analytics.md spec');
+    }
 }
 
 // Update analytics widget with data and smooth transitions
