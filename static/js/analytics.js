@@ -295,7 +295,10 @@
         }
 
         // Always attempt reconnection when disconnected
-        handleReconnection();
+        // But not if page is being unloaded
+        if (document.visibilityState !== 'hidden') {
+            handleReconnection();
+        }
     }
 
     /**
@@ -404,22 +407,43 @@
         if (typeof document.visibilityState !== 'undefined') {
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') {
-                    debug('Page became visible, checking connection...');
+                    debug('Page became visible, ensuring connection...');
                     
-                    // Always attempt to reconnect when page becomes visible
-                    reconnectAttempts = 0; // Reset reconnect attempts
+                    // Reset reconnect attempts for fresh start
+                    reconnectAttempts = 0;
                     
-                    // Force reconnection regardless of current state
-                    if (websocket) {
-                        websocket.close();
-                        websocket = null;
+                    // If not connected, connect immediately
+                    if (!isConnected) {
+                        debug('Not connected, initiating connection...');
+                        
+                        // Clean up any existing connection
+                        if (websocket) {
+                            websocket.close();
+                            websocket = null;
+                        }
+                        
+                        // Clear any pending reconnection timers
+                        if (reconnectTimer) {
+                            clearTimeout(reconnectTimer);
+                            reconnectTimer = null;
+                        }
+                        
+                        // Connect immediately
+                        connect();
+                    } else {
+                        debug('Already connected, sending heartbeat...');
+                        // Send a heartbeat to verify connection
+                        if (websocket && websocket.readyState === WebSocket.OPEN) {
+                            websocket.send(JSON.stringify({
+                                type: 'heartbeat',
+                                timestamp: new Date().toISOString(),
+                                sessionId: sessionId
+                            }));
+                        }
                     }
-                    
-                    isConnected = false;
-                    setTimeout(connect, 200); // Quick reconnect
                 } else if (document.visibilityState === 'hidden') {
                     debug('Page became hidden');
-                    // Keep connection alive
+                    // Keep connection alive for now
                 }
             });
         }
