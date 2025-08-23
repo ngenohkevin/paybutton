@@ -83,19 +83,64 @@ function updateCharts(data) {
     }
 }
 
-// Analytics refresh state management
-let analyticsRefreshTimer = null;
-let isLoadingAnalytics = false;
+// Analytics update configuration (WebSocket preferred, polling fallback as per analytics.md)
+let analyticsWS = null;
+let analyticsWSReconnectDelay = 1000;
+let analyticsWSMaxReconnectDelay = 30000;
+let analyticsPollingTimer = null;
+let useWebSocketAnalytics = true; // Prefer WebSocket for instant updates, fallback to 5s polling
 
-// Load site analytics data for dashboard widget with improved error handling
-function loadSiteAnalytics() {
-    // Prevent multiple simultaneous requests
-    if (isLoadingAnalytics) {
-        return;
+// Initialize analytics WebSocket connection
+function initAnalyticsWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/admin/analytics`;
+    
+    try {
+        analyticsWS = new WebSocket(wsUrl);
+        
+        analyticsWS.onopen = function(event) {
+            console.log('Analytics WebSocket connected');
+            analyticsWSReconnectDelay = 1000; // Reset reconnect delay on successful connection
+        };
+        
+        analyticsWS.onmessage = function(event) {
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'analytics_update') {
+                    updateAnalyticsWidget(message.data);
+                }
+            } catch (error) {
+                console.error('Error parsing analytics WebSocket message:', error);
+            }
+        };
+        
+        analyticsWS.onclose = function(event) {
+            console.log('Analytics WebSocket closed, falling back to polling as per analytics.md...');
+            analyticsWS = null;
+            
+            // Fall back to 5-second polling as specified in analytics.md
+            if (useWebSocketAnalytics) {
+                console.log('WebSocket failed, switching to 5-second polling fallback');
+                useWebSocketAnalytics = false;
+                initAnalyticsPolling();
+            }
+        };
+        
+        analyticsWS.onerror = function(error) {
+            console.error('Analytics WebSocket error:', error);
+        };
+        
+    } catch (error) {
+        console.error('Failed to create analytics WebSocket:', error);
+        // Fallback to periodic retry
+        setTimeout(() => {
+            initAnalyticsWebSocket();
+        }, analyticsWSReconnectDelay);
     }
-    
-    isLoadingAnalytics = true;
-    
+}
+
+// Load initial analytics data (fallback for first load)
+function loadInitialAnalytics() {
     fetch('/admin/api/dashboard-analytics')
         .then(response => {
             if (!response.ok) {
@@ -105,24 +150,40 @@ function loadSiteAnalytics() {
         })
         .then(data => {
             updateAnalyticsWidget(data);
-            isLoadingAnalytics = false;
-            
-            // Schedule next refresh with longer interval to reduce flickering
-            if (analyticsRefreshTimer) {
-                clearTimeout(analyticsRefreshTimer);
-            }
-            analyticsRefreshTimer = setTimeout(loadSiteAnalytics, 10000); // Refresh every 10 seconds
         })
         .catch(error => {
-            console.error('Error loading site analytics:', error);
-            isLoadingAnalytics = false;
-            
-            // Retry with exponential backoff on error
-            if (analyticsRefreshTimer) {
-                clearTimeout(analyticsRefreshTimer);
-            }
-            analyticsRefreshTimer = setTimeout(loadSiteAnalytics, 15000);
+            console.error('Error loading initial analytics:', error);
+            // Show loading error in widget
+            const activeViewersEl = document.getElementById('dashboard-active-viewers');
+            if (activeViewersEl) activeViewersEl.textContent = 'Error';
         });
+}
+
+// Polling fallback as specified in analytics.md (5-second updates)
+function initAnalyticsPolling() {
+    // Clear any existing polling
+    if (analyticsPollingTimer) {
+        clearTimeout(analyticsPollingTimer);
+    }
+    
+    function pollAnalytics() {
+        fetch('/admin/api/dashboard-analytics')
+            .then(response => response.json())
+            .then(data => {
+                updateAnalyticsWidget(data);
+                // Schedule next poll in 5 seconds (as per analytics.md requirement)
+                analyticsPollingTimer = setTimeout(pollAnalytics, 5000);
+            })
+            .catch(error => {
+                console.error('Error polling analytics:', error);
+                // Retry with longer delay on error
+                analyticsPollingTimer = setTimeout(pollAnalytics, 10000);
+            });
+    }
+    
+    // Start polling
+    pollAnalytics();
+    console.log('Started 5-second analytics polling as per analytics.md spec');
 }
 
 // Update analytics widget with data and smooth transitions
@@ -276,7 +337,7 @@ function updateSiteBreakdownTable(sites) {
     }
 }
 
-// Refresh site analytics manually
+// Refresh site analytics manually (now just refreshes WebSocket connection)
 function refreshSiteAnalytics() {
     const btn = event.target.closest('button');
     if (btn) {
@@ -284,7 +345,18 @@ function refreshSiteAnalytics() {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i><span>Refreshing...</span>';
     }
     
-    loadSiteAnalytics();
+    // Close existing WebSocket connection to force reconnect and get fresh data
+    if (analyticsWS) {
+        analyticsWS.close();
+    }
+    
+    // Load fresh data immediately
+    loadInitialAnalytics();
+    
+    // Reinitialize WebSocket
+    setTimeout(() => {
+        initAnalyticsWebSocket();
+    }, 100);
     
     if (btn) {
         setTimeout(() => {
@@ -300,7 +372,8 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
         // Re-initialize charts after content update and load data
         setTimeout(() => {
             initializeCharts();
-            loadSiteAnalytics(); // Load analytics data
+            initAnalyticsWebSocket(); // Initialize WebSocket connection
+            loadInitialAnalytics(); // Load initial analytics data
             // Fetch and update chart data after a short delay to ensure DOM is ready
             setTimeout(() => {
                 fetch('/admin/status')
@@ -655,43 +728,7 @@ function startSessionUpdates() {
     updateSessionStats();
 }
 
-// Site Analytics Functions
-let siteAnalyticsUpdateInterval;
-
-function updateSiteAnalyticsStats() {
-    fetch('/admin/api/dashboard-analytics')
-        .then(response => response.json())
-        .then(data => {
-            // Update site analytics metrics
-            const activeViewersEl = document.getElementById('dashboard-active-viewers');
-            const weeklyVisitorsEl = document.getElementById('dashboard-weekly-visitors');
-            const activeSitesEl = document.getElementById('dashboard-active-sites');
-            
-            if (activeViewersEl) activeViewersEl.textContent = data.summary?.total_active || 0;
-            if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.summary?.total_weekly || 0;
-            if (activeSitesEl) activeSitesEl.textContent = data.summary?.active_sites || 0;
-            
-            // Update site breakdown table
-            updateSiteBreakdownTable(data.top_sites || []);
-        })
-        .catch(error => {
-            console.error('Error updating site analytics stats:', error);
-            // Set fallback values on error
-            const activeViewersEl = document.getElementById('dashboard-active-viewers');
-            const weeklyVisitorsEl = document.getElementById('dashboard-weekly-visitors');  
-            const activeSitesEl = document.getElementById('dashboard-active-sites');
-            
-            if (activeViewersEl) activeViewersEl.textContent = '0';
-            if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = '0';
-            if (activeSitesEl) activeSitesEl.textContent = '0';
-            
-            // Show error state for table
-            const tableEl = document.getElementById('site-breakdown-table');
-            if (tableEl) {
-                tableEl.innerHTML = '<div class="text-center py-4 text-red-500 dark:text-red-400 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to load site data</div>';
-            }
-        });
-}
+// Site Analytics Functions (now using WebSocket instead of polling)
 
 function updateSiteBreakdownTable(sites) {
     const tableEl = document.getElementById('site-breakdown-table');
@@ -883,16 +920,16 @@ function updateSiteBreakdownTable(sites) {
 }
 
 function startSiteAnalyticsUpdates() {
-    // Clear any existing interval
-    if (siteAnalyticsUpdateInterval) {
-        clearInterval(siteAnalyticsUpdateInterval);
+    // Try WebSocket first for instant updates, fallback to 5s polling as per analytics.md
+    if (useWebSocketAnalytics && typeof WebSocket !== 'undefined') {
+        initAnalyticsWebSocket();
+    } else {
+        console.log('WebSocket not available, using 5-second polling as per analytics.md');
+        initAnalyticsPolling();
     }
     
-    // Update site analytics stats every 5 seconds (faster than session stats for live feel)
-    siteAnalyticsUpdateInterval = setInterval(updateSiteAnalyticsStats, 5000);
-    
-    // Initial update
-    updateSiteAnalyticsStats();
+    // Load initial data
+    loadInitialAnalytics();
 }
 
 // Start session and site analytics updates when dashboard loads
@@ -906,13 +943,16 @@ document.body.addEventListener('htmx:afterSettle', function(event) {
     }
 });
 
-// Clean up intervals when navigating away
+// Clean up intervals and WebSocket when navigating away
 window.addEventListener('beforeunload', () => {
     if (sessionUpdateInterval) {
         clearInterval(sessionUpdateInterval);
     }
-    if (siteAnalyticsUpdateInterval) {
-        clearInterval(siteAnalyticsUpdateInterval);
+    if (analyticsWS) {
+        analyticsWS.close();
+    }
+    if (analyticsPollingTimer) {
+        clearTimeout(analyticsPollingTimer);
     }
 });
 </script>

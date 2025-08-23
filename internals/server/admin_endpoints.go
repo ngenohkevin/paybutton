@@ -52,9 +52,9 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	admin.GET("/status", getSystemStatus)
 	api.GET("/dashboard-sessions", getDashboardSessionStats)
 
-	// Site Analytics endpoints
-	api.GET("/site-analytics", getSiteAnalyticsData)
-	api.GET("/dashboard-analytics", getDashboardAnalytics)
+	// Analytics endpoints as specified in analytics.md
+	api.GET("/analytics", getSiteAnalyticsData)           // Full site analytics data  
+	api.GET("/dashboard-analytics", getDashboardAnalytics) // Summary data for dashboard widget
 
 	// Phase 5: Advanced analytics endpoints
 	api.GET("/site-analytics/:siteName/historical", getSiteHistoricalData)
@@ -3457,57 +3457,61 @@ func convertSessionsToCSV(activeSessions map[string]*SessionInfo, historySession
 
 // Analytics endpoint handlers
 
-// getSiteAnalyticsData returns full site analytics data
+// getSiteAnalyticsData returns full site analytics data with optimized single call
 func getSiteAnalyticsData(c *gin.Context) {
-	allSites := analytics.GetAllSiteAnalytics()
-	totalActive := analytics.GetTotalActiveViewers()
-	totalWeekly := analytics.GetTotalWeeklyVisitors()
-	activeSites := analytics.GetActiveSitesCount()
+	combined := analytics.GetCombinedAnalytics()
 
 	// Debug logging
 	log.Printf("Analytics API called: active=%d, weekly=%d, active_sites=%d, total_sites=%d", 
-		totalActive, totalWeekly, activeSites, len(allSites))
+		combined.TotalActive, combined.TotalWeekly, combined.ActiveSites, len(combined.Sites))
 
 	response := gin.H{
-		"sites": allSites,
+		"sites": combined.Sites,
 		"totals": gin.H{
-			"active":       totalActive,
-			"weekly":       totalWeekly,
-			"active_sites": activeSites,
+			"active":       combined.TotalActive,
+			"weekly":       combined.TotalWeekly,
+			"active_sites": combined.ActiveSites,
 		},
-		"timestamp": time.Now().Format(time.RFC3339),
+		"timestamp": combined.LastUpdated.Format(time.RFC3339),
 	}
 
 	c.JSON(http.StatusOK, response)
 }
 
-// getDashboardAnalytics returns summary analytics data for dashboard widget
+// getDashboardAnalytics returns summary analytics data for dashboard widget with optimized processing
 func getDashboardAnalytics(c *gin.Context) {
-	totalActive := analytics.GetTotalActiveViewers()
-	totalWeekly := analytics.GetTotalWeeklyVisitors()
-	activeSites := analytics.GetActiveSitesCount()
+	combined := analytics.GetCombinedAnalytics()
 
-	// Get top 5 most active sites for mini chart
-	allSites := analytics.GetAllSiteAnalytics()
-	topSites := make([]gin.H, 0)
-
-	// Convert to slice for sorting
-	siteList := make([]analytics.SiteAnalytics, 0, len(allSites))
-	for _, site := range allSites {
-		siteList = append(siteList, site)
-	}
-
-	// Sort by active count (simple bubble sort for small dataset)
-	for i := 0; i < len(siteList)-1; i++ {
-		for j := 0; j < len(siteList)-i-1; j++ {
-			if siteList[j].ActiveCount < siteList[j+1].ActiveCount {
-				siteList[j], siteList[j+1] = siteList[j+1], siteList[j]
-			}
+	// Get top 5 most active sites for mini chart - optimized sorting
+	topSites := make([]gin.H, 0, 5)
+	siteList := make([]analytics.SiteAnalytics, 0, len(combined.Sites))
+	
+	// Convert to slice and collect only sites with active viewers
+	for _, site := range combined.Sites {
+		if site.ActiveCount > 0 {
+			siteList = append(siteList, site)
 		}
 	}
 
-	// Take top 5 sites
+	// Use optimized partial sort for top 5 (insertion sort for small dataset)
 	maxSites := 5
+	if len(siteList) < maxSites {
+		maxSites = len(siteList)
+	}
+
+	for i := 0; i < maxSites && i < len(siteList); i++ {
+		maxIdx := i
+		for j := i + 1; j < len(siteList); j++ {
+			if siteList[j].ActiveCount > siteList[maxIdx].ActiveCount {
+				maxIdx = j
+			}
+		}
+		if maxIdx != i {
+			siteList[i], siteList[maxIdx] = siteList[maxIdx], siteList[i]
+		}
+	}
+
+	// Take top sites (maxSites already declared above)
 	if len(siteList) < maxSites {
 		maxSites = len(siteList)
 	}
@@ -3523,13 +3527,13 @@ func getDashboardAnalytics(c *gin.Context) {
 
 	response := gin.H{
 		"summary": gin.H{
-			"total_active": totalActive,
-			"total_weekly": totalWeekly,
-			"active_sites": activeSites,
-			"total_sites":  len(allSites),
+			"total_active": combined.TotalActive,
+			"total_weekly": combined.TotalWeekly,
+			"active_sites": combined.ActiveSites,
+			"total_sites":  len(combined.Sites),
 		},
 		"top_sites": topSites,
-		"timestamp": time.Now().Format(time.RFC3339),
+		"timestamp": combined.LastUpdated.Format(time.RFC3339),
 	}
 
 	c.JSON(http.StatusOK, response)

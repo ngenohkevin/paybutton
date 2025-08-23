@@ -124,6 +124,9 @@ func (s *Server) Start() error {
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
 
+	// Admin Analytics WebSocket endpoint for real-time dashboard updates
+	r.GET("/ws/admin/analytics", analytics.HandleAdminWebSocket)
+
 	// Analytics SDK endpoint
 	r.GET("/analytics.js", serveAnalyticsSDK)
 
@@ -384,6 +387,9 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
+
+	// Admin Analytics WebSocket endpoint for real-time dashboard updates
+	r.GET("/ws/admin/analytics", analytics.HandleAdminWebSocket)
 
 	// Analytics SDK endpoint
 	r.GET("/analytics.js", serveAnalyticsSDK)

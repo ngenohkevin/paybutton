@@ -425,6 +425,9 @@ func (am *AnalyticsManager) addConnectionWithPath(siteName string, conn *websock
 	// Phase 5: Record page view
 	am.recordPageView(siteName, pagePath, sessionID)
 
+	// Invalidate global cache when connections change
+	am.invalidateGlobalCache()
+
 	logger.Info("Added analytics connection",
 		slog.String("site", siteName),
 		slog.String("session", sessionID),
@@ -458,6 +461,9 @@ func (am *AnalyticsManager) removeConnection(siteName string, sessionID string) 
 		logger.Info("Cleaned up empty connection list",
 			slog.String("site", siteName))
 	}
+
+	// Invalidate global cache when connections change
+	am.invalidateGlobalCache()
 }
 
 // recordVisitor records a visitor for weekly tracking
@@ -591,40 +597,71 @@ func (am *AnalyticsManager) getSiteAnalyticsUnsafe(siteName string) SiteAnalytic
 	}
 }
 
-// GetAllSiteAnalytics returns combined analytics for all sites with caching
+// CombinedAnalytics holds all analytics data in a single cached structure
+type CombinedAnalytics struct {
+	Sites         map[string]SiteAnalytics `json:"sites"`
+	TotalActive   int                      `json:"total_active"`
+	TotalWeekly   int                      `json:"total_weekly"`
+	ActiveSites   int                      `json:"active_sites"`
+	LastUpdated   time.Time               `json:"last_updated"`
+	CacheValid    bool                    `json:"-"`
+}
+
+// Global combined analytics cache
+var globalAnalyticsCache *CombinedAnalytics
+var globalCacheMutex sync.RWMutex
+
+// GetAllSiteAnalytics returns combined analytics for all sites with improved caching
 func GetAllSiteAnalytics() map[string]SiteAnalytics {
+	combined := GetCombinedAnalytics()
+	return combined.Sites
+}
+
+// GetCombinedAnalytics returns all analytics data in a single optimized call
+func GetCombinedAnalytics() *CombinedAnalytics {
 	if manager == nil {
-		return make(map[string]SiteAnalytics)
+		return &CombinedAnalytics{
+			Sites:       make(map[string]SiteAnalytics),
+			TotalActive: 0,
+			TotalWeekly: 0,
+			ActiveSites: 0,
+			LastUpdated: time.Now(),
+			CacheValid:  true,
+		}
+	}
+
+	globalCacheMutex.RLock()
+	// Check if global cache is valid (15 seconds for better performance)
+	if globalAnalyticsCache != nil && 
+		time.Since(globalAnalyticsCache.LastUpdated) < 15*time.Second &&
+		globalAnalyticsCache.CacheValid {
+		defer globalCacheMutex.RUnlock()
+		return globalAnalyticsCache
+	}
+	globalCacheMutex.RUnlock()
+
+	// Need to rebuild cache
+	globalCacheMutex.Lock()
+	defer globalCacheMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	if globalAnalyticsCache != nil && 
+		time.Since(globalAnalyticsCache.LastUpdated) < 15*time.Second &&
+		globalAnalyticsCache.CacheValid {
+		return globalAnalyticsCache
 	}
 
 	manager.mutex.RLock()
-	
-	// Check if cache is still valid
-	if time.Since(manager.cacheTimestamp) < manager.cacheDuration && len(manager.cachedAnalytics) > 0 {
-		result := make(map[string]SiteAnalytics)
-		for siteName, analytics := range manager.cachedAnalytics {
-			result[siteName] = analytics
-		}
-		manager.mutex.RUnlock()
-		return result
+	defer manager.mutex.RUnlock()
+
+	result := &CombinedAnalytics{
+		Sites:       make(map[string]SiteAnalytics),
+		TotalActive: 0,
+		TotalWeekly: 0,
+		ActiveSites: 0,
+		LastUpdated: time.Now(),
+		CacheValid:  true,
 	}
-	
-	manager.mutex.RUnlock()
-
-	// Cache is stale or empty, need to rebuild
-	manager.mutex.Lock()
-	defer manager.mutex.Unlock()
-
-	// Double-check cache after acquiring write lock
-	if time.Since(manager.cacheTimestamp) < manager.cacheDuration && len(manager.cachedAnalytics) > 0 {
-		result := make(map[string]SiteAnalytics)
-		for siteName, analytics := range manager.cachedAnalytics {
-			result[siteName] = analytics
-		}
-		return result
-	}
-
-	result := make(map[string]SiteAnalytics)
 
 	// Get all sites from both active connections and weekly data
 	allSites := make(map[string]bool)
@@ -635,21 +672,229 @@ func GetAllSiteAnalytics() map[string]SiteAnalytics {
 		allSites[siteName] = true
 	}
 
-	// Build analytics for each site
+	// Single pass through all sites to calculate everything
+	cutoff := time.Now().Add(-24 * time.Hour)
 	for siteName := range allSites {
-		analytics := manager.getSiteAnalyticsUnsafe(siteName)
-		result[siteName] = analytics
-		manager.cachedAnalytics[siteName] = analytics
+		// Get site analytics
+		activeCount := len(manager.connections[siteName])
+		weeklyTotal := 0
+		lastSeen := time.Time{}
+
+		if siteData := manager.weeklyData[siteName]; siteData != nil {
+			// Calculate weekly total in single pass
+			for _, count := range siteData.hourlyVisitors {
+				weeklyTotal += count
+			}
+			lastSeen = siteData.lastUpdate
+		}
+
+		analytics := SiteAnalytics{
+			SiteName:    siteName,
+			ActiveCount: activeCount,
+			WeeklyTotal: weeklyTotal,
+			LastSeen:    lastSeen,
+		}
+
+		result.Sites[siteName] = analytics
+		result.TotalActive += activeCount
+		result.TotalWeekly += weeklyTotal
+
+		// Count as active site if has connections or recent activity
+		if activeCount > 0 || lastSeen.After(cutoff) {
+			result.ActiveSites++
+		}
 	}
 
-	// Update cache timestamp
-	manager.cacheTimestamp = time.Now()
+	// Update global cache
+	globalAnalyticsCache = result
 
-	logger.Info("Analytics cache refreshed",
-		slog.Int("sites_cached", len(result)),
-		slog.Time("cache_timestamp", manager.cacheTimestamp))
+	logger.Info("Combined analytics cache refreshed",
+		slog.Int("sites_cached", len(result.Sites)),
+		slog.Int("total_active", result.TotalActive),
+		slog.Int("total_weekly", result.TotalWeekly),
+		slog.Int("active_sites", result.ActiveSites),
+		slog.Time("cache_timestamp", result.LastUpdated))
 
 	return result
+}
+
+// invalidateGlobalCache marks the global cache as invalid and broadcasts updates (must be called with manager lock held)
+func (am *AnalyticsManager) invalidateGlobalCache() {
+	globalCacheMutex.Lock()
+	if globalAnalyticsCache != nil {
+		globalAnalyticsCache.CacheValid = false
+	}
+	globalCacheMutex.Unlock()
+	
+	// Broadcast analytics updates to admin dashboard via WebSocket
+	go am.broadcastAnalyticsUpdate()
+}
+
+// AdminWebSocketConnection represents a WebSocket connection for admin dashboard
+type AdminWebSocketConnection struct {
+	conn     *websocket.Conn
+	id       string
+	joinTime time.Time
+}
+
+// Admin WebSocket connections for real-time dashboard updates
+var adminConnections map[string]*AdminWebSocketConnection
+var adminConnectionsMutex sync.RWMutex
+
+// Initialize admin connections map
+func init() {
+	adminConnections = make(map[string]*AdminWebSocketConnection)
+}
+
+// HandleAdminWebSocket handles WebSocket connections for admin dashboard analytics
+func HandleAdminWebSocket(c *gin.Context) {
+	// Upgrade HTTP connection to WebSocket
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		logger.Error("Failed to upgrade admin analytics WebSocket",
+			slog.String("error", err.Error()),
+			slog.String("remote_addr", c.ClientIP()))
+		return
+	}
+	defer conn.Close()
+
+	// Generate unique connection ID
+	connID := generateSessionID()
+	
+	// Add connection to admin connections
+	adminConnectionsMutex.Lock()
+	adminConnections[connID] = &AdminWebSocketConnection{
+		conn:     conn,
+		id:       connID,
+		joinTime: time.Now(),
+	}
+	adminConnectionsMutex.Unlock()
+	
+	defer func() {
+		adminConnectionsMutex.Lock()
+		delete(adminConnections, connID)
+		adminConnectionsMutex.Unlock()
+	}()
+
+	logger.Info("Admin analytics WebSocket connected",
+		slog.String("connection_id", connID),
+		slog.String("remote_addr", c.ClientIP()))
+
+	// Send initial analytics data
+	combined := GetCombinedAnalytics()
+	initialData := map[string]interface{}{
+		"type": "analytics_update",
+		"data": map[string]interface{}{
+			"sites": combined.Sites,
+			"totals": map[string]interface{}{
+				"active":       combined.TotalActive,
+				"weekly":       combined.TotalWeekly,
+				"active_sites": combined.ActiveSites,
+			},
+			"timestamp": combined.LastUpdated.Format(time.RFC3339),
+		},
+	}
+
+	if err := conn.WriteJSON(initialData); err != nil {
+		logger.Error("Error sending initial admin analytics data",
+			slog.String("connection_id", connID),
+			slog.String("error", err.Error()))
+		return
+	}
+
+	// Handle heartbeat messages
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		return nil
+	})
+
+	// Send ping every 15 seconds
+	pingTicker := time.NewTicker(15 * time.Second)
+	defer pingTicker.Stop()
+
+	// Handle incoming messages and keep connection alive
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+					logger.Warn("Admin analytics WebSocket unexpected close",
+						slog.String("connection_id", connID),
+						slog.String("error", err.Error()))
+				}
+				return
+			}
+		}
+	}()
+
+	// Keep connection alive with periodic pings
+	for {
+		select {
+		case <-done:
+			return
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				logger.Warn("Admin analytics ping failed",
+					slog.String("connection_id", connID),
+					slog.String("error", err.Error()))
+				return
+			}
+		}
+	}
+}
+
+// broadcastAnalyticsUpdate broadcasts analytics updates to all admin WebSocket connections
+func (am *AnalyticsManager) broadcastAnalyticsUpdate() {
+	adminConnectionsMutex.RLock()
+	connections := make([]*AdminWebSocketConnection, 0, len(adminConnections))
+	for _, conn := range adminConnections {
+		connections = append(connections, conn)
+	}
+	adminConnectionsMutex.RUnlock()
+
+	if len(connections) == 0 {
+		return // No admin connections to update
+	}
+
+	// Get latest analytics data
+	combined := GetCombinedAnalytics()
+	
+	updateData := map[string]interface{}{
+		"type": "analytics_update",
+		"data": map[string]interface{}{
+			"sites": combined.Sites,
+			"totals": map[string]interface{}{
+				"active":       combined.TotalActive,
+				"weekly":       combined.TotalWeekly,
+				"active_sites": combined.ActiveSites,
+			},
+			"timestamp": combined.LastUpdated.Format(time.RFC3339),
+		},
+	}
+
+	// Broadcast to all admin connections
+	for _, adminConn := range connections {
+		go func(conn *AdminWebSocketConnection) {
+			if err := conn.conn.WriteJSON(updateData); err != nil {
+				logger.Warn("Failed to broadcast analytics update to admin",
+					slog.String("connection_id", conn.id),
+					slog.String("error", err.Error()))
+				// Remove failed connection
+				adminConnectionsMutex.Lock()
+				delete(adminConnections, conn.id)
+				adminConnectionsMutex.Unlock()
+			}
+		}(adminConn)
+	}
+
+	logger.Info("Broadcasted analytics update to admin connections",
+		slog.Int("admin_connections", len(connections)),
+		slog.Int("total_active", combined.TotalActive),
+		slog.Int("total_weekly", combined.TotalWeekly))
 }
 
 // rotateHourlyDataForSite rotates hourly data buckets for a specific site
@@ -827,79 +1072,22 @@ func detectTorFriendlyRegion(userAgent, acceptLanguage, timezone string) string 
 	return "Unknown"
 }
 
-// GetTotalActiveViewers returns the total number of active viewers across all sites
+// GetTotalActiveViewers returns the total number of active viewers across all sites using cache
 func GetTotalActiveViewers() int {
-	if manager == nil {
-		logger.Warn("Analytics manager is nil")
-		return 0
-	}
-
-	manager.mutex.RLock()
-	defer manager.mutex.RUnlock()
-
-	total := 0
-	for siteName, connections := range manager.connections {
-		total += len(connections)
-		if len(connections) > 0 {
-			logger.Info("Active viewers found",
-				slog.String("site", siteName),
-				slog.Int("active_connections", len(connections)))
-		}
-	}
-
-	logger.Info("Total active viewers calculated",
-		slog.Int("total_active", total),
-		slog.Int("total_sites_with_connections", len(manager.connections)),
-		slog.Int("total_sites_with_weekly_data", len(manager.weeklyData)))
-
-	return total
+	combined := GetCombinedAnalytics()
+	return combined.TotalActive
 }
 
-// GetTotalWeeklyVisitors returns the total weekly visitors across all sites
+// GetTotalWeeklyVisitors returns the total weekly visitors across all sites using cache
 func GetTotalWeeklyVisitors() int {
-	if manager == nil {
-		return 0
-	}
-
-	manager.mutex.RLock()
-	defer manager.mutex.RUnlock()
-
-	total := 0
-	for _, siteData := range manager.weeklyData {
-		for _, count := range siteData.hourlyVisitors {
-			total += count
-		}
-	}
-
-	return total
+	combined := GetCombinedAnalytics()
+	return combined.TotalWeekly
 }
 
-// GetActiveSitesCount returns the number of sites with active connections OR recent activity
+// GetActiveSitesCount returns the number of sites with active connections OR recent activity using cache
 func GetActiveSitesCount() int {
-	if manager == nil {
-		return 0
-	}
-
-	manager.mutex.RLock()
-	defer manager.mutex.RUnlock()
-
-	// Get all sites from both active connections and weekly data
-	activeSites := make(map[string]bool)
-	
-	// Sites with active connections
-	for siteName := range manager.connections {
-		activeSites[siteName] = true
-	}
-	
-	// Sites with recent weekly activity (within last 24 hours)
-	cutoff := time.Now().Add(-24 * time.Hour)
-	for siteName, siteData := range manager.weeklyData {
-		if siteData.lastUpdate.After(cutoff) {
-			activeSites[siteName] = true
-		}
-	}
-
-	return len(activeSites)
+	combined := GetCombinedAnalytics()
+	return combined.ActiveSites
 }
 
 // Phase 5: recordHistoricalData records hourly visitor count data

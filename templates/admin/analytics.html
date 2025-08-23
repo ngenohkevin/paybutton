@@ -1522,7 +1522,7 @@ function updateAnalyticsSummary(data) {
 
 // Real analytics data loading
 function loadRealAnalyticsData() {
-    fetch('/admin/api/site-analytics')
+    fetch('/admin/api/analytics')
         .then(response => response.json())
         .then(data => {
             if (data) {
