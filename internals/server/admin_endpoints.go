@@ -53,7 +53,7 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	api.GET("/dashboard-sessions", getDashboardSessionStats)
 
 	// Analytics endpoints as specified in analytics.md
-	api.GET("/analytics", getSiteAnalyticsData)           // Full site analytics data  
+	api.GET("/analytics", getSiteAnalyticsData)            // Full site analytics data
 	api.GET("/dashboard-analytics", getDashboardAnalytics) // Summary data for dashboard widget
 
 	// Phase 5: Advanced analytics endpoints
@@ -3462,7 +3462,7 @@ func getSiteAnalyticsData(c *gin.Context) {
 	combined := analytics.GetCombinedAnalytics()
 
 	// Debug logging
-	log.Printf("Analytics API called: active=%d, weekly=%d, active_sites=%d, total_sites=%d", 
+	log.Printf("Analytics API called: active=%d, weekly=%d, active_sites=%d, total_sites=%d",
 		combined.TotalActive, combined.TotalWeekly, combined.ActiveSites, len(combined.Sites))
 
 	response := gin.H{
@@ -3485,10 +3485,12 @@ func getDashboardAnalytics(c *gin.Context) {
 	// Get top 5 most active sites for mini chart - optimized sorting
 	topSites := make([]gin.H, 0, 5)
 	siteList := make([]analytics.SiteAnalytics, 0, len(combined.Sites))
-	
-	// Convert to slice and collect only sites with active viewers
+
+	// Convert to slice and collect sites with active viewers OR recent weekly activity
+	cutoff := time.Now().Add(-24 * time.Hour) // Sites active within last 24 hours
 	for _, site := range combined.Sites {
-		if site.ActiveCount > 0 {
+		// Include sites with active connections OR recent weekly activity
+		if site.ActiveCount > 0 || (site.WeeklyTotal > 0 && site.LastSeen.After(cutoff)) {
 			siteList = append(siteList, site)
 		}
 	}
