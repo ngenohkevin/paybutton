@@ -44,9 +44,10 @@ type AnalyticsManager struct {
 	// Rate limiting
 	rateLimiter map[string]*AnalyticsRateLimit // IP -> rate limit info
 
-	mutex   sync.RWMutex
-	cleanup chan string  // for connection cleanup
-	ticker  *time.Ticker // hourly rotation
+	mutex      sync.RWMutex
+	cleanup    chan string  // for connection cleanup
+	ticker     *time.Ticker // hourly rotation
+	isShutdown bool         // flag to prevent double shutdown
 }
 
 // AnalyticsRateLimit tracks connection attempts per IP
@@ -165,6 +166,7 @@ func Initialize() {
 		rateLimiter:    make(map[string]*AnalyticsRateLimit),
 		cleanup:        make(chan string, 100),
 		ticker:         time.NewTicker(time.Hour), // Rotate hourly data every hour
+		isShutdown:     false,                     // Initialize shutdown flag
 	}
 
 	// Start background cleanup routines
@@ -183,10 +185,18 @@ func Shutdown() {
 		return
 	}
 
-	logger.Info("Analytics Manager: Starting graceful shutdown")
-
 	manager.mutex.Lock()
-	defer manager.mutex.Unlock()
+	
+	// Check if already shutdown to prevent double close
+	if manager.isShutdown {
+		manager.mutex.Unlock()
+		return
+	}
+	
+	// Mark as shutdown
+	manager.isShutdown = true
+	
+	logger.Info("Analytics Manager: Starting graceful shutdown")
 
 	// Close all active connections
 	totalConnections := 0
@@ -217,10 +227,16 @@ func Shutdown() {
 	// Stop background routines
 	if manager.ticker != nil {
 		manager.ticker.Stop()
+		manager.ticker = nil
 	}
 
-	// Close cleanup channel
-	close(manager.cleanup)
+	// Close cleanup channel only if it's not nil
+	if manager.cleanup != nil {
+		close(manager.cleanup)
+		manager.cleanup = nil
+	}
+	
+	manager.mutex.Unlock()
 
 	logger.Info("Analytics Manager: Graceful shutdown completed",
 		slog.Int("connections_closed", totalConnections),
