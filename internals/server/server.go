@@ -123,12 +123,19 @@ func (s *Server) Start() error {
 
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
+	
+	// Enhanced Analytics v2 WebSocket endpoint with improved features
+	r.GET("/ws/analytics/v2/:siteName", analytics.HandleEnhancedWebSocket)
 
 	// Admin Analytics WebSocket endpoint for real-time dashboard updates
 	r.GET("/ws/admin/analytics", analytics.HandleAdminWebSocket)
+	
+	// Beacon API fallback endpoint for analytics
+	r.POST("/analytics/beacon", analytics.HandleBeacon)
 
-	// Analytics SDK endpoint
+	// Analytics SDK endpoints
 	r.GET("/analytics.js", serveAnalyticsSDK)
+	r.GET("/analytics-v2.js", serveAnalyticsSDKv2)
 
 	// Initialize admin authentication and UI
 	adminAuth := NewAdminAuth()
@@ -387,12 +394,19 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
+	
+	// Enhanced Analytics v2 WebSocket endpoint with improved features
+	r.GET("/ws/analytics/v2/:siteName", analytics.HandleEnhancedWebSocket)
 
 	// Admin Analytics WebSocket endpoint for real-time dashboard updates
 	r.GET("/ws/admin/analytics", analytics.HandleAdminWebSocket)
+	
+	// Beacon API fallback endpoint for analytics
+	r.POST("/analytics/beacon", analytics.HandleBeacon)
 
-	// Analytics SDK endpoint
+	// Analytics SDK endpoints
 	r.GET("/analytics.js", serveAnalyticsSDK)
+	r.GET("/analytics-v2.js", serveAnalyticsSDKv2)
 
 	// Initialize admin authentication and UI
 	adminAuth := NewAdminAuth()
@@ -623,4 +637,21 @@ func serveAnalyticsSDK(c *gin.Context) {
 
 	// Serve the analytics.js file
 	c.File("./static/js/analytics.js")
+}
+
+// serveAnalyticsSDKv2 serves the enhanced analytics v2 JavaScript SDK
+func serveAnalyticsSDKv2(c *gin.Context) {
+	// Set appropriate headers for JavaScript
+	c.Header("Content-Type", "application/javascript; charset=utf-8")
+	c.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour in production
+	c.Header("Access-Control-Allow-Origin", "*") // Allow cross-origin requests
+	c.Header("Access-Control-Allow-Methods", "GET")
+	c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	c.Header("X-Content-Type-Options", "nosniff")
+	
+	// Add version header for debugging
+	c.Header("X-Analytics-Version", "2.0.0")
+
+	// Serve the analytics-v2.js file
+	c.File("./static/js/analytics-v2.js")
 }

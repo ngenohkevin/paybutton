@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayButton Analytics v2 Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .status {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        
+        .status-card {
+            flex: 1;
+            min-width: 200px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .status-card.connected {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .status-card.fallback {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .status-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .status-card .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .controls {
+            margin: 30px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .log {
+            background: #f7f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-entry.error {
+            color: #d73a49;
+        }
+        
+        .log-entry.success {
+            color: #28a745;
+        }
+        
+        .log-entry.info {
+            color: #0366d6;
+        }
+        
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        .metrics-table th,
+        .metrics-table td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        
+        .metrics-table th {
+            background: #f6f8fa;
+            font-weight: 600;
+        }
+        
+        .content-section {
+            margin: 40px 0;
+            padding: 20px;
+            background: #f6f8fa;
+            border-radius: 10px;
+        }
+        
+        .content-section h2 {
+            color: #586069;
+            margin-top: 0;
+        }
+        
+        .content-section p {
+            line-height: 1.6;
+            color: #24292e;
+        }
+        
+        .scroll-indicator {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        @media (max-width: 768px) {
+            .status {
+                flex-direction: column;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scroll-indicator">
+        Scroll: <span id="scrollDepth">0</span>%
+    </div>
+    
+    <div class="container">
+        <h1>🚀 PayButton Analytics v2 Test Page</h1>
+        
+        <div class="status">
+            <div class="status-card" id="connectionStatus">
+                <h3>Connection Status</h3>
+                <div class="value" id="statusValue">Initializing...</div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Session ID</h3>
+                <div class="value" id="sessionId">-</div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Site Name</h3>
+                <div class="value" id="siteName">-</div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Queue Size</h3>
+                <div class="value" id="queueSize">0</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="testConnection()">Test Connection</button>
+            <button onclick="testReconnect()">Test Reconnect</button>
+            <button onclick="testDisconnect()">Test Disconnect</button>
+            <button onclick="testCustomEvent()">Send Custom Event</button>
+            <button onclick="testPageView()">Track Page View</button>
+            <button onclick="showDebug()">Show Debug Info</button>
+            <button onclick="clearLog()">Clear Log</button>
+            <button onclick="testFallback()">Test Fallback Mode</button>
+            <button onclick="simulateActivity()">Simulate Activity</button>
+        </div>
+        
+        <h2>📊 Metrics</h2>
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody id="metricsBody">
+                <tr><td>Loading metrics...</td><td>-</td></tr>
+            </tbody>
+        </table>
+        
+        <h2>📝 Event Log</h2>
+        <div class="log" id="eventLog">
+            <div class="log-entry info">Waiting for analytics to initialize...</div>
+        </div>
+        
+        <div class="content-section">
+            <h2>Test Content Section 1</h2>
+            <p>This is a long content section designed to test scroll depth tracking. The analytics v2 system should track how far users scroll down the page, providing valuable engagement metrics.</p>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        </div>
+        
+        <div class="content-section">
+            <h2>Test Content Section 2</h2>
+            <p>Keep scrolling to test the scroll depth tracking feature. The analytics system will record the maximum scroll depth reached during your session.</p>
+            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        </div>
+        
+        <div class="content-section">
+            <h2>Test Content Section 3</h2>
+            <p>This section helps test engagement metrics. Click anywhere on the page to register interactions. The system tracks:</p>
+            <ul>
+                <li>Time on page</li>
+                <li>Scroll depth percentage</li>
+                <li>Number of interactions (clicks)</li>
+                <li>Page performance metrics</li>
+            </ul>
+        </div>
+        
+        <div class="content-section">
+            <h2>Features Being Tested</h2>
+            <p><strong>Connection Management:</strong> Automatic reconnection with exponential backoff, idle timeout detection, and connection pooling.</p>
+            <p><strong>Performance Optimization:</strong> Event batching, message compression, and reduced heartbeat frequency.</p>
+            <p><strong>Fallback Mechanism:</strong> Beacon API fallback when WebSocket is unavailable.</p>
+            <p><strong>Advanced Analytics:</strong> Engagement tracking, performance metrics, and custom events.</p>
+        </div>
+    </div>
+    
+    <!-- Load Analytics v2 -->
+    <script src="http://localhost:8080/analytics-v2.js?site=test-site-v2"></script>
+    
+    <script>
+        // Test configuration
+        window.PAYBUTTON_ANALYTICS_DEBUG = true;
+        
+        // Update UI
+        function updateStatus() {
+            if (window.PayButtonAnalytics) {
+                const connected = window.PayButtonAnalytics.isConnected();
+                const fallback = window.PayButtonAnalytics.isUsingFallback();
+                const sessionId = window.PayButtonAnalytics.getSessionId();
+                const siteName = window.PayButtonAnalytics.getSiteName();
+                const queueSize = window.PayButtonAnalytics.getQueueSize();
+                
+                document.getElementById('statusValue').textContent = 
+                    connected ? 'Connected' : (fallback ? 'Fallback Mode' : 'Disconnected');
+                
+                const statusCard = document.getElementById('connectionStatus');
+                statusCard.className = 'status-card ' + 
+                    (connected ? 'connected' : (fallback ? 'fallback' : ''));
+                
+                document.getElementById('sessionId').textContent = sessionId || '-';
+                document.getElementById('siteName').textContent = siteName || '-';
+                document.getElementById('queueSize').textContent = queueSize || '0';
+                
+                updateMetrics();
+            }
+        }
+        
+        function updateMetrics() {
+            if (window.PayButtonAnalytics) {
+                const metrics = window.PayButtonAnalytics.getMetrics();
+                const tbody = document.getElementById('metricsBody');
+                tbody.innerHTML = '';
+                
+                for (const [key, value] of Object.entries(metrics)) {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = key.replace(/([A-Z])/g, ' $1').trim();
+                    row.insertCell(1).textContent = value;
+                }
+            }
+        }
+        
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('eventLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Test functions
+        function testConnection() {
+            addLog('Testing connection...', 'info');
+            if (window.PayButtonAnalytics) {
+                window.PayButtonAnalytics.connect();
+                addLog('Connection initiated', 'success');
+            }
+        }
+        
+        function testReconnect() {
+            addLog('Testing reconnection...', 'info');
+            if (window.PayButtonAnalytics) {
+                window.PayButtonAnalytics.disconnect();
+                setTimeout(() => {
+                    window.PayButtonAnalytics.connect();
+                    addLog('Reconnection initiated', 'success');
+                }, 1000);
+            }
+        }
+        
+        function testDisconnect() {
+            addLog('Testing disconnect...', 'info');
+            if (window.PayButtonAnalytics) {
+                window.PayButtonAnalytics.disconnect();
+                addLog('Disconnected', 'success');
+            }
+        }
+        
+        function testCustomEvent() {
+            addLog('Sending custom event...', 'info');
+            if (window.PayButtonAnalytics) {
+                window.PayButtonAnalytics.trackEvent('test_event', {
+                    timestamp: new Date().toISOString(),
+                    random: Math.random()
+                });
+                addLog('Custom event sent', 'success');
+            }
+        }
+        
+        function testPageView() {
+            const path = '/test/' + Math.random().toString(36).substring(7);
+            addLog(`Tracking page view: ${path}`, 'info');
+            if (window.PayButtonAnalytics) {
+                window.PayButtonAnalytics.trackPageView(path);
+                addLog('Page view tracked', 'success');
+            }
+        }
+        
+        function showDebug() {
+            if (window.PayButtonAnalytics) {
+                window.PayButtonAnalytics.debug();
+                addLog('Debug info printed to console', 'info');
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('eventLog').innerHTML = 
+                '<div class="log-entry info">Log cleared</div>';
+        }
+        
+        function testFallback() {
+            addLog('Testing fallback mode...', 'info');
+            if (window.PayButtonAnalytics) {
+                // Disconnect WebSocket to force fallback
+                window.PayButtonAnalytics.disconnect();
+                
+                // Configure to use fallback
+                window.PayButtonAnalytics.configure({
+                    FALLBACK_ENABLED: true,
+                    MAX_RECONNECT_ATTEMPTS: 0
+                });
+                
+                // Send events via fallback
+                window.PayButtonAnalytics.trackEvent('fallback_test', {
+                    method: 'beacon'
+                });
+                
+                addLog('Fallback mode activated', 'success');
+            }
+        }
+        
+        function simulateActivity() {
+            addLog('Simulating user activity...', 'info');
+            
+            // Simulate clicks
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    document.body.click();
+                    addLog(`Click ${i + 1} simulated`, 'success');
+                }, i * 500);
+            }
+            
+            // Simulate scroll
+            setTimeout(() => {
+                window.scrollTo(0, document.body.scrollHeight / 2);
+                addLog('Scroll simulated', 'success');
+            }, 3000);
+            
+            // Track custom events
+            setTimeout(() => {
+                if (window.PayButtonAnalytics) {
+                    window.PayButtonAnalytics.trackEvent('activity_complete', {
+                        clicks: 5,
+                        scroll: true
+                    });
+                    addLog('Activity simulation complete', 'success');
+                }
+            }, 4000);
+        }
+        
+        // Update scroll depth indicator
+        window.addEventListener('scroll', () => {
+            const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+            if (scrollHeight > 0) {
+                const scrollPercent = Math.round((window.scrollY / scrollHeight) * 100);
+                document.getElementById('scrollDepth').textContent = scrollPercent;
+            }
+        });
+        
+        // Monitor analytics status
+        setInterval(updateStatus, 1000);
+        
+        // Initial setup
+        window.addEventListener('load', () => {
+            addLog('Page loaded, analytics should initialize', 'info');
+            updateStatus();
+            
+            // Log when analytics connects
+            setTimeout(() => {
+                if (window.PayButtonAnalytics && window.PayButtonAnalytics.isConnected()) {
+                    addLog('Analytics connected successfully!', 'success');
+                } else {
+                    addLog('Analytics not yet connected', 'error');
+                }
+            }, 2000);
+        });
+        
+        // Track page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            const state = document.visibilityState;
+            addLog(`Page visibility changed: ${state}`, 'info');
+        });
+        
+        // Track online/offline events
+        window.addEventListener('online', () => {
+            addLog('Network: Online', 'success');
+        });
+        
+        window.addEventListener('offline', () => {
+            addLog('Network: Offline', 'error');
+        });
+    </script>
+</body>
+</html>

@@ -186,11 +186,15 @@ func Initialize() {
 	// Start background cleanup routines
 	go manager.cleanupRoutine()
 	go manager.hourlyRotation()
+	
+	// Start enhanced cleanup routine for v2 features
+	StartEnhancedCleanup()
 
 	logger.Info("Analytics Manager initialized",
 		slog.Int("pid", os.Getpid()),
 		slog.String("cleanup_interval", "60s"),
-		slog.String("rotation_interval", "1h"))
+		slog.String("rotation_interval", "1h"),
+		slog.String("version", "2.0"))
 }
 
 // Shutdown gracefully closes all analytics connections and stops background routines
