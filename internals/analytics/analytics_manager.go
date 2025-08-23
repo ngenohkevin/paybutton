@@ -247,18 +247,9 @@ func HandleWebSocket(c *gin.Context) {
 	timezone := c.Query("tz") // Optional timezone from frontend
 	region := detectTorFriendlyRegion(userAgent, acceptLanguage, timezone)
 
-	// Apply rate limiting
+	// Note: Rate limiting removed to allow normal user browsing behavior
+	// Users frequently open/close pages and this shouldn't be restricted
 	clientIP := c.ClientIP()
-	if !manager.checkRateLimit(clientIP) {
-		logger.Warn("Analytics WebSocket connection rate limited",
-			slog.String("site", siteName),
-			slog.String("remote_addr", clientIP))
-		c.JSON(http.StatusTooManyRequests, gin.H{
-			"error":       "Too many connection attempts. Please try again later.",
-			"retry_after": 60,
-		})
-		return
-	}
 
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -1063,7 +1054,7 @@ func (am *AnalyticsManager) checkRateLimit(clientIP string) bool {
 
 	now := time.Now()
 	windowDuration := 5 * time.Minute // 5-minute window
-	maxAttempts := 10                 // Max 10 connections per 5 minutes
+	maxAttempts := 100                // Max 100 connections per 5 minutes (increased for testing)
 
 	// Get or create rate limit record for this IP
 	rateLimit, exists := am.rateLimiter[clientIP]
