@@ -65,10 +65,6 @@ func (s *Server) Start() error {
 	monitoring.InitializeAlertManager()
 	s.logger.Info("Alert management system initialized")
 
-	// Initialize analytics system
-	analytics.Initialize()
-	s.logger.Info("Analytics system initialized")
-
 	bot, err := tgbotapi.NewBotAPI(botToken.BotApiKey)
 	if err != nil {
 		s.logger.Error("Error initializing bot:", err)

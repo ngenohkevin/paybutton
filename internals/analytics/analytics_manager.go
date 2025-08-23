@@ -154,10 +154,18 @@ var logger *slog.Logger
 
 // Initialize creates and starts the analytics manager
 func Initialize() {
-	// Initialize structured logger for analytics
-	logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})).With("component", "analytics")
+	// Initialize structured logger for analytics if not already initialized
+	if logger == nil {
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})).With("component", "analytics")
+	}
+
+	// Prevent double initialization
+	if manager != nil {
+		logger.Warn("Analytics Manager already initialized, skipping duplicate initialization")
+		return
+	}
 
 	manager = &AnalyticsManager{
 		connections:    make(map[string][]*AnalyticsConnection),
@@ -230,6 +238,9 @@ func Shutdown() {
 		logger.Info("Analytics Manager: Graceful shutdown completed",
 			slog.Int("connections_closed", totalConnections),
 			slog.Int("sites_affected", siteCount))
+		
+		// Reset manager to nil so it can be re-initialized
+		manager = nil
 	})
 }
 

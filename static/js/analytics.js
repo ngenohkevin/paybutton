@@ -407,10 +407,20 @@
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') {
                     // Always reconnect when page becomes visible if not connected
-                    if (!isConnected && !websocket) {
+                    if (!isConnected) {
                         debug('Page became visible, reconnecting...');
                         reconnectAttempts = 0; // Reset reconnect attempts
-                        setTimeout(connect, 500);
+                        
+                        // Clean up any stale websocket first
+                        if (websocket && websocket.readyState !== WebSocket.OPEN && websocket.readyState !== WebSocket.CONNECTING) {
+                            websocket.close();
+                            websocket = null;
+                        }
+                        
+                        // Only reconnect if we don't have an active connection attempt
+                        if (!websocket) {
+                            setTimeout(connect, 500);
+                        }
                     }
                 } else if (document.visibilityState === 'hidden') {
                     debug('Page became hidden');
@@ -512,9 +522,22 @@
         if (!siteName) {
             console.log('PayButton Analytics: Reinitializing on load event');
             initialize();
-        } else if (!isConnected && !websocket) {
-            console.log('PayButton Analytics: Not connected on load, attempting connection');
-            connect();
+        } else if (!isConnected) {
+            console.log('PayButton Analytics: Not connected on load, checking connection state');
+            
+            // Clean up stale connections
+            if (websocket && websocket.readyState !== WebSocket.OPEN && websocket.readyState !== WebSocket.CONNECTING) {
+                console.log('PayButton Analytics: Cleaning up stale websocket');
+                websocket.close();
+                websocket = null;
+            }
+            
+            // Attempt connection if none exists
+            if (!websocket) {
+                console.log('PayButton Analytics: Attempting fresh connection');
+                reconnectAttempts = 0; // Reset attempts
+                connect();
+            }
         }
     });
 
