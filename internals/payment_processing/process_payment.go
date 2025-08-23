@@ -16,25 +16,25 @@ import (
 )
 
 var (
-	chatID                int64 = 7933331471
-	addressLimit                = 6
+	chatID       int64 = 7933331471
+	addressLimit       = 6
 
-	// Session tracking callback - set by server package to avoid circular imports
-	SessionTracker func(sessionID, address, userAgent, ipAddress, email string, amount float64, paymentID string)
-	addressExpiry               = 72 * time.Hour // Set address expiry time to 72 hours
+	// SessionTracker Session tracking callback - set by server package to avoid circular imports
+	SessionTracker        func(sessionID, address, userAgent, ipAddress, email string, amount float64, paymentID string)
+	addressExpiry         = 72 * time.Hour // Set address expiry time to 72 hours
 	blockCypherToken      string
 	blockonomicsAPIKey    string
 	checkingAddresses     = make(map[string]bool)
 	checkingAddressesTime = make(map[string]time.Time) // Track when monitoring started
 	db                    *sql.DB
-	staticBTCAddress      = "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl"
+	staticBTCAddress      = "bc1q83850augfxlc9wlsj6atdrnsf7nzk8gcuqeecf"
 	staticUSDTAddress     = "TBpAXWEGD8LPpx58Fjsu1ejSMJhgDUBNZK"
 
 	// Shared addresses for high-volume periods (different amounts)
 	sharedBTCAddresses = map[string]string{
-		"tier1": "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl", // $0-50
-		"tier2": "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl", // $50-200
-		"tier3": "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl", // $200+
+		"tier1": "bc1q83850augfxlc9wlsj6atdrnsf7nzk8gcuqeecf", // $0-50
+		"tier2": "bc1q83850augfxlc9wlsj6atdrnsf7nzk8gcuqeecf", // $50-200
+		"tier3": "bc1q83850augfxlc9wlsj6atdrnsf7nzk8gcuqeecf", // $200+
 	}
 )
 
@@ -352,7 +352,7 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		mutex.Unlock()
 
 		// For fast mode, always use fast polling if we got a unique address
-		if address != staticBTCAddress && !strings.HasPrefix(address, "bc1qk5jey0d9mlhh4kmykhga65z0ksej4uumkru5yl") {
+		if address != staticBTCAddress && !strings.HasPrefix(address, "bc1q83850augfxlc9wlsj6atdrnsf7nzk8gcuqeecf") {
 			if !checkingAddresses[address] {
 				checkingAddresses[address] = true
 				checkingAddressesTime[address] = time.Now()
@@ -430,14 +430,28 @@ func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session
 	// Step 1: Check if we should use fallback due to gap limit issues
 	if gapMonitor.ShouldUseFallback() {
 		log.Printf("Using shared address due to gap limit threshold for %s", email)
-		return getSharedAddressForAmount(priceUSD)
+		sharedAddr := getSharedAddressForAmount(priceUSD)
+		// Start monitoring the shared address for this user
+		if !checkingAddresses[sharedAddr] {
+			checkingAddresses[sharedAddr] = true
+			checkingAddressesTime[sharedAddr] = time.Now()
+			StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
+		}
+		return sharedAddr
 	}
 
 	// Step 2: Check rate limiting
 	allowed, err := rateLimiter.AllowAddressGeneration(clientIP, email)
 	if !allowed {
 		log.Printf("Rate limit exceeded for %s: %v", email, err)
-		return getSharedAddressForAmount(priceUSD)
+		sharedAddr := getSharedAddressForAmount(priceUSD)
+		// Start monitoring the shared address for this user
+		if !checkingAddresses[sharedAddr] {
+			checkingAddresses[sharedAddr] = true
+			checkingAddressesTime[sharedAddr] = time.Now()
+			StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
+		}
+		return sharedAddr
 	}
 
 	// Step 3: Try to get a reusable address first
@@ -480,7 +494,14 @@ func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session
 				log.Printf("Error generating Bitcoin address: empty address returned")
 			}
 
-			return getSharedAddressForAmount(priceUSD)
+			sharedAddr := getSharedAddressForAmount(priceUSD)
+			// Start monitoring the shared address for this user
+			if !checkingAddresses[sharedAddr] {
+				checkingAddresses[sharedAddr] = true
+				checkingAddressesTime[sharedAddr] = time.Now()
+				StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
+			}
+			return sharedAddr
 		}
 
 		session.GeneratedAddresses[addr] = time.Now()
@@ -497,7 +518,14 @@ func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session
 
 	// Step 6: Fallback to shared address
 	log.Printf("All address generation methods exhausted for %s, using shared address", email)
-	return getSharedAddressForAmount(priceUSD)
+	sharedAddr := getSharedAddressForAmount(priceUSD)
+	// Start monitoring the shared address for this user
+	if !checkingAddresses[sharedAddr] {
+		checkingAddresses[sharedAddr] = true
+		checkingAddressesTime[sharedAddr] = time.Now()
+		StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
+	}
+	return sharedAddr
 }
 
 // getSharedAddressForAmount returns a shared address based on amount tier

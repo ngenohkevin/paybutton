@@ -185,7 +185,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					continue
 				}
 				balance = btc * rate
-				log.Printf("Address: %s, BTC Balance: %.8f BTC (%.2f USD)", address, btc, balance)
+				log.Printf("Checking %s: %.8f BTC (%.2f USD)", address, btc, balance)
 			} else {
 				// USDT balance check - USDT value is already in USD
 				usdtBalance, err := payments2.GetUSDTBalance(address)
@@ -239,38 +239,43 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 
 				// Log different messages based on balance
 				if internalBalance <= 0 {
-					log.Printf("Address: %s, No USDT balance found", address)
+					log.Printf("Checking %s: No USDT balance", address)
 				} else {
-					log.Printf("Address: %s, USDT Balance: %.6f USDT (%.2f USD)", address, usdtBalance, internalBalance)
+					log.Printf("Checking %s: %.6f USDT (%.2f USD)", address, usdtBalance, internalBalance)
 				}
 			}
 
 			if balance > 0 && currencyType == "BTC" {
-				// Check if this is a static/shared address - if so, only log but don't process
+				// Check if this is a static/shared address - if so, only notify admin
+				// because the balance could be from any user, not necessarily this one
 				if isStaticOrSharedAddress(address) {
-					log.Printf("ALERT: Payment detected on static/shared address %s for email %s, amount: %.2f USD", address, email, balance)
+					log.Printf("Balance detected on static/shared address %s (monitoring for %s): %.2f USD", address, email, balance)
 
-					// Send alert to Telegram but don't process
-					alertMsg := fmt.Sprintf(
-						"⚠️ *STATIC ADDRESS PAYMENT DETECTED*\n\n"+
-							"*Email:* `%s`\n"+
-							"*Address:* `%s`\n"+
-							"*Amount:* `%.2f USD`\n\n"+
-							"❌ *No automatic processing* - Manual intervention required",
-						email, address, balance)
+					// Send notification to admin for manual verification (like USDT)
+					confirmationTime := time.Now().Format(time.RFC3339)
+					botLogMessage := fmt.Sprintf(
+						"*Email:* `%s`\n*BTC Balance Detected (Static Address):* `%.2f USD`\n*Address:* `%s`\n*Confirmation Time:* `%s`\n\n⚠️ *Static address - manual verification required*",
+						email, balance, address, confirmationTime)
 
-					msg := tgbotapi.NewMessage(chatID, alertMsg)
+					msg := tgbotapi.NewMessage(chatID, botLogMessage)
 					msg.ParseMode = tgbotapi.ModeMarkdown
-					if _, err := bot.Send(msg); err != nil {
-						log.Printf("Error sending static address alert: %s", err)
+					_, err = bot.Send(msg)
+					if err != nil {
+						log.Printf("Error sending static address balance notification: %s", err)
 					}
 
-					// Stop monitoring this address
+					// Mark address as detected but don't process automatically
 					mutex.Lock()
+					session := userSessions[email]
+					if session != nil {
+						// Mark that we've seen balance on this address
+						session.UsedAddresses[address] = true
+					}
 					delete(checkingAddresses, address)
 					mutex.Unlock()
 
-					return // Exit without processing
+					// Exit monitoring for this address
+					return
 				}
 
 				balanceUSD := database.RoundToTwoDecimalPlaces(balance)
@@ -450,7 +455,7 @@ func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 		// Success - record it, cache it, and return
 		circuitManager.OnSuccess(provider.name)
 		cache.Set(address, balance)
-		log.Printf("Successfully fetched balance from %s and cached for address %s: %d satoshis", provider.name, address, balance)
+		log.Printf("Balance check via %s for %s: %d satoshis", provider.name, address, balance)
 		return balance, nil
 	}
 

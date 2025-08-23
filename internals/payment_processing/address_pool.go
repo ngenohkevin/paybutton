@@ -88,17 +88,37 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Check if user already has a reserved address
+	// Check if user already has ANY reserved address within 72 hours
+	// This prevents users from generating multiple addresses
+	var existingReservedAddr string
+	var mostRecentReservation *time.Time
+	
 	for addr, poolAddr := range p.reservedAddrs {
-		if poolAddr.ReservedFor == email && time.Since(*poolAddr.ReservedAt) < 30*time.Minute {
-			// Extend reservation
+		if poolAddr.ReservedFor == email && poolAddr.ReservedAt != nil {
+			// Track the most recent reservation
+			if mostRecentReservation == nil || poolAddr.ReservedAt.After(*mostRecentReservation) {
+				mostRecentReservation = poolAddr.ReservedAt
+				existingReservedAddr = addr
+			}
+		}
+	}
+	
+	// If user has a reserved address within 72 hours, return that same address
+	if mostRecentReservation != nil && time.Since(*mostRecentReservation) < 72*time.Hour {
+		// Update the reservation time and amount
+		if poolAddr, exists := p.reservedAddrs[existingReservedAddr]; exists {
 			now := time.Now()
 			poolAddr.ReservedAt = &now
 			poolAddr.Amount = amount
-			log.Printf("Extended reservation for existing address %s for user %s", addr, email)
-			return addr, nil
+			log.Printf("User %s already has reserved address %s (reserved %v ago), returning same address", 
+				email, existingReservedAddr, time.Since(*mostRecentReservation).Round(time.Minute))
+			return existingReservedAddr, nil
 		}
 	}
+
+	// Note: We removed the check for used addresses here
+	// Users who have successfully paid SHOULD be able to get a new address for their next payment
+	// The 72-hour reservation on their previous address is already handled above
 
 	// Get address from pool
 	if len(p.availableAddrs) == 0 {
@@ -122,9 +142,27 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 		return addr, nil
 	}
 
-	// Take address from pool
-	poolAddr := p.availableAddrs[0]
-	p.availableAddrs = p.availableAddrs[1:]
+	// Take address from pool, but ensure it's not already used
+	var poolAddr PoolAddress
+	var foundCleanAddress bool
+	
+	for i, addr := range p.availableAddrs {
+		// Check if this address is NOT in usedAddrs
+		if _, isUsed := p.usedAddrs[addr.Address]; !isUsed {
+			poolAddr = addr
+			// Remove from available pool
+			p.availableAddrs = append(p.availableAddrs[:i], p.availableAddrs[i+1:]...)
+			foundCleanAddress = true
+			break
+		} else {
+			log.Printf("WARNING: Found used address %s in available pool, skipping", addr.Address)
+		}
+	}
+	
+	if !foundCleanAddress {
+		log.Printf("No clean addresses available in pool for user %s", email)
+		return "", fmt.Errorf("no clean addresses available in pool")
+	}
 
 	now := time.Now()
 	poolAddr.ReservedAt = &now
@@ -170,23 +208,51 @@ func (p *AddressPool) recycleExpiredReservationsInternal() {
 
 	now := time.Now()
 	recycled := 0
+	usedAddressesFound := 0
 
 	for addr, poolAddr := range p.reservedAddrs {
-		// Recycle if reserved for more than 30 minutes without payment
-		if poolAddr.ReservedAt != nil && now.Sub(*poolAddr.ReservedAt) > 30*time.Minute {
-			// Add back to available pool if not too old
-			if now.Sub(poolAddr.CreatedAt) < 24*time.Hour {
-				p.availableAddrs = append(p.availableAddrs, *poolAddr)
-				recycled++
+		// Only recycle if reserved for more than 72 hours without payment
+		// This gives users plenty of time to complete their payment
+		if poolAddr.ReservedAt != nil && now.Sub(*poolAddr.ReservedAt) > 72*time.Hour {
+			// Before recycling, check if address has received funds
+			hasBalance := p.checkAddressBalance(addr)
+			if hasBalance {
+				// Move to used addresses instead of recycling
+				now := time.Now()
+				poolAddr.UsedAt = &now
+				poolAddr.UsedBy = poolAddr.ReservedFor
+				p.usedAddrs[addr] = poolAddr
+				p.stats.TotalUsed++
+				usedAddressesFound++
+				log.Printf("Moved funded address %s to used addresses (reserved by %s)", addr, poolAddr.ReservedFor)
+			} else {
+				// Only recycle if address is less than 7 days old and has no funds
+				if now.Sub(poolAddr.CreatedAt) < 7*24*time.Hour {
+					// Double-check this address is not in usedAddrs before recycling
+					if _, isUsed := p.usedAddrs[addr]; !isUsed {
+						// Reset reservation info before adding back to pool
+						poolAddr.ReservedAt = nil
+						poolAddr.ReservedFor = ""
+						poolAddr.Amount = 0
+						p.availableAddrs = append(p.availableAddrs, *poolAddr)
+						recycled++
+						log.Printf("Recycled unused address %s after 72 hours (originally for %s)", addr, poolAddr.ReservedFor)
+					} else {
+						log.Printf("WARNING: Prevented recycling of used address %s", addr)
+					}
+				} else {
+					// Address is too old (>7 days), don't recycle it
+					log.Printf("Discarding old unused address %s (created %v ago)", addr, now.Sub(poolAddr.CreatedAt))
+				}
 			}
 			delete(p.reservedAddrs, addr)
 		}
 	}
 
-	if recycled > 0 {
+	if recycled > 0 || usedAddressesFound > 0 {
 		p.stats.TotalRecycled += recycled
 		p.stats.CurrentPoolSize = len(p.availableAddrs)
-		log.Printf("Recycled %d expired reserved addresses back to pool", recycled)
+		log.Printf("Pool maintenance: recycled %d clean addresses, moved %d funded addresses to used", recycled, usedAddressesFound)
 	}
 }
 
@@ -238,12 +304,17 @@ func (p *AddressPool) refillPool() {
 		}
 
 		p.mu.Lock()
-		p.availableAddrs = append(p.availableAddrs, PoolAddress{
-			Address:   addr,
-			CreatedAt: time.Now(),
-		})
-		p.stats.TotalGenerated++
-		p.stats.CurrentPoolSize = len(p.availableAddrs)
+		// Before adding to available pool, verify it's not in usedAddrs
+		if _, isUsed := p.usedAddrs[addr]; !isUsed {
+			p.availableAddrs = append(p.availableAddrs, PoolAddress{
+				Address:   addr,
+				CreatedAt: time.Now(),
+			})
+			p.stats.TotalGenerated++
+			p.stats.CurrentPoolSize = len(p.availableAddrs)
+		} else {
+			log.Printf("WARNING: Attempted to add used address %s to available pool during refill", addr)
+		}
 		p.mu.Unlock()
 
 		generated++
@@ -270,6 +341,8 @@ func (p *AddressPool) generateSingleAddress() (string, error) {
 
 // maintainPool runs periodic maintenance tasks
 func (p *AddressPool) maintainPool() {
+	// Runs every 5 minutes to check for expired reservations
+	// But addresses are only recycled after 72 hours of no payment
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -582,6 +655,20 @@ func (p *AddressPool) ExportUsedAddressesCSV(filter string) string {
 	}
 
 	return csv
+}
+
+// checkAddressBalance verifies if an address has received funds
+func (p *AddressPool) checkAddressBalance(address string) bool {
+	// Use the existing balance checking function from balance_ops.go
+	balance, err := GetBitcoinAddressBalanceWithFallback(address, blockCypherToken)
+	if err != nil {
+		// If we can't check balance, be conservative and assume it might have funds
+		log.Printf("Warning: Could not check balance for address %s during recycling: %v", address, err)
+		return true
+	}
+	
+	// Consider any balance > 0 satoshis as "has funds"
+	return balance > 0
 }
 
 // RecycleExpiredReservations returns the count of recycled addresses for admin feedback
