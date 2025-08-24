@@ -93,6 +93,12 @@ let useWebSocketAnalytics = true;
 
 // Initialize analytics WebSocket connection
 function initAnalyticsWebSocket() {
+    // Prevent duplicate connections
+    if (analyticsWS && (analyticsWS.readyState === WebSocket.OPEN || analyticsWS.readyState === WebSocket.CONNECTING)) {
+        console.log('Analytics WebSocket already connected or connecting');
+        return;
+    }
+    
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/admin/analytics`;
     
@@ -399,14 +405,134 @@ function refreshSiteAnalytics() {
     }
 }
 
+// Alpine.js component for analytics widget
+document.addEventListener('alpine:init', () => {
+    Alpine.data('analyticsWidget', () => ({
+        // State
+        activeViewers: 0,
+        weeklyVisitors: 0,
+        activeSites: 0,
+        sites: [],
+        lastUpdate: null,
+        isConnected: false,
+        
+        // WebSocket
+        ws: null,
+        reconnectDelay: 1000,
+        maxReconnectDelay: 30000,
+        reconnectTimer: null,
+        
+        init() {
+            console.log('Initializing Alpine analytics widget');
+            // Prevent duplicate initialization
+            if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+            this.connect();
+            this.loadInitialData();
+        },
+        
+        connect() {
+            // Prevent duplicate connections
+            if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+                console.log('Alpine WebSocket already connected or connecting');
+                return;
+            }
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/admin/analytics`;
+            
+            try {
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    console.log('Alpine WebSocket connected');
+                    this.isConnected = true;
+                    this.reconnectDelay = 1000;
+                };
+                
+                this.ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'analytics_update') {
+                            this.updateData(message.data);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing message:', error);
+                    }
+                };
+                
+                this.ws.onclose = (event) => {
+                    console.log('Alpine WebSocket closed:', event.code);
+                    this.isConnected = false;
+                    this.ws = null;
+                    
+                    // Reconnect with exponential backoff
+                    if (event.code !== 1000 && event.code !== 1001) {
+                        this.scheduleReconnect();
+                    }
+                };
+                
+                this.ws.onerror = (error) => {
+                    console.error('Alpine WebSocket error:', error);
+                };
+                
+            } catch (error) {
+                console.error('Failed to create WebSocket:', error);
+                this.scheduleReconnect();
+            }
+        },
+        
+        scheduleReconnect() {
+            if (this.reconnectTimer) return;
+            
+            this.reconnectTimer = setTimeout(() => {
+                this.reconnectTimer = null;
+                this.connect();
+            }, this.reconnectDelay);
+            
+            this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+        },
+        
+        loadInitialData() {
+            fetch('/admin/api/dashboard-analytics')
+                .then(response => response.json())
+                .then(data => this.updateData(data))
+                .catch(error => console.error('Error loading initial data:', error));
+        },
+        
+        updateData(data) {
+            // Update state with smooth transitions
+            this.activeViewers = data.summary?.total_active || 0;
+            this.weeklyVisitors = data.summary?.total_weekly || 0;
+            this.activeSites = data.summary?.active_sites || 0;
+            this.sites = data.top_sites || [];
+            this.lastUpdate = new Date();
+        },
+        
+        refresh() {
+            this.loadInitialData();
+        },
+        
+        formatTime(date) {
+            if (!date) return '--:--:--';
+            return date.toLocaleTimeString();
+        }
+    }));
+});
+
+// Track if analytics has been initialized
+let analyticsInitialized = false;
+
 // Listen for HTMX updates
 document.body.addEventListener('htmx:afterSwap', function(event) {
     if (event.target.id === 'dashboard-content') {
         // Re-initialize charts after content update and load data
         setTimeout(() => {
             initializeCharts();
-            initAnalyticsWebSocket(); // Initialize WebSocket connection
-            loadInitialAnalytics(); // Load initial analytics data
+            
+            // Don't initialize old WebSocket system if Alpine is available
+            // Alpine.js will handle the analytics widget independently
             // Fetch and update chart data after a short delay to ensure DOM is ready
             setTimeout(() => {
                 fetch('/admin/status')

@@ -536,8 +536,8 @@ func getSystemStatusHTML(c *gin.Context) {
 		</div>
 	</div>
 	
-	<!-- Enhanced Site Analytics Widget -->
-	<div class="card mb-8 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 dark:from-gray-900 dark:via-black dark:to-gray-900 border-0 shadow-2xl" id="site-analytics-widget">
+	<!-- Enhanced Site Analytics Widget with Alpine.js -->
+	<div class="card mb-8 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 dark:from-gray-900 dark:via-black dark:to-gray-900 border-0 shadow-2xl" id="site-analytics-widget" x-data="analyticsWidget" x-init="init()">
 		<div class="card-header bg-gradient-to-r from-gray-800 to-gray-700 dark:from-gray-900 dark:to-black text-white border-0 relative overflow-hidden">
 			<div class="absolute inset-0 bg-black opacity-30"></div>
 			<div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
@@ -574,8 +574,8 @@ func getSystemStatusHTML(c *gin.Context) {
 						</div>
 						<div class="space-y-1">
 							<p class="text-emerald-200 text-sm font-semibold">Active Viewers</p>
-							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-active-viewers">
-								<span class="animate-pulse">-</span>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-active-viewers" x-text="activeViewers">
+								0
 							</p>
 							<p class="text-emerald-300 text-xs font-medium">
 								<i class="fas fa-trending-up mr-1"></i>Real-time count
@@ -599,8 +599,8 @@ func getSystemStatusHTML(c *gin.Context) {
 						</div>
 						<div class="space-y-1">
 							<p class="text-indigo-200 text-sm font-semibold">Weekly Visitors</p>
-							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-weekly-visitors">
-								<span class="animate-pulse">-</span>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-weekly-visitors" x-text="weeklyVisitors">
+								0
 							</p>
 							<p class="text-indigo-300 text-xs font-medium">
 								<i class="fas fa-chart-line mr-1"></i>Total this week
@@ -624,8 +624,8 @@ func getSystemStatusHTML(c *gin.Context) {
 						</div>
 						<div class="space-y-1">
 							<p class="text-teal-200 text-sm font-semibold">Active Sites</p>
-							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-active-sites">
-								<span class="animate-pulse">-</span>
+							<p class="text-4xl font-black tracking-tight text-white" id="dashboard-active-sites" x-text="activeSites">
+								0
 							</p>
 							<p class="text-teal-300 text-xs font-medium">
 								<i class="fas fa-globe mr-1"></i>Sites online
