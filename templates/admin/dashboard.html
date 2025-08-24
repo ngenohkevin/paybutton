@@ -415,12 +415,26 @@ document.addEventListener('alpine:init', () => {
         sites: [],
         lastUpdate: null,
         isConnected: false,
+        connectionStable: false,
         
         // WebSocket
         ws: null,
         reconnectDelay: 1000,
         maxReconnectDelay: 30000,
         reconnectTimer: null,
+        
+        // Ping/Pong heartbeat
+        heartbeatInterval: null,
+        heartbeatTimer: null,
+        pingInterval: 30000, // 30 seconds
+        pongTimeout: 10000, // 10 seconds to wait for pong
+        lastPongTime: null,
+        
+        // Connection state management
+        connectionAttempts: 0,
+        maxConnectionAttempts: 5,
+        lastConnectionTime: null,
+        stableConnectionDuration: 60000, // 1 minute for stable connection
         
         init() {
             console.log('Initializing Alpine analytics widget');
@@ -430,6 +444,11 @@ document.addEventListener('alpine:init', () => {
             }
             this.connect();
             this.loadInitialData();
+            
+            // Setup cleanup on page unload
+            window.addEventListener('beforeunload', () => {
+                this.cleanup();
+            });
         },
         
         connect() {
@@ -438,6 +457,17 @@ document.addEventListener('alpine:init', () => {
                 console.log('Alpine WebSocket already connected or connecting');
                 return;
             }
+            
+            // Rate limiting - don't reconnect too frequently
+            const now = Date.now();
+            if (this.lastConnectionTime && (now - this.lastConnectionTime) < 5000) {
+                console.log('Alpine WebSocket connection rate limited, waiting...');
+                setTimeout(() => this.connect(), 5000);
+                return;
+            }
+            
+            this.lastConnectionTime = now;
+            this.connectionAttempts++;
             
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/admin/analytics`;
@@ -448,12 +478,38 @@ document.addEventListener('alpine:init', () => {
                 this.ws.onopen = () => {
                     console.log('Alpine WebSocket connected');
                     this.isConnected = true;
+                    this.connectionStable = false;
+                    this.connectionAttempts = 0;
                     this.reconnectDelay = 1000;
+                    this.lastPongTime = Date.now();
+                    
+                    // Start heartbeat after connection is established
+                    this.startHeartbeat();
+                    
+                    // Mark connection as stable after duration
+                    setTimeout(() => {
+                        if (this.isConnected) {
+                            this.connectionStable = true;
+                            console.log('Alpine WebSocket connection stabilized');
+                        }
+                    }, this.stableConnectionDuration);
                 };
                 
                 this.ws.onmessage = (event) => {
                     try {
                         const message = JSON.parse(event.data);
+                        
+                        // Handle pong responses
+                        if (message.type === 'pong') {
+                            this.lastPongTime = Date.now();
+                            if (this.heartbeatTimer) {
+                                clearTimeout(this.heartbeatTimer);
+                                this.heartbeatTimer = null;
+                            }
+                            return;
+                        }
+                        
+                        // Handle analytics updates
                         if (message.type === 'analytics_update') {
                             this.updateData(message.data);
                         }
@@ -463,13 +519,14 @@ document.addEventListener('alpine:init', () => {
                 };
                 
                 this.ws.onclose = (event) => {
-                    console.log('Alpine WebSocket closed:', event.code);
-                    this.isConnected = false;
-                    this.ws = null;
+                    console.log('Alpine WebSocket closed:', event.code, event.reason);
+                    this.cleanup();
                     
-                    // Reconnect with exponential backoff
-                    if (event.code !== 1000 && event.code !== 1001) {
+                    // Only reconnect on unexpected closures and if not at max attempts
+                    if (this.shouldReconnect(event.code) && this.connectionAttempts <= this.maxConnectionAttempts) {
                         this.scheduleReconnect();
+                    } else if (this.connectionAttempts > this.maxConnectionAttempts) {
+                        console.log('Alpine WebSocket max reconnection attempts reached');
                     }
                 };
                 
@@ -479,19 +536,90 @@ document.addEventListener('alpine:init', () => {
                 
             } catch (error) {
                 console.error('Failed to create WebSocket:', error);
-                this.scheduleReconnect();
+                if (this.connectionAttempts <= this.maxConnectionAttempts) {
+                    this.scheduleReconnect();
+                }
+            }
+        },
+        
+        shouldReconnect(closeCode) {
+            // Don't reconnect on normal closure or going away
+            if (closeCode === 1000 || closeCode === 1001) return false;
+            
+            // Don't reconnect if connection was never stable and we're getting consistent failures
+            if (!this.connectionStable && closeCode === 1005 && this.connectionAttempts >= 3) {
+                console.log('Alpine WebSocket unstable connection, reducing reconnection attempts');
+                return false;
+            }
+            
+            return true;
+        },
+        
+        startHeartbeat() {
+            // Clear any existing heartbeat
+            this.stopHeartbeat();
+            
+            this.heartbeatInterval = setInterval(() => {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    // Send ping
+                    this.ws.send(JSON.stringify({ type: 'ping' }));
+                    
+                    // Set timeout for pong response
+                    this.heartbeatTimer = setTimeout(() => {
+                        console.log('Alpine WebSocket pong timeout, connection may be dead');
+                        if (this.ws) {
+                            this.ws.close(1000, 'Pong timeout');
+                        }
+                    }, this.pongTimeout);
+                }
+            }, this.pingInterval);
+        },
+        
+        stopHeartbeat() {
+            if (this.heartbeatInterval) {
+                clearInterval(this.heartbeatInterval);
+                this.heartbeatInterval = null;
+            }
+            if (this.heartbeatTimer) {
+                clearTimeout(this.heartbeatTimer);
+                this.heartbeatTimer = null;
+            }
+        },
+        
+        cleanup() {
+            this.isConnected = false;
+            this.connectionStable = false;
+            this.stopHeartbeat();
+            
+            if (this.ws) {
+                // Remove event listeners to prevent reconnection
+                this.ws.onopen = null;
+                this.ws.onmessage = null;
+                this.ws.onclose = null;
+                this.ws.onerror = null;
+                
+                if (this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.close(1000, 'Page unloading');
+                }
+                this.ws = null;
             }
         },
         
         scheduleReconnect() {
             if (this.reconnectTimer) return;
             
+            console.log(`Alpine WebSocket scheduling reconnect in ${this.reconnectDelay}ms (attempt ${this.connectionAttempts})`);
+            
             this.reconnectTimer = setTimeout(() => {
                 this.reconnectTimer = null;
                 this.connect();
             }, this.reconnectDelay);
             
-            this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+            // Exponential backoff with jitter
+            this.reconnectDelay = Math.min(
+                this.reconnectDelay * 2 + Math.random() * 1000, 
+                this.maxReconnectDelay
+            );
         },
         
         loadInitialData() {
