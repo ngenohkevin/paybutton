@@ -16,10 +16,10 @@ import (
 
 // BatchEvent represents a batch of analytics events
 type BatchEvent struct {
-	Type      string                 `json:"type"`
-	Events    []AnalyticsEvent       `json:"events"`
-	SessionID string                 `json:"sessionId"`
-	Timestamp string                 `json:"timestamp"`
+	Type      string           `json:"type"`
+	Events    []AnalyticsEvent `json:"events"`
+	SessionID string           `json:"sessionId"`
+	Timestamp string           `json:"timestamp"`
 }
 
 // AnalyticsEvent represents a single analytics event
@@ -35,10 +35,10 @@ type AnalyticsEvent struct {
 
 // PageInfo contains page-specific information
 type PageInfo struct {
-	Path     string `json:"path"`
-	Title    string `json:"title"`
-	Referrer string `json:"referrer"`
-	URL      string `json:"url"`
+	Path      string `json:"path"`
+	Title     string `json:"title"`
+	Referrer  string `json:"referrer"`
+	URL       string `json:"url"`
 	Timestamp string `json:"timestamp"`
 }
 
@@ -59,20 +59,20 @@ type PerformanceMetrics struct {
 
 // SessionMetrics tracks session-level metrics
 type SessionMetrics struct {
-	Duration     int64                  `json:"duration"`     // milliseconds
-	PageViews    int                    `json:"pageViews"`
-	Events       int                    `json:"events"`
-	Engagement   *EngagementMetrics     `json:"engagement,omitempty"`
-	Performance  *PerformanceMetrics    `json:"performance,omitempty"`
-	LastActivity time.Time              `json:"lastActivity"`
+	Duration     int64               `json:"duration"` // milliseconds
+	PageViews    int                 `json:"pageViews"`
+	Events       int                 `json:"events"`
+	Engagement   *EngagementMetrics  `json:"engagement,omitempty"`
+	Performance  *PerformanceMetrics `json:"performance,omitempty"`
+	LastActivity time.Time           `json:"lastActivity"`
 }
 
 // EnhancedAnalyticsConnection extends the basic connection with more tracking
 type EnhancedAnalyticsConnection struct {
 	*AnalyticsConnection
-	metrics      *SessionMetrics
+	metrics       *SessionMetrics
 	lastHeartbeat time.Time
-	version      string
+	version       string
 }
 
 // BeaconPayload represents data sent via beacon API fallback
@@ -84,10 +84,10 @@ type BeaconPayload struct {
 
 // Global enhanced features
 var (
-	sessionMetrics     map[string]*SessionMetrics
+	sessionMetrics      map[string]*SessionMetrics
 	sessionMetricsMutex sync.RWMutex
-	beaconBuffer       []BeaconPayload
-	beaconBufferMutex  sync.Mutex
+	beaconBuffer        []BeaconPayload
+	beaconBufferMutex   sync.Mutex
 )
 
 func init() {
@@ -105,16 +105,16 @@ func HandleEnhancedWebSocket(c *gin.Context) {
 
 	// Get version from query params
 	version := c.DefaultQuery("v", "1.0")
-	
+
 	// Get additional context
 	pagePath := c.DefaultQuery("path", "/")
 	timezone := c.DefaultQuery("tz", "0")
-	
+
 	// Detect client capabilities
 	userAgent := c.GetHeader("User-Agent")
 	acceptEncoding := c.GetHeader("Accept-Encoding")
 	supportsCompression := acceptEncoding != "" && (acceptEncoding == "*" || acceptEncoding == "gzip" || acceptEncoding == "deflate")
-	
+
 	logger.Info("Enhanced WebSocket connection attempt",
 		slog.String("site", siteName),
 		slog.String("version", version),
@@ -134,7 +134,7 @@ func HandleEnhancedWebSocket(c *gin.Context) {
 
 	// Generate session ID
 	sessionID := generateSessionID()
-	
+
 	// Create enhanced connection
 	enhancedConn := &EnhancedAnalyticsConnection{
 		AnalyticsConnection: &AnalyticsConnection{
@@ -209,7 +209,7 @@ func HandleEnhancedWebSocket(c *gin.Context) {
 		var msgType struct {
 			Type string `json:"type"`
 		}
-		
+
 		if err := json.Unmarshal(message, &msgType); err != nil {
 			continue
 		}
@@ -217,26 +217,26 @@ func HandleEnhancedWebSocket(c *gin.Context) {
 		switch msgType.Type {
 		case "batch":
 			handleBatchEvents(enhancedConn, message)
-			
+
 		case "heartbeat":
 			handleHeartbeat(enhancedConn, message)
-			
+
 		case "pageview":
 			handlePageView(enhancedConn, message)
-			
+
 		case "engagement":
 			handleEngagement(enhancedConn, message)
-			
+
 		case "performance":
 			handlePerformance(enhancedConn, message)
-			
+
 		case "custom":
 			handleCustomEvent(enhancedConn, message)
-			
+
 		case "disconnect":
 			handleDisconnect(enhancedConn, message)
 			return
-			
+
 		default:
 			logger.Debug("Unknown message type",
 				slog.String("type", msgType.Type),
@@ -245,14 +245,14 @@ func HandleEnhancedWebSocket(c *gin.Context) {
 
 		// Update last activity
 		enhancedConn.metrics.LastActivity = time.Now()
-		
+
 		// Reset read deadline
 		conn.SetReadDeadline(time.Now().Add(45 * time.Second))
 	}
 
 	// Calculate session duration
 	enhancedConn.metrics.Duration = time.Since(enhancedConn.joinTime).Milliseconds()
-	
+
 	// Log session summary
 	logger.Info("Enhanced session ended",
 		slog.String("site", siteName),
@@ -273,7 +273,7 @@ func handleBatchEvents(conn *EnhancedAnalyticsConnection, message json.RawMessag
 	// Process each event
 	for _, event := range batch.Events {
 		conn.metrics.Events++
-		
+
 		switch event.Type {
 		case "pageview":
 			conn.metrics.PageViews++
@@ -290,11 +290,11 @@ func handleBatchEvents(conn *EnhancedAnalyticsConnection, message json.RawMessag
 
 	// Send acknowledgment
 	ack := map[string]interface{}{
-		"type":  "ack",
-		"count": len(batch.Events),
+		"type":      "ack",
+		"count":     len(batch.Events),
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
-	
+
 	if err := conn.conn.WriteJSON(ack); err != nil {
 		logger.Error("Failed to send ack", slog.String("error", err.Error()))
 	}
@@ -307,14 +307,14 @@ func handleBatchEvents(conn *EnhancedAnalyticsConnection, message json.RawMessag
 // Handle heartbeat
 func handleHeartbeat(conn *EnhancedAnalyticsConnection, message json.RawMessage) {
 	conn.lastHeartbeat = time.Now()
-	
+
 	var heartbeat struct {
 		Metrics struct {
 			QueueSize int   `json:"queueSize"`
 			Uptime    int64 `json:"uptime"`
 		} `json:"metrics"`
 	}
-	
+
 	if err := json.Unmarshal(message, &heartbeat); err == nil {
 		logger.Debug("Heartbeat received",
 			slog.String("session", conn.sessionID),
@@ -327,14 +327,14 @@ func handleHeartbeat(conn *EnhancedAnalyticsConnection, message json.RawMessage)
 func handlePageView(conn *EnhancedAnalyticsConnection, message json.RawMessage) {
 	conn.metrics.PageViews++
 	conn.metrics.Events++
-	
+
 	var event struct {
 		Page PageInfo `json:"page"`
 	}
-	
+
 	if err := json.Unmarshal(message, &event); err == nil {
 		conn.pagePath = event.Page.Path
-		
+
 		logger.Info("Page view tracked",
 			slog.String("session", conn.sessionID),
 			slog.String("path", event.Page.Path),
@@ -345,14 +345,14 @@ func handlePageView(conn *EnhancedAnalyticsConnection, message json.RawMessage) 
 // Handle engagement metrics
 func handleEngagement(conn *EnhancedAnalyticsConnection, message json.RawMessage) {
 	conn.metrics.Events++
-	
+
 	var event struct {
 		Metrics EngagementMetrics `json:"metrics"`
 	}
-	
+
 	if err := json.Unmarshal(message, &event); err == nil {
 		conn.metrics.Engagement = &event.Metrics
-		
+
 		logger.Debug("Engagement tracked",
 			slog.String("session", conn.sessionID),
 			slog.Int("time_on_page", event.Metrics.TimeOnPage),
@@ -364,14 +364,14 @@ func handleEngagement(conn *EnhancedAnalyticsConnection, message json.RawMessage
 // Handle performance metrics
 func handlePerformance(conn *EnhancedAnalyticsConnection, message json.RawMessage) {
 	conn.metrics.Events++
-	
+
 	var event struct {
 		Metrics PerformanceMetrics `json:"metrics"`
 	}
-	
+
 	if err := json.Unmarshal(message, &event); err == nil {
 		conn.metrics.Performance = &event.Metrics
-		
+
 		logger.Info("Performance tracked",
 			slog.String("session", conn.sessionID),
 			slog.Float64("load_time", event.Metrics.LoadTime),
@@ -382,12 +382,12 @@ func handlePerformance(conn *EnhancedAnalyticsConnection, message json.RawMessag
 // Handle custom events
 func handleCustomEvent(conn *EnhancedAnalyticsConnection, message json.RawMessage) {
 	conn.metrics.Events++
-	
+
 	var event struct {
 		Name string      `json:"name"`
 		Data interface{} `json:"data"`
 	}
-	
+
 	if err := json.Unmarshal(message, &event); err == nil {
 		logger.Debug("Custom event tracked",
 			slog.String("session", conn.sessionID),
@@ -400,7 +400,7 @@ func handleDisconnect(conn *EnhancedAnalyticsConnection, message json.RawMessage
 	var event struct {
 		Reason string `json:"reason"`
 	}
-	
+
 	if err := json.Unmarshal(message, &event); err == nil {
 		logger.Info("Client disconnect",
 			slog.String("session", conn.sessionID),
@@ -425,7 +425,7 @@ func HandleBeacon(c *gin.Context) {
 	// Store beacon data for processing
 	beaconBufferMutex.Lock()
 	beaconBuffer = append(beaconBuffer, payload)
-	
+
 	// Prevent buffer overflow
 	if len(beaconBuffer) > 1000 {
 		beaconBuffer = beaconBuffer[100:] // Keep last 900 entries
@@ -454,7 +454,7 @@ func processBeaconEvents(payload BeaconPayload) {
 	if exists {
 		metrics.Events += len(payload.Events)
 		metrics.LastActivity = time.Now()
-		
+
 		for _, event := range payload.Events {
 			if event.Type == "pageview" {
 				metrics.PageViews++
@@ -471,7 +471,7 @@ func processBeaconEvents(payload BeaconPayload) {
 // GetEnhancedAnalytics returns enhanced analytics data with performance metrics
 func GetEnhancedAnalytics() map[string]interface{} {
 	combined := GetCombinedAnalytics()
-	
+
 	// Add session metrics
 	sessionMetricsMutex.RLock()
 	activeSessions := len(sessionMetrics)
@@ -479,7 +479,7 @@ func GetEnhancedAnalytics() map[string]interface{} {
 	var avgScrollDepth int
 	var avgLoadTime float64
 	var performanceCount int
-	
+
 	for _, metrics := range sessionMetrics {
 		if metrics.Engagement != nil {
 			totalEngagementTime += int64(metrics.Engagement.TimeOnPage)
@@ -544,7 +544,7 @@ func CleanupSessionMetrics() {
 	}
 }
 
-// Start cleanup routine for enhanced features
+// StartEnhancedCleanup Start cleanup routine for enhanced features
 func StartEnhancedCleanup() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
@@ -552,7 +552,7 @@ func StartEnhancedCleanup() {
 
 		for range ticker.C {
 			CleanupSessionMetrics()
-			
+
 			// Clear old beacon buffer entries
 			beaconBufferMutex.Lock()
 			if len(beaconBuffer) > 500 {

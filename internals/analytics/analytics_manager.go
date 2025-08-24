@@ -52,6 +52,8 @@ type AnalyticsManager struct {
 	// Debouncing for dashboard updates
 	lastBroadcast     time.Time     // last broadcast timestamp
 	broadcastDebounce time.Duration // minimum time between broadcasts
+	broadcastTimer    *time.Timer   // timer for delayed broadcasts
+	pendingBroadcast  bool          // flag for pending broadcast
 
 	mutex      sync.RWMutex
 	cleanup    chan string  // for connection cleanup
@@ -177,7 +179,9 @@ func Initialize() {
 		cacheTimestamp:    time.Time{},                    // Initialize with zero time
 		cacheDuration:     5 * time.Second,                // Cache for 5 seconds to reduce flickering
 		lastBroadcast:     time.Time{},                    // Initialize broadcast debouncing
-		broadcastDebounce: 2 * time.Second,                // Minimum 2 seconds between dashboard updates
+		broadcastDebounce: 3 * time.Second,                // Minimum 3 seconds between dashboard updates
+		broadcastTimer:    nil,                            // Timer for delayed broadcasts
+		pendingBroadcast:  false,                          // No pending broadcast initially
 		cleanup:           make(chan string, 100),
 		ticker:            time.NewTicker(time.Hour), // Rotate hourly data every hour
 		isShutdown:        false,                     // Initialize shutdown flag
@@ -186,7 +190,7 @@ func Initialize() {
 	// Start background cleanup routines
 	go manager.cleanupRoutine()
 	go manager.hourlyRotation()
-	
+
 	// Start enhanced cleanup routine for v2 features
 	StartEnhancedCleanup()
 
@@ -829,7 +833,8 @@ func HandleAdminWebSocket(c *gin.Context) {
 		defer close(done)
 		for {
 			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-			_, _, err := conn.ReadMessage()
+			var msg map[string]interface{}
+			err := conn.ReadJSON(&msg)
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
 					logger.Warn("Admin analytics WebSocket unexpected close",
@@ -837,6 +842,24 @@ func HandleAdminWebSocket(c *gin.Context) {
 						slog.String("error", err.Error()))
 				}
 				return
+			}
+
+			// Handle message types for better stability
+			if msgType, ok := msg["type"].(string); ok {
+				switch msgType {
+				case "ping":
+					// Respond with pong
+					pongMsg := map[string]interface{}{
+						"type":      "pong",
+						"timestamp": time.Now().Format(time.RFC3339),
+					}
+					if err := conn.WriteJSON(pongMsg); err != nil {
+						logger.Error("Error sending pong", slog.String("error", err.Error()))
+					}
+				case "refresh":
+					// Send fresh data on demand
+					go manager.debouncedBroadcastAnalyticsUpdate()
+				}
 			}
 		}
 	}()
@@ -857,27 +880,85 @@ func HandleAdminWebSocket(c *gin.Context) {
 	}
 }
 
-// debouncedBroadcastAnalyticsUpdate broadcasts analytics updates with debouncing to prevent flickering
+// debouncedBroadcastAnalyticsUpdate broadcasts analytics updates with improved debouncing
 func (am *AnalyticsManager) debouncedBroadcastAnalyticsUpdate() {
-	now := time.Now()
+	am.mutex.Lock()
+	defer am.mutex.Unlock()
 
-	// Check if enough time has passed since last broadcast
-	if now.Sub(am.lastBroadcast) < am.broadcastDebounce {
-		return // Skip this broadcast to prevent flickering
+	now := time.Now()
+	timeSinceLastBroadcast := now.Sub(am.lastBroadcast)
+
+	// If enough time has passed, broadcast immediately
+	if timeSinceLastBroadcast >= am.broadcastDebounce {
+		am.lastBroadcast = now
+		am.pendingBroadcast = false
+
+		// Cancel any pending timer
+		if am.broadcastTimer != nil {
+			am.broadcastTimer.Stop()
+			am.broadcastTimer = nil
+		}
+
+		// Broadcast without lock (broadcastAnalyticsUpdate will handle its own locking)
+		am.mutex.Unlock()
+		am.broadcastAnalyticsUpdate()
+		am.mutex.Lock()
+		return
 	}
 
-	am.lastBroadcast = now
-	am.broadcastAnalyticsUpdate()
+	// If we're within the debounce period, schedule a delayed broadcast
+	if !am.pendingBroadcast {
+		am.pendingBroadcast = true
+		remainingTime := am.broadcastDebounce - timeSinceLastBroadcast
+
+		// Cancel existing timer if any
+		if am.broadcastTimer != nil {
+			am.broadcastTimer.Stop()
+		}
+
+		// Schedule a new broadcast after the remaining debounce time
+		am.broadcastTimer = time.AfterFunc(remainingTime, func() {
+			am.mutex.Lock()
+			am.lastBroadcast = time.Now()
+			am.pendingBroadcast = false
+			am.broadcastTimer = nil
+			am.mutex.Unlock()
+
+			am.broadcastAnalyticsUpdate()
+		})
+	}
+	// Otherwise, a broadcast is already pending, so we don't need to do anything
 }
 
 // broadcastAnalyticsUpdate broadcasts analytics updates to all admin WebSocket connections
 func (am *AnalyticsManager) broadcastAnalyticsUpdate() {
-	adminConnectionsMutex.RLock()
+	adminConnectionsMutex.Lock()
+	// Clean up stale connections first
+	staleConnections := []string{}
+	for id, conn := range adminConnections {
+		// Check if connection is stale (older than 5 minutes without activity)
+		if time.Since(conn.joinTime) > 5*time.Minute {
+			// Try to ping the connection to check if it's alive
+			if err := conn.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				staleConnections = append(staleConnections, id)
+			}
+		}
+	}
+
+	// Remove stale connections
+	for _, id := range staleConnections {
+		if conn, exists := adminConnections[id]; exists {
+			conn.conn.Close()
+			delete(adminConnections, id)
+			logger.Info("Removed stale admin connection", slog.String("connection_id", id))
+		}
+	}
+
 	connections := make([]*AdminWebSocketConnection, 0, len(adminConnections))
 	for _, conn := range adminConnections {
 		connections = append(connections, conn)
 	}
-	adminConnectionsMutex.RUnlock()
+	adminConnectionsMutex.Unlock()
 
 	if len(connections) == 0 {
 		return // No admin connections to update
