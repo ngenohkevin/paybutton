@@ -493,7 +493,7 @@
                 v: '2.0' // Version for compatibility
             });
             
-            const wsUrl = `${protocol}//${host}/ws/analytics/${state.siteName}?${params}`;
+            const wsUrl = `${protocol}//${host}/ws/analytics/v2/${state.siteName}?${params}`;
             
             // Create WebSocket with options
             state.websocket = new WebSocket(wsUrl);
