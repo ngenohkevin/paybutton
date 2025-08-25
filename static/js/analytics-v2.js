@@ -402,7 +402,7 @@
         // Queue engagement update
         state.queueEvent({
             type: 'engagement',
-            page: state.currentPage.path,
+            page: getPageInfo(),
             metrics: {
                 timeOnPage: Math.round(state.currentPage.engagementTime / 1000), // seconds
                 scrollDepth: state.currentPage.scrollDepth,
@@ -440,7 +440,7 @@
         if (metrics.loadTime > 0) {
             state.queueEvent({
                 type: 'performance',
-                page: state.currentPage.path,
+                page: getPageInfo(),
                 metrics: metrics
             });
         }
