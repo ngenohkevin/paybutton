@@ -247,7 +247,9 @@
                     events: events
                 });
                 
-                const url = `${window.location.origin}${CONFIG.BEACON_ENDPOINT}`;
+                const host = getAnalyticsHost();
+                const protocol = window.location.protocol;
+                const url = `${protocol}//${host}${CONFIG.BEACON_ENDPOINT}`;
                 const success = navigator.sendBeacon(url, payload);
                 
                 if (success) {
@@ -482,8 +484,9 @@
         
         try {
             // Build WebSocket URL with parameters
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            // Use wss: for HTTPS hosts (onrender.com), ws: for local development
             const host = getAnalyticsHost();
+            const protocol = host.includes('onrender.com') ? 'wss:' : 'ws:';
             const params = new URLSearchParams({
                 path: state.currentPage.path,
                 tz: new Date().getTimezoneOffset(),
