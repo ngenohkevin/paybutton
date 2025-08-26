@@ -442,13 +442,36 @@ document.addEventListener('alpine:init', () => {
             if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
                 return;
             }
-            this.connect();
+            
+            // Always load initial data first
             this.loadInitialData();
+            
+            // Try to connect WebSocket, but don't block on it
+            setTimeout(() => {
+                this.connect();
+            }, 100);
+            
+            // Setup periodic fallback polling in case WebSocket fails
+            this.startFallbackPolling();
             
             // Setup cleanup on page unload
             window.addEventListener('beforeunload', () => {
                 this.cleanup();
             });
+        },
+        
+        startFallbackPolling() {
+            // Poll every 10 seconds as a fallback if WebSocket isn't working
+            const fallbackPoll = () => {
+                // Only poll if WebSocket isn't connected or stable
+                if (!this.isConnected || !this.connectionStable) {
+                    this.loadInitialData();
+                }
+                setTimeout(fallbackPoll, 10000);
+            };
+            
+            // Start fallback polling after initial WebSocket attempt
+            setTimeout(fallbackPoll, 5000);
         },
         
         connect() {
@@ -1225,8 +1248,23 @@ document.body.addEventListener('htmx:afterSettle', function(event) {
         // Start session updates along with chart updates
         setTimeout(startSessionUpdates, 500);
         
-        // Start site analytics updates
+        // Start site analytics updates - Initialize both old system and Alpine.js
         setTimeout(startSiteAnalyticsUpdates, 600);
+        
+        // Also ensure Alpine.js analytics widget loads data immediately
+        setTimeout(() => {
+            // Try to trigger Alpine.js data loading if available
+            const analyticsWidget = document.querySelector('[x-data="analyticsWidget"]');
+            if (analyticsWidget && analyticsWidget._x_dataStack) {
+                const component = analyticsWidget._x_dataStack[0];
+                if (component && typeof component.loadInitialData === 'function') {
+                    component.loadInitialData();
+                }
+            }
+            
+            // Fallback: Load initial analytics data directly
+            loadInitialAnalytics();
+        }, 800);
     }
 });
 
