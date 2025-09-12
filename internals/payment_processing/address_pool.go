@@ -88,8 +88,8 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Check if user already has ANY reserved address within 72 hours
-	// This prevents users from generating multiple addresses
+	// IMPORTANT: First check if user already has a reserved address that's still unpaid
+	// This is crucial for avoiding gap limit issues - we should reuse unpaid addresses
 	var existingReservedAddr string
 	var mostRecentReservation *time.Time
 
@@ -103,16 +103,20 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 		}
 	}
 
-	// If user has a reserved address within 72 hours, return that same address
+	// If user has a reserved address within 72 hours that hasn't been paid, return that same address
+	// This is CRITICAL for managing gap limit - we must reuse unpaid addresses!
 	if mostRecentReservation != nil && time.Since(*mostRecentReservation) < 72*time.Hour {
-		// Update the reservation time and amount
-		if poolAddr, exists := p.reservedAddrs[existingReservedAddr]; exists {
-			now := time.Now()
-			poolAddr.ReservedAt = &now
-			poolAddr.Amount = amount
-			log.Printf("User %s already has reserved address %s (reserved %v ago), returning same address",
-				email, existingReservedAddr, time.Since(*mostRecentReservation).Round(time.Minute))
-			return existingReservedAddr, nil
+		// Check if this address has been paid
+		if _, isUsed := p.usedAddrs[existingReservedAddr]; !isUsed {
+			// Address is still unpaid - REUSE IT to avoid gap limit issues
+			if poolAddr, exists := p.reservedAddrs[existingReservedAddr]; exists {
+				now := time.Now()
+				poolAddr.ReservedAt = &now
+				poolAddr.Amount = amount
+				log.Printf("REUSING unpaid address %s for user %s (reserved %v ago) - Gap limit optimization",
+					existingReservedAddr, email, time.Since(*mostRecentReservation).Round(time.Minute))
+				return existingReservedAddr, nil
+			}
 		}
 	}
 
@@ -211,9 +215,16 @@ func (p *AddressPool) recycleExpiredReservationsInternal() {
 	usedAddressesFound := 0
 
 	for addr, poolAddr := range p.reservedAddrs {
-		// Only recycle if reserved for more than 72 hours without payment
-		// This gives users plenty of time to complete their payment
-		if poolAddr.ReservedAt != nil && now.Sub(*poolAddr.ReservedAt) > 72*time.Hour {
+		// More aggressive recycling: 24 hours for unpaid addresses when gap limit is high
+		recycleTimeout := 72 * time.Hour
+		gapMonitor := GetGapMonitor()
+		if gapMonitor != nil && gapMonitor.ShouldUseFallback() {
+			// When in fallback mode, recycle more aggressively
+			recycleTimeout = 24 * time.Hour
+		}
+		
+		// Only recycle if reserved for more than recycleTimeout without payment
+		if poolAddr.ReservedAt != nil && now.Sub(*poolAddr.ReservedAt) > recycleTimeout {
 			// Before recycling, check if address has received funds
 			hasBalance := p.checkAddressBalance(addr)
 			if hasBalance {

@@ -137,9 +137,15 @@ func (m *GapLimitMonitor) ShouldUseFallback() bool {
 		return true
 	}
 
-	// 2. Gap ratio is critical
+	// 2. Gap ratio is critical - use dynamic threshold based on recent activity
+	// If we have many recent errors, be more conservative
+	dynamicThreshold := m.criticalThreshold
+	if len(m.recentErrors) > 3 {
+		dynamicThreshold = 0.7 // Lower threshold when experiencing issues
+	}
+	
 	gapRatio := float64(m.unpaidAddresses) / float64(m.maxGapLimit)
-	if gapRatio >= m.criticalThreshold {
+	if gapRatio >= dynamicThreshold {
 		return true
 	}
 
@@ -208,12 +214,38 @@ func (m *GapLimitMonitor) monitor() {
 		log.Printf("Gap Monitor Status: %v", stats)
 
 		// Auto-recover from fallback mode if conditions improve
+		// Also check for stale unpaid addresses that might have been paid
+		if m.unpaidAddresses > 10 {
+			// Audit actual unpaid addresses - some may have been paid but not recorded
+			m.auditUnpaidAddresses()
+		}
+		
 		if m.consecutiveFailures > 0 && m.unpaidAddresses < int(float64(m.maxGapLimit)*0.5) {
 			m.mu.Lock()
 			m.consecutiveFailures = 0
 			m.mu.Unlock()
 			log.Printf("Gap limit conditions improved, resetting failure counter")
 		}
+	}
+}
+
+// auditUnpaidAddresses checks if "unpaid" addresses have actually been paid
+func (m *GapLimitMonitor) auditUnpaidAddresses() {
+	addressPool := GetAddressPool()
+	if addressPool == nil {
+		return
+	}
+	
+	// Get pool stats to cross-reference
+	poolStats := addressPool.GetStats()
+	actualUnpaid := poolStats.TotalGenerated - poolStats.TotalUsed
+	
+	if actualUnpaid < m.unpaidAddresses {
+		m.mu.Lock()
+		oldCount := m.unpaidAddresses
+		m.unpaidAddresses = actualUnpaid
+		m.mu.Unlock()
+		log.Printf("Gap monitor audit: Corrected unpaid count from %d to %d", oldCount, actualUnpaid)
 	}
 }
 

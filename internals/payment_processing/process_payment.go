@@ -555,6 +555,7 @@ func isGapLimitError(err error) bool {
 }
 
 func getReusableAddress(session *UserSession, currencyType string) (string, error) {
+	// First check session addresses
 	for addr, createdAt := range session.GeneratedAddresses {
 		// Skip if it's not the requested currency type
 		if currencyType == "BTC" && !btcRegex.MatchString(addr) {
@@ -564,10 +565,29 @@ func getReusableAddress(session *UserSession, currencyType string) (string, erro
 			continue
 		}
 
-		// Check if the address is not used and has not expired
+		// IMPORTANT: Reuse unpaid addresses to avoid gap limit issues
+		// Check if the address is not used (not paid) and still within expiry
 		if !session.UsedAddresses[addr] && time.Since(createdAt) <= addressExpiry {
+			log.Printf("Reusing unpaid %s address %s from session (age: %v) - Gap limit optimization", 
+				currencyType, addr, time.Since(createdAt).Round(time.Minute))
 			return addr, nil
 		}
 	}
+	
+	// If BTC and no session address available, try to get from address pool
+	// This helps reuse unpaid addresses from the pool system
+	if currencyType == "BTC" {
+		pool := GetAddressPool()
+		if pool != nil {
+			// Try to get an existing reserved address for this user
+			if addr, err := pool.ReserveAddress(session.Email, 0); err == nil && addr != "" {
+				// Add to session for tracking
+				session.GeneratedAddresses[addr] = time.Now()
+				log.Printf("Reusing address %s from pool for %s - Gap limit optimization", addr, session.Email)
+				return addr, nil
+			}
+		}
+	}
+	
 	return "", fmt.Errorf("no reusable %s address found", currencyType)
 }
