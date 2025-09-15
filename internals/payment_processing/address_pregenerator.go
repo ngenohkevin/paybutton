@@ -16,15 +16,36 @@ func PreGenerateAddressPool(site string, count int) error {
 	defer pool.mutex.Unlock()
 
 	generated := 0
+	maxRetries := 3
+	retryDelay := time.Second
 
 	// Generate addresses sequentially to avoid ANY gaps
 	for i := 0; i < count && pool.nextIndex <= config.EndIndex; i++ {
-		// Generate address using site's derivation path and index
-		address, err := generateAddressForSite(site, pool.nextIndex)
+		var address string
+		var err error
+
+		// Retry logic with exponential backoff
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			address, err = generateAddressForSite(site, pool.nextIndex)
+			if err == nil {
+				break // Success
+			}
+
+			if attempt < maxRetries-1 {
+				log.Printf("Retry %d/%d for address at index %d for %s after error: %v",
+					attempt+1, maxRetries, pool.nextIndex, site, err)
+				time.Sleep(retryDelay * time.Duration(attempt+1))
+			}
+		}
+
 		if err != nil {
-			log.Printf("Error generating address at index %d for %s: %v",
-				pool.nextIndex, site, err)
-			return err
+			// After all retries failed, stop here to avoid creating gaps
+			log.Printf("Failed to generate address at index %d for %s after %d attempts: %v",
+				pool.nextIndex, site, maxRetries, err)
+			if generated > 0 {
+				log.Printf("Partially generated %d addresses for %s before failure", generated, site)
+			}
+			return fmt.Errorf("address generation failed at index %d: %w", pool.nextIndex, err)
 		}
 
 		// Add to pool
@@ -45,8 +66,10 @@ func PreGenerateAddressPool(site string, count int) error {
 		pool.nextIndex++
 	}
 
-	log.Printf("Pre-generated %d addresses for site %s (indices %d-%d, pool size: %d)",
-		generated, site, pool.nextIndex-generated, pool.nextIndex-1, len(pool.availableQueue))
+	if generated > 0 {
+		log.Printf("Pre-generated %d addresses for site %s (indices %d-%d, pool size: %d)",
+			generated, site, pool.nextIndex-generated, pool.nextIndex-1, len(pool.availableQueue))
+	}
 
 	// Check gap limit status
 	consecutiveUnpaid, isAtRisk := pool.GetGapLimitStatus()
@@ -62,12 +85,9 @@ func PreGenerateAddressPool(site string, count int) error {
 func InitializeAddressPools() {
 	log.Println("Initializing address pools for all sites...")
 
-	// Pre-generate 100 addresses per site to start
-	for site := range SiteRegistry {
-		if err := PreGenerateAddressPool(site, 100); err != nil {
-			log.Printf("Error initializing pool for %s: %v", site, err)
-		}
-	}
+	// NO PRE-GENERATION - Generate on-demand only to avoid gap limit issues
+	// Addresses will be generated when users actually request them
+	log.Println("Address pools initialized - using on-demand generation only")
 
 	// Start recycling timer
 	go func() {
@@ -76,25 +96,25 @@ func InitializeAddressPools() {
 			log.Println("Running hourly address recycling...")
 			RecycleExpiredAddresses()
 
-			// Top up pools if running low
+			// NO PRE-GENERATION - Only recycle expired addresses
+			// New addresses are generated on-demand when users request them
+
+			// Check gap limit status for monitoring
 			for site := range SiteRegistry {
 				pool := GetSitePool(site)
-				pool.mutex.RLock()
-				availableCount := len(pool.availableQueue)
-				pool.mutex.RUnlock()
-
-				if availableCount < 20 {
-					log.Printf("Pool for %s running low (%d available), generating more...",
-						site, availableCount)
-					PreGenerateAddressPool(site, 50)
-				}
-
-				// Check gap limit
 				consecutiveUnpaid, isAtRisk := pool.GetGapLimitStatus()
 				if isAtRisk {
 					log.Printf("GAP LIMIT WARNING: Site %s has %d consecutive unpaid addresses!",
 						site, consecutiveUnpaid)
 				}
+
+				pool.mutex.RLock()
+				totalAddresses := len(pool.addresses)
+				availableCount := len(pool.availableQueue)
+				pool.mutex.RUnlock()
+
+				log.Printf("Site %s status: %d total addresses, %d available for reuse",
+					site, totalAddresses, availableCount)
 			}
 		}
 	}()

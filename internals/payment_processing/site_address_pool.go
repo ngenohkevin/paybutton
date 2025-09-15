@@ -123,9 +123,46 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 		return address, nil
 	}
 
-	// PRIORITY 4: Only generate new if absolutely necessary
-	// This should be VERY RARE - only when pool is exhausted
-	return "", fmt.Errorf("address pool exhausted for site %s - need to pre-generate more", p.site)
+	// PRIORITY 4: Generate on-demand when pool is empty
+	// This is the main generation path now - no pre-generation needed
+	log.Printf("Generating new address on-demand for %s on site %s", email, p.site)
+
+	// Generate a single address at the current index
+	config := SiteRegistry[p.site]
+	if p.nextIndex > config.EndIndex {
+		return "", fmt.Errorf("address index limit reached for site %s", p.site)
+	}
+
+	// Generate the address using the site-specific index
+	address, err := generateAddressForSite(p.site, p.nextIndex)
+	if err != nil {
+		log.Printf("Failed to generate on-demand address for %s on %s: %v", email, p.site, err)
+		return "", err
+	}
+
+	// Create new pooled address entry
+	pooledAddr := &PooledAddress{
+		Address:      address,
+		Site:         p.site,
+		Email:        email,
+		Status:       AddressStatusReserved,
+		ReservedAt:   now,
+		LastChecked:  now,
+		Index:        p.nextIndex,
+	}
+
+	// Store in pool and increment index
+	p.addresses[address] = pooledAddr
+	p.emailToAddress[email] = address
+	p.nextIndex++
+
+	// Register address-to-site mapping
+	RegisterAddressForSite(address, p.site)
+
+	log.Printf("Generated on-demand address %s for %s on %s at index %d",
+		address, email, p.site, pooledAddr.Index)
+
+	return address, nil
 }
 
 // MarkAddressUsed - Called when payment is received
