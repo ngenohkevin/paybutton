@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	payments2 "github.com/ngenohkevin/paybutton/internals/payments"
 	"github.com/ngenohkevin/paybutton/utils"
 )
 
@@ -74,8 +73,9 @@ type PaymentInfo struct {
 
 type UserSession struct {
 	Email                  string
-	GeneratedAddresses     map[string]time.Time
-	UsedAddresses          map[string]bool
+	GeneratedAddresses     map[string]time.Time              // Keep for backward compatibility
+	SiteAddresses         map[string]map[string]time.Time   // NEW: site -> address -> time
+	UsedAddresses         map[string]bool
 	ExtendedAddressAllowed bool
 	PaymentInfo            []PaymentInfo // Store payment information for automatic delivery
 	LastActivity           time.Time     // Track last activity for cleanup
@@ -155,7 +155,7 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	var address string
 	if generateBtcAddress {
 		// Use the new enhanced address generation logic
-		address = generateBTCAddressWithEnhancedLogic(email, priceUSD, session, bot, clientIP)
+		address = generateBTCAddressWithEnhancedLogic(email, priceUSD, session, bot, clientIP, site)
 	} else if generateUsdtAddress {
 		// Attempt to get a reusable USDT address
 		address, err = getReusableAddress(session, "USDT")
@@ -352,7 +352,7 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 	if generateBtcAddress {
 		mutex.Lock()
 		// Use the enhanced address generation logic for fast mode too
-		address = generateBTCAddressWithEnhancedLogic(req.Email, priceUSD, session, bot, clientIP)
+		address = generateBTCAddressWithEnhancedLogic(req.Email, priceUSD, session, bot, clientIP, req.Site)
 		mutex.Unlock()
 
 		// For fast mode, always use fast polling if we got a unique address
@@ -425,111 +425,84 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 	c.JSON(http.StatusOK, responseData)
 }
 
-// generateBTCAddressWithEnhancedLogic handles address generation with all mitigation strategies
-func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session *UserSession, bot *tgbotapi.BotAPI, clientIP string) string {
-	gapMonitor := GetGapMonitor()
-	rateLimiter := GetRateLimiter()
-	addressPool := GetAddressPool()
-
-	// Step 1: Check if we should use fallback due to gap limit issues
-	if gapMonitor.ShouldUseFallback() {
-		log.Printf("Using shared address due to gap limit threshold for %s", email)
-		sharedAddr := getSharedAddressForAmount(priceUSD)
-		// Start monitoring the shared address for this user
-		if !checkingAddresses[sharedAddr] {
-			checkingAddresses[sharedAddr] = true
-			checkingAddressesTime[sharedAddr] = time.Now()
-			StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
-		}
-		return sharedAddr
+// generateBTCAddressWithEnhancedLogic handles address generation with site-based routing and aggressive reuse
+func generateBTCAddressWithEnhancedLogic(email string, priceUSD float64, session *UserSession, bot *tgbotapi.BotAPI, clientIP string, site string) string {
+	// Normalize site name
+	site = strings.ToLower(site)
+	if site == "" {
+		log.Printf("No site specified for %s, defaulting to dwebstore", email)
+		site = "dwebstore"
 	}
 
-	// Step 2: Check rate limiting
-	allowed, err := rateLimiter.AllowAddressGeneration(clientIP, email)
-	if !allowed {
-		log.Printf("Rate limit exceeded for %s: %v", email, err)
-		sharedAddr := getSharedAddressForAmount(priceUSD)
-		// Start monitoring the shared address for this user
-		if !checkingAddresses[sharedAddr] {
-			checkingAddresses[sharedAddr] = true
-			checkingAddressesTime[sharedAddr] = time.Now()
-			StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
-		}
-		return sharedAddr
+	// Validate site exists
+	if _, exists := SiteRegistry[site]; !exists {
+		log.Printf("Unknown site %s for %s, defaulting to dwebstore", site, email)
+		site = "dwebstore"
 	}
 
-	// Step 3: Try to get a reusable address first
-	if addr, err := getReusableAddress(session, "BTC"); err == nil && addr != "" {
-		log.Printf("Reusing existing address %s for %s", addr, email)
-		if !checkingAddresses[addr] {
-			checkingAddresses[addr] = true
-			checkingAddressesTime[addr] = time.Now()
-			StartBalanceCheckWithResourceLimit(addr, email, blockCypherToken, bot, 60*time.Second)
+	// Get site-specific pool
+	pool := GetSitePool(site)
+
+	// AGGRESSIVE REUSE: Always try pool first - this prevents gap limit!
+	address, err := pool.GetOrReuseAddress(email, priceUSD)
+	if err == nil && address != "" {
+		// Update session tracking
+		if session.SiteAddresses == nil {
+			session.SiteAddresses = make(map[string]map[string]time.Time)
 		}
-		return addr
-	}
-
-	// Step 4: Try to get address from pool
-	poolAddr, err := addressPool.ReserveAddress(email, priceUSD)
-	if err == nil && poolAddr != "" {
-		log.Printf("Using pooled address %s for %s", poolAddr, email)
-		session.GeneratedAddresses[poolAddr] = time.Now()
-		gapMonitor.RecordAddressGeneration()
-		if !checkingAddresses[poolAddr] {
-			checkingAddresses[poolAddr] = true
-			checkingAddressesTime[poolAddr] = time.Now()
-			StartBalanceCheckWithResourceLimit(poolAddr, email, blockCypherToken, bot, 60*time.Second)
+		if session.SiteAddresses[site] == nil {
+			session.SiteAddresses[site] = make(map[string]time.Time)
 		}
-		return poolAddr
-	}
+		session.SiteAddresses[site][address] = time.Now()
 
-	// Step 5: Try to generate new address if within limits
-	if len(session.GeneratedAddresses) < addressLimit || session.ExtendedAddressAllowed {
-		addr, err := payments2.GenerateBitcoinAddress(email, priceUSD)
-		if err != nil || addr == "" {
-			if err != nil {
-				log.Printf("Error generating Bitcoin address: %s", err)
+		// Also update legacy tracking for backward compatibility
+		session.GeneratedAddresses[address] = time.Now()
 
-				// Check if it's a gap limit error
-				if isGapLimitError(err) {
-					gapMonitor.RecordGapLimitError(email, err.Error())
-				}
-			} else {
-				log.Printf("Error generating Bitcoin address: empty address returned")
-			}
-
-			sharedAddr := getSharedAddressForAmount(priceUSD)
-			// Start monitoring the shared address for this user
-			if !checkingAddresses[sharedAddr] {
-				checkingAddresses[sharedAddr] = true
-				checkingAddressesTime[sharedAddr] = time.Now()
-				StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
-			}
-			return sharedAddr
+		// Start monitoring
+		if !checkingAddresses[address] {
+			checkingAddresses[address] = true
+			checkingAddressesTime[address] = time.Now()
+			StartBalanceCheckWithResourceLimit(address, email, blockCypherToken, bot, 60*time.Second)
 		}
 
-		session.GeneratedAddresses[addr] = time.Now()
-		gapMonitor.RecordAddressGeneration()
-		log.Printf("Generated new BTC address: %s for email: %s", addr, email)
-
-		if !checkingAddresses[addr] {
-			checkingAddresses[addr] = true
-			checkingAddressesTime[addr] = time.Now()
-			StartBalanceCheckWithResourceLimit(addr, email, blockCypherToken, bot, 60*time.Second)
-		}
-		return addr
+		log.Printf("Address %s assigned to %s for site %s", address, email, site)
+		return address
 	}
 
-	// Step 6: Fallback to shared address
-	log.Printf("All address generation methods exhausted for %s, using shared address", email)
-	sharedAddr := getSharedAddressForAmount(priceUSD)
-	// Start monitoring the shared address for this user
-	if !checkingAddresses[sharedAddr] {
-		checkingAddresses[sharedAddr] = true
-		checkingAddressesTime[sharedAddr] = time.Now()
-		StartBalanceCheckWithResourceLimit(sharedAddr, email, blockCypherToken, bot, 60*time.Second)
+	// If pool is exhausted, try to generate more
+	log.Printf("Pool exhausted for %s, attempting emergency generation", site)
+	if err := PreGenerateAddressPool(site, 10); err != nil {
+		log.Printf("CRITICAL: Cannot generate addresses for %s: %v", site, err)
+		// Use shared fallback as absolute last resort
+		return getSharedAddressForAmount(priceUSD)
 	}
-	return sharedAddr
+
+	// Try pool again
+	address, err = pool.GetOrReuseAddress(email, priceUSD)
+	if err != nil {
+		log.Printf("CRITICAL: Still cannot get address for %s on %s", email, site)
+		return getSharedAddressForAmount(priceUSD)
+	}
+
+	// Update session tracking
+	if session.SiteAddresses == nil {
+		session.SiteAddresses = make(map[string]map[string]time.Time)
+	}
+	if session.SiteAddresses[site] == nil {
+		session.SiteAddresses[site] = make(map[string]time.Time)
+	}
+	session.SiteAddresses[site][address] = time.Now()
+	session.GeneratedAddresses[address] = time.Now()
+
+	// Start monitoring
+	if !checkingAddresses[address] {
+		checkingAddresses[address] = true
+		checkingAddressesTime[address] = time.Now()
+		StartBalanceCheckWithResourceLimit(address, email, blockCypherToken, bot, 60*time.Second)
+	}
+
+	log.Printf("Address %s assigned to %s for site %s (after emergency generation)", address, email, site)
+	return address
 }
 
 // getSharedAddressForAmount returns a shared address based on amount tier

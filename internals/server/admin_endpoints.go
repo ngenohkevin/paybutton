@@ -101,6 +101,11 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	rateLimitAPI.POST("/cleanup", triggerRateLimitCleanup)
 	rateLimitAPI.GET("/export", exportRateLimitData)
 
+	// Site pool monitoring endpoints
+	admin.GET("/site-pools", getSitePoolsPage)
+	admin.GET("/api/site-pools/stats", getSitePoolStats)
+	admin.GET("/api/gap-limit/status", getGapLimitStatus)
+
 	// Logs management endpoints
 	admin.GET("/logs", getLogsPage)
 	admin.GET("/api/logs/stream", streamLogs)
@@ -3735,4 +3740,44 @@ func convertSiteExportToCSV(data *analytics.SiteExportData) string {
 	}
 
 	return csvBuilder.String()
+}
+
+// Site pool monitoring endpoints
+
+// getSitePoolsPage returns the site pools monitoring page
+func getSitePoolsPage(c *gin.Context) {
+	c.HTML(http.StatusOK, "site_pools.html", gin.H{
+		"title": "Site Pool Monitoring",
+	})
+}
+
+// getSitePoolStats returns site pool statistics as JSON
+func getSitePoolStats(c *gin.Context) {
+	stats := payment_processing.GetPoolStats()
+	c.JSON(http.StatusOK, stats)
+}
+
+// getGapLimitStatus returns gap limit status for all sites
+func getGapLimitStatus(c *gin.Context) {
+	status := make(map[string]interface{})
+
+	// Get stats for each site
+	siteStats := payment_processing.GetPoolStats()
+	for site, stats := range siteStats {
+		if siteMap, ok := stats.(map[string]interface{}); ok {
+			consecutiveUnpaid, _ := siteMap["consecutive_unpaid"].(int)
+			isAtRisk, _ := siteMap["gap_limit_risk"].(bool)
+
+			status[site] = map[string]interface{}{
+				"consecutive_unpaid": consecutiveUnpaid,
+				"is_at_risk":        isAtRisk,
+				"total_addresses":   siteMap["total_addresses"],
+				"available":         siteMap["available"],
+				"reserved":          siteMap["reserved"],
+				"used":              siteMap["used"],
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, status)
 }

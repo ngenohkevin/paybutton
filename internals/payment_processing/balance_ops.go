@@ -300,22 +300,41 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					userName = "User" // Set default name
 				}
 
-				// Extract site information from the session data first
+				// NEW: Determine site from address, not session
+				site := GetSiteForAddress(address)
+				if site == "" {
+					// Fallback: try to determine from address pattern
+					site = DetermineSiteFromAddressPattern(address)
+					if site == "" {
+						log.Printf("WARNING: Cannot determine site for address %s, checking session", address)
+						// Last resort: check session
+						mutex.Lock()
+						if session, exists := userSessions[email]; exists && len(session.PaymentInfo) > 0 {
+							latestPayment := session.PaymentInfo[len(session.PaymentInfo)-1]
+							site = latestPayment.Site
+						}
+						mutex.Unlock()
+					}
+				}
+
+				// Get site configuration
+				siteConfig, exists := SiteRegistry[strings.ToLower(site)]
+				if !exists {
+					log.Printf("Unknown site %s for payment, defaulting to dwebstore", site)
+					siteConfig = SiteRegistry["dwebstore"]
+				}
+
 				productName := ""
-				site := ""
 				mutex.Lock()
-				session, exists := userSessions[email]
-				if exists && session != nil && len(session.PaymentInfo) > 0 {
-					// Get the latest payment info
+				if session, exists := userSessions[email]; exists && len(session.PaymentInfo) > 0 {
 					latestPayment := session.PaymentInfo[len(session.PaymentInfo)-1]
 					productName = latestPayment.Description
-					site = latestPayment.Site
 				}
 				mutex.Unlock()
 
 				// Mark address as used and update monitoring systems
 				mutex.Lock()
-				if session != nil {
+				if session, exists := userSessions[email]; exists && session != nil {
 					session.UsedAddresses[address] = true
 					if len(session.UsedAddresses) > 0 && !session.ExtendedAddressAllowed {
 						session.ExtendedAddressAllowed = true
@@ -330,19 +349,25 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 				gapMonitor := GetGapMonitor()
 				gapMonitor.RecordPayment(address)
 
-				// Update address pool if this was a pooled address
+				// Mark address as used in site-specific pool
+				pool := GetSitePool(strings.ToLower(siteConfig.Name))
+				pool.MarkAddressUsed(address)
+
+				// Also update legacy address pool for backward compatibility
 				addressPool := GetAddressPool()
 				addressPool.MarkAddressUsed(address, email)
 
 				confirmationTime := time.Now().Format(time.RFC3339)
 
-				// Site-based conditional logic
-				if site == "Dwebstore" || site == "dwebstore" {
-					// DWEBSTORE: Product delivery flow
-					log.Printf("Dwebstore payment detected - processing product delivery for %s: %s", email, productName)
+				// Site-based routing using configuration
+				switch siteConfig.Type {
+				case SiteTypeProductDelivery:
+					// Dwebstore - product delivery
+					log.Printf("%s payment detected - processing product delivery for %s: %s",
+						siteConfig.Name, email, productName)
 
 					if productName != "" {
-						err = HandleAutomaticDelivery(email, userName, productName, site, bot)
+						err = HandleAutomaticDelivery(email, userName, productName, siteConfig.Name, bot)
 						if err != nil {
 							log.Printf("Error in automatic product delivery: %s", err)
 						} else {
@@ -355,7 +380,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					// Telegram notification for product delivery
 					botLogMessage := fmt.Sprintf(
 						"*Email:* `%s`\n*Product Delivered (%s):* `%s`\n*Amount:* `%s USD`\n*Site:* `%s`\n*Confirmation Time:* `%s`",
-						email, currencyType, productName, fmt.Sprintf("%.2f", balanceUSD), site, confirmationTime)
+						email, currencyType, productName, fmt.Sprintf("%.2f", balanceUSD), siteConfig.Name, confirmationTime)
 
 					msg := tgbotapi.NewMessage(chatID, botLogMessage)
 					msg.ParseMode = tgbotapi.ModeMarkdown
@@ -364,16 +389,19 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 						log.Printf("Error sending product delivery confirmation to bot: %s", err)
 					}
 
-				} else {
-					// CARDERSHAVEN or other sites: Balance update flow
-					log.Printf("Cardershaven/other payment detected - processing balance update for %s", email)
+				case SiteTypeBalanceUpdate:
+					// Cardershaven or Ganymede - update site-specific database
+					log.Printf("%s payment detected - processing balance update for %s",
+						siteConfig.Name, email)
 
-					// Update database balance
-					err = database.UpdateUserBalance(email, balanceUSD)
+					// Update site-specific database
+					err = updateSiteSpecificBalance(email, balanceUSD, siteConfig.DatabaseTable)
 					if err != nil {
-						log.Printf("Could not update balance for email %s (may not exist in database): %s", email, err)
+						log.Printf("Could not update balance for %s on %s: %s",
+							email, siteConfig.Name, err)
 					} else {
-						log.Printf("Balance updated successfully for user %s", email)
+						log.Printf("Balance updated successfully for %s on %s",
+							email, siteConfig.Name)
 					}
 
 					// Send balance confirmation email
@@ -392,7 +420,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					// Telegram notification for balance update
 					botLogMessage := fmt.Sprintf(
 						"*Email:* `%s`\n*New Balance Added (%s):* `%s USD`\n*Site:* `%s`\n*Confirmation Time:* `%s`",
-						email, currencyType, fmt.Sprintf("%.2f", balanceUSD), site, confirmationTime)
+						email, currencyType, fmt.Sprintf("%.2f", balanceUSD), siteConfig.Name, confirmationTime)
 
 					msg := tgbotapi.NewMessage(chatID, botLogMessage)
 					msg.ParseMode = tgbotapi.ModeMarkdown
@@ -474,6 +502,27 @@ func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 	}
 
 	return balance, nil
+}
+
+// updateSiteSpecificBalance - Helper function to update site-specific balance
+func updateSiteSpecificBalance(email string, amount float64, tableName string) error {
+	if tableName == "" {
+		return fmt.Errorf("no database table configured for this site")
+	}
+
+	// Use parameterized query for safety
+	query := fmt.Sprintf("UPDATE %s SET balance = balance + $1 WHERE email = $2", tableName)
+	result, err := database.DB.Exec(query, amount, email)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("user %s not found in %s", email, tableName)
+	}
+
+	return nil
 }
 
 // isStaticOrSharedAddress checks if the address is a static or shared fallback address

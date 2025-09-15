@@ -13,6 +13,7 @@ import (
 	"github.com/ngenohkevin/paybutton/internals/config"
 	"github.com/ngenohkevin/paybutton/internals/database"
 	"github.com/ngenohkevin/paybutton/internals/monitoring"
+	"github.com/ngenohkevin/paybutton/internals/payment_processing"
 	"github.com/ngenohkevin/paybutton/internals/server"
 )
 
@@ -52,6 +53,9 @@ func main() {
 
 	//closing the db when the app exits
 	defer database.CloseDB()
+
+	// Initialize address pools for all sites
+	payment_processing.InitializeAddressPools()
 
 	srv, err := server.NewServerWithConfig(logger, cfg)
 	if err != nil {
