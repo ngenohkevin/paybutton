@@ -33,14 +33,14 @@ var SiteRegistry = map[string]SiteConfig{
 		Type:           SiteTypeBalanceUpdate,
 		StartIndex:     10000,
 		EndIndex:       19999,
-		DatabaseTable:  "cardershaven_users",
+		DatabaseTable:  "users",
 	},
 	"ganymede": {
 		Name:           "Ganymede",
-		Type:           SiteTypeBalanceUpdate,
+		Type:           SiteTypeProductDelivery,
 		StartIndex:     20000,
 		EndIndex:       29999,
-		DatabaseTable:  "ganymede_users",
+		DatabaseTable:  "",
 	},
 }
 
