@@ -71,6 +71,11 @@ func (m *GapLimitMonitor) RecordAddressGeneration() {
 	// Check if we're approaching the limit
 	gapRatio := float64(m.unpaidAddresses) / float64(m.maxGapLimit)
 
+	// CRITICAL FIX: Force address reuse when approaching gap limit
+	if m.unpaidAddresses >= 15 {
+		log.Printf("⚠️ GAP LIMIT PREVENTION: %d unpaid addresses - MUST reuse addresses!", m.unpaidAddresses)
+	}
+
 	if gapRatio >= m.criticalThreshold {
 		m.sendAlert("CRITICAL", fmt.Sprintf("Gap limit critical: %d/%d unpaid addresses (%.0f%%)",
 			m.unpaidAddresses, m.maxGapLimit, gapRatio*100))
