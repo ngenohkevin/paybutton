@@ -24,10 +24,8 @@ type Config struct {
 }
 
 func LoadConfig() (config Config, err error) {
-	err = godotenv.Load(".env")
-	if err != nil {
-		return Config{}, err
-	}
+	// Try to load .env file, but don't fail if it doesn't exist (for container deployments)
+	_ = godotenv.Load(".env")
 
 	user := os.Getenv("POSTGRES_USER")
 	host := os.Getenv("POSTGRES_HOST")
@@ -61,5 +59,5 @@ func LoadConfig() (config Config, err error) {
 		SmtpPassword:     smtpPassword,
 	}
 
-	return config, err
+	return config, nil
 }
