@@ -235,15 +235,19 @@ func IsProduction() bool {
 // GetWebhookURL constructs the webhook URL for the Telegram bot
 func GetWebhookURL() string {
 	// Get the host from environment variables
-	renderURL := os.Getenv("RENDER_EXTERNAL_URL")
-	if renderURL == "" {
-		// Fallback for testing
-		renderURL = "https://paybutton.onrender.com"
+	// Can use RENDER_EXTERNAL_URL or EXTERNAL_URL for flexibility
+	externalURL := os.Getenv("RENDER_EXTERNAL_URL")
+	if externalURL == "" {
+		externalURL = os.Getenv("EXTERNAL_URL")
+	}
+	if externalURL == "" {
+		// Default to Coolify deployment
+		externalURL = "https://paybutton.perigrine.cloud"
 	}
 
 	// Get the bot token
 	botToken := os.Getenv("BOT_API_KEY")
 
 	// Construct the webhook URL with the token as part of the path for security
-	return renderURL + "/bot" + botToken + "/webhook"
+	return externalURL + "/bot" + botToken + "/webhook"
 }
