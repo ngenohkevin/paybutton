@@ -28,6 +28,7 @@ func init() {
 
 	config, err := utils.LoadConfig()
 	if err != nil {
+		log.Printf("Error loading config: %v", err)
 		log.Fatal("could not load config")
 	}
 

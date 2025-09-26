@@ -15,6 +15,7 @@ func MinimalEmailDelivery(to, userName, productName string) error {
 
 	config, err := utils.LoadConfig()
 	if err != nil {
+		log.Printf("Error loading config: %v", err)
 		log.Fatal("Error loading config:", err)
 	}
 

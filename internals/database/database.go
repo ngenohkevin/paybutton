@@ -23,6 +23,7 @@ func InitDBWithConfig(maxIdleConns, maxOpenConns int, connMaxLifetime time.Durat
 
 	config, err := utils.LoadConfig()
 	if err != nil {
+		log.Printf("Error loading config: %v", err)
 		log.Fatal("Error loading config:", err)
 	}
 

@@ -575,8 +575,11 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 		IdleTimeout:  s.config.IdleTimeout,
 	}
 
+	s.logger.Info("Starting HTTP server", slog.String("address", s.httpServer.Addr))
+
 	// Start server in goroutine
 	go func() {
+		s.logger.Info("HTTP server listening", slog.String("address", s.httpServer.Addr))
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			s.logger.Error("Server error:", slog.String("error", err.Error()))
 		}

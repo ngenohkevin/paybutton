@@ -45,7 +45,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		// Server settings
-		Port:            getEnv("PORT", "8080"),
+		Port:            getEnv("PORT", "8000"),
 		Environment:     getEnv("ENVIRONMENT", "production"),
 		MaxConnections:  getEnvAsInt("MAX_CONNECTIONS", 100),
 		ReadTimeout:     getEnvAsDuration("READ_TIMEOUT", "30s"),

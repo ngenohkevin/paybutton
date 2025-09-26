@@ -53,6 +53,7 @@ var ipLocationAPI string
 func GetIpLocation(ipAddr string) (*IPAPIData, error) {
 	location, err := LoadConfig()
 	if err != nil {
+		log.Printf("Error loading config: %v", err)
 		log.Fatal("could not load config")
 	}
 
