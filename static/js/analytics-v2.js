@@ -484,9 +484,9 @@
         
         try {
             // Build WebSocket URL with parameters
-            // Use wss: for HTTPS hosts (onrender.com), ws: for local development
+            // Use wss: for HTTPS hosts, ws: for HTTP/local development
             const host = getAnalyticsHost();
-            const protocol = host.includes('onrender.com') ? 'wss:' : 'ws:';
+            const protocol = (window.location.protocol === 'https:' || host.includes('https://')) ? 'wss:' : 'ws:';
             const params = new URLSearchParams({
                 path: state.currentPage.path,
                 tz: new Date().getTimezoneOffset(),

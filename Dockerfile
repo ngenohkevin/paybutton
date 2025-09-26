@@ -57,7 +57,8 @@ ENV GOMAXPROCS=2 \
     MAX_MEMORY_MB=400 \
     MAX_GOROUTINES=50 \
     MAX_IDLE_CONNS=5 \
-    MAX_OPEN_CONNS=10
+    MAX_OPEN_CONNS=10 \
+    COOLIFY_DEPLOYMENT=true
 
 # Run the binary
 CMD ["./paybutton"]

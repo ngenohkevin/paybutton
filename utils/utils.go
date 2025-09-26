@@ -226,10 +226,13 @@ func RandomUSDTAddress() string {
 	return addresses[randomIndex]
 }
 
-// IsProduction checks if the app is running in production (Render)
+// IsProduction checks if the app is running in production (Render or Coolify)
 func IsProduction() bool {
-	// Render sets this environment variable in production
-	return os.Getenv("RENDER") != ""
+	// Check for various production indicators
+	// Render sets RENDER=true, Coolify sets COOLIFY_DEPLOYMENT=true
+	return os.Getenv("RENDER") != "" ||
+		os.Getenv("COOLIFY_DEPLOYMENT") != "" ||
+		os.Getenv("PRODUCTION") == "true"
 }
 
 // GetWebhookURL constructs the webhook URL for the Telegram bot
