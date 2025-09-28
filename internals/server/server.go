@@ -53,12 +53,12 @@ func (s *Server) Start() error {
 
 	botToken, err := utils.LoadConfig()
 	if err != nil {
-		s.logger.Error("Error loading config:", err)
+		s.logger.Error("Error loading config:", "error", err)
 	}
 
 	// Initialize API keys for payment processing
 	if err := payment_processing.InitializeAPIKeys(); err != nil {
-		s.logger.Error("Error initializing API keys:", err)
+		s.logger.Error("Error initializing API keys:", "error", err)
 	}
 
 	// Initialize alert management system
@@ -71,7 +71,7 @@ func (s *Server) Start() error {
 
 	bot, err := tgbotapi.NewBotAPI(botToken.BotApiKey)
 	if err != nil {
-		s.logger.Error("Error initializing bot:", err)
+		s.logger.Error("Error initializing bot:", "error", err)
 		log.Printf("Bot initialized in development mode for sending only")
 		// Continue without bot for development/testing
 		bot = nil
@@ -319,12 +319,12 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	botToken, err := utils.LoadConfig()
 	if err != nil {
-		s.logger.Error("Error loading config:", err)
+		s.logger.Error("Error loading config:", "error", err)
 	}
 
 	// Initialize API keys for payment processing
 	if err := payment_processing.InitializeAPIKeys(); err != nil {
-		s.logger.Error("Error initializing API keys:", err)
+		s.logger.Error("Error initializing API keys:", "error", err)
 	}
 
 	// Initialize alert management system
@@ -337,7 +337,7 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	bot, err := tgbotapi.NewBotAPI(botToken.BotApiKey)
 	if err != nil {
-		s.logger.Error("Error initializing bot:", err)
+		s.logger.Error("Error initializing bot:", "error", err)
 		log.Printf("Bot initialized in development mode for sending only")
 		bot = nil
 	}
