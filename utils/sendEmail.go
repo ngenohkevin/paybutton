@@ -41,7 +41,7 @@ func SendEmail(userEmail string, userName string, amount string) error {
 </div>
 `, userName, amount))
 
-	// Additional logging
+	// Additional  logging
 	fmt.Println("Attempting to send email...")
 	//fmt.Printf("To: %s\nSubject: %s\n", userEmail, message.GetHeader("Subject"))
 
