@@ -1520,40 +1520,117 @@ function updateAnalyticsSummary(data) {
     summaryDiv.innerHTML = summaryHTML;
 }
 
-// Real analytics data loading
+// Real analytics data loading with better error handling
 function loadRealAnalyticsData() {
-    fetch('/admin/api/analytics')
-        .then(response => response.json())
+    const tbody = document.getElementById('siteAnalyticsTableBody');
+
+    // Add timeout to prevent infinite loading
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    fetch('/admin/api/analytics', { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data) {
                 // Store the analytics data globally for other functions
                 analyticsData = data;
                 sitesData = data.sites || {};
-                
+
                 // Update stats cards - using correct element IDs
                 const activeViewersEl = document.getElementById('totalActiveValue');
                 if (activeViewersEl) activeViewersEl.textContent = data.totals?.active || '0';
-                
+
                 const weeklyVisitorsEl = document.getElementById('totalWeeklyValue');
                 if (weeklyVisitorsEl) weeklyVisitorsEl.textContent = data.totals?.weekly || '0';
-                
+
                 const activeSitesEl = document.getElementById('activeSitesValue');
                 if (activeSitesEl) activeSitesEl.textContent = data.totals?.active_sites || '0';
-                
+
                 // Update charts
                 updateChartsWithData(data);
-                
-                // Update analytics table
+
+                // Update analytics table (this will replace the loading message)
                 updateAnalyticsTable(data);
-                
+
                 // Update analytics summary
                 updateAnalyticsSummary(data);
-                
+
                 // Update site dropdowns for Phase 5 features
                 updateSiteDropdowns();
+
+                // Update live status
+                updateLiveStatus('connected');
+            } else {
+                // Handle empty data
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-500 py-8">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                No analytics data available. Make sure sites are integrated with the analytics SDK.
+                            </td>
+                        </tr>
+                    `;
+                }
+                updateLiveStatus('no-data');
             }
         })
-        .catch(error => console.error('Error loading analytics:', error));
+        .catch(error => {
+            clearTimeout(timeoutId);
+            console.error('Error loading analytics:', error);
+
+            // Show error in table
+            if (tbody) {
+                const errorMessage = error.name === 'AbortError' ?
+                    'Request timed out. The analytics service may be unavailable.' :
+                    `Failed to load analytics: ${error.message}`;
+
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-red-500 py-8">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            ${errorMessage}
+                            <br>
+                            <button onclick="loadRealAnalyticsData()" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                <i class="fas fa-refresh mr-2"></i>Retry
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+            updateLiveStatus('error');
+        });
+}
+
+// Update live status indicator
+function updateLiveStatus(status) {
+    const liveStatusEl = document.getElementById('liveStatus');
+    if (!liveStatusEl) return;
+
+    const statusConfig = {
+        'connected': {
+            html: '<div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>Connected',
+            class: 'text-green-600 dark:text-green-400'
+        },
+        'no-data': {
+            html: '<div class="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>No Sites Connected',
+            class: 'text-yellow-600 dark:text-yellow-400'
+        },
+        'error': {
+            html: '<div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>Connection Error',
+            class: 'text-red-600 dark:text-red-400'
+        }
+    };
+
+    const config = statusConfig[status] || statusConfig['error'];
+    liveStatusEl.innerHTML = config.html;
+    liveStatusEl.className = `flex items-center text-sm ${config.class}`;
 }
 
 </script>
