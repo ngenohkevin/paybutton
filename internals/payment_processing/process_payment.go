@@ -73,9 +73,9 @@ type PaymentInfo struct {
 
 type UserSession struct {
 	Email                  string
-	GeneratedAddresses     map[string]time.Time              // Keep for backward compatibility
-	SiteAddresses         map[string]map[string]time.Time   // NEW: site -> address -> time
-	UsedAddresses         map[string]bool
+	GeneratedAddresses     map[string]time.Time            // Keep for backward compatibility
+	SiteAddresses          map[string]map[string]time.Time // NEW: site -> address -> time
+	UsedAddresses          map[string]bool
 	ExtendedAddressAllowed bool
 	PaymentInfo            []PaymentInfo // Store payment information for automatic delivery
 	LastActivity           time.Time     // Track last activity for cleanup
@@ -541,12 +541,12 @@ func getReusableAddress(session *UserSession, currencyType string) (string, erro
 		// IMPORTANT: Reuse unpaid addresses to avoid gap limit issues
 		// Check if the address is not used (not paid) and still within expiry
 		if !session.UsedAddresses[addr] && time.Since(createdAt) <= addressExpiry {
-			log.Printf("Reusing unpaid %s address %s from session (age: %v) - Gap limit optimization", 
+			log.Printf("Reusing unpaid %s address %s from session (age: %v) - Gap limit optimization",
 				currencyType, addr, time.Since(createdAt).Round(time.Minute))
 			return addr, nil
 		}
 	}
-	
+
 	// If BTC and no session address available, try to get from address pool
 	// This helps reuse unpaid addresses from the pool system
 	if currencyType == "BTC" {
@@ -561,6 +561,6 @@ func getReusableAddress(session *UserSession, currencyType string) (string, erro
 			}
 		}
 	}
-	
+
 	return "", fmt.Errorf("no reusable %s address found", currencyType)
 }

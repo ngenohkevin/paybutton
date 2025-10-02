@@ -156,10 +156,10 @@ func getBlockonomicsAddresses(apiKey string) ([]BlockonomicsAddress, error) {
 
 func saveRecoveryData(addresses []BlockonomicsAddress, missing []BlockonomicsAddress) {
 	data := struct {
-		Timestamp        time.Time               `json:"timestamp"`
-		TotalAddresses   int                     `json:"total_addresses"`
-		MissingAddresses []BlockonomicsAddress   `json:"missing_addresses"`
-		AllAddresses     []BlockonomicsAddress   `json:"all_addresses"`
+		Timestamp        time.Time             `json:"timestamp"`
+		TotalAddresses   int                   `json:"total_addresses"`
+		MissingAddresses []BlockonomicsAddress `json:"missing_addresses"`
+		AllAddresses     []BlockonomicsAddress `json:"all_addresses"`
 	}{
 		Timestamp:        time.Now(),
 		TotalAddresses:   len(addresses),

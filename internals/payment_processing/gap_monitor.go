@@ -148,7 +148,7 @@ func (m *GapLimitMonitor) ShouldUseFallback() bool {
 	if len(m.recentErrors) > 3 {
 		dynamicThreshold = 0.7 // Lower threshold when experiencing issues
 	}
-	
+
 	gapRatio := float64(m.unpaidAddresses) / float64(m.maxGapLimit)
 	if gapRatio >= dynamicThreshold {
 		return true
@@ -224,7 +224,7 @@ func (m *GapLimitMonitor) monitor() {
 			// Audit actual unpaid addresses - some may have been paid but not recorded
 			m.auditUnpaidAddresses()
 		}
-		
+
 		if m.consecutiveFailures > 0 && m.unpaidAddresses < int(float64(m.maxGapLimit)*0.5) {
 			m.mu.Lock()
 			m.consecutiveFailures = 0
@@ -240,11 +240,11 @@ func (m *GapLimitMonitor) auditUnpaidAddresses() {
 	if addressPool == nil {
 		return
 	}
-	
+
 	// Get pool stats to cross-reference
 	poolStats := addressPool.GetStats()
 	actualUnpaid := poolStats.TotalGenerated - poolStats.TotalUsed
-	
+
 	if actualUnpaid < m.unpaidAddresses {
 		m.mu.Lock()
 		oldCount := m.unpaidAddresses

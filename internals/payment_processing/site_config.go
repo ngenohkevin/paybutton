@@ -13,34 +13,34 @@ const (
 )
 
 type SiteConfig struct {
-	Name           string
-	Type           SiteType
-	StartIndex     int     // Start of address index range for this site
-	EndIndex       int     // End of address index range for this site
-	DatabaseTable  string  // Empty for sites without database
+	Name          string
+	Type          SiteType
+	StartIndex    int    // Start of address index range for this site
+	EndIndex      int    // End of address index range for this site
+	DatabaseTable string // Empty for sites without database
 }
 
 var SiteRegistry = map[string]SiteConfig{
 	"dwebstore": {
-		Name:           "Dwebstore",
-		Type:           SiteTypeProductDelivery,
-		StartIndex:     0,
-		EndIndex:       9999,
-		DatabaseTable:  "",
+		Name:          "Dwebstore",
+		Type:          SiteTypeProductDelivery,
+		StartIndex:    0,
+		EndIndex:      9999,
+		DatabaseTable: "",
 	},
 	"cardershaven": {
-		Name:           "Cardershaven",
-		Type:           SiteTypeBalanceUpdate,
-		StartIndex:     10000,
-		EndIndex:       19999,
-		DatabaseTable:  "users",
+		Name:          "Cardershaven",
+		Type:          SiteTypeBalanceUpdate,
+		StartIndex:    10000,
+		EndIndex:      19999,
+		DatabaseTable: "users",
 	},
 	"ganymede": {
-		Name:           "Ganymede",
-		Type:           SiteTypeProductDelivery,
-		StartIndex:     20000,
-		EndIndex:       29999,
-		DatabaseTable:  "",
+		Name:          "Ganymede",
+		Type:          SiteTypeProductDelivery,
+		StartIndex:    20000,
+		EndIndex:      29999,
+		DatabaseTable: "",
 	},
 }
 

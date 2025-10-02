@@ -123,13 +123,13 @@ func (s *Server) Start() error {
 
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
-	
+
 	// Enhanced Analytics v2 WebSocket endpoint with improved features
 	r.GET("/ws/analytics/v2/:siteName", analytics.HandleEnhancedWebSocket)
 
 	// Admin Analytics WebSocket endpoint for real-time dashboard updates
 	r.GET("/ws/admin/analytics", analytics.HandleAdminWebSocket)
-	
+
 	// Beacon API fallback endpoint for analytics
 	r.POST("/analytics/beacon", analytics.HandleBeacon)
 
@@ -394,13 +394,13 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 
 	// Analytics WebSocket endpoint for site visitor tracking
 	r.GET("/ws/analytics/:siteName", analytics.HandleWebSocket)
-	
+
 	// Enhanced Analytics v2 WebSocket endpoint with improved features
 	r.GET("/ws/analytics/v2/:siteName", analytics.HandleEnhancedWebSocket)
 
 	// Admin Analytics WebSocket endpoint for real-time dashboard updates
 	r.GET("/ws/admin/analytics", analytics.HandleAdminWebSocket)
-	
+
 	// Beacon API fallback endpoint for analytics
 	r.POST("/analytics/beacon", analytics.HandleBeacon)
 
@@ -647,11 +647,11 @@ func serveAnalyticsSDKv2(c *gin.Context) {
 	// Set appropriate headers for JavaScript
 	c.Header("Content-Type", "application/javascript; charset=utf-8")
 	c.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour in production
-	c.Header("Access-Control-Allow-Origin", "*") // Allow cross-origin requests
+	c.Header("Access-Control-Allow-Origin", "*")      // Allow cross-origin requests
 	c.Header("Access-Control-Allow-Methods", "GET")
 	c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 	c.Header("X-Content-Type-Options", "nosniff")
-	
+
 	// Add version header for debugging
 	c.Header("X-Analytics-Version", "2.0.0")
 

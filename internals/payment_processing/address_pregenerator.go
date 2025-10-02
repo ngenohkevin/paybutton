@@ -2,9 +2,9 @@ package payment_processing
 
 import (
 	"fmt"
+	"github.com/ngenohkevin/paybutton/internals/payments"
 	"log"
 	"time"
-	"github.com/ngenohkevin/paybutton/internals/payments"
 )
 
 // PreGenerateAddressPool - Generate addresses in bulk to avoid gaps
@@ -50,10 +50,10 @@ func PreGenerateAddressPool(site string, count int) error {
 
 		// Add to pool
 		pooledAddr := &PooledAddress{
-			Address:      address,
-			Site:         site,
-			Status:       AddressStatusAvailable,
-			Index:        pool.nextIndex,
+			Address: address,
+			Site:    site,
+			Status:  AddressStatusAvailable,
+			Index:   pool.nextIndex,
 		}
 
 		pool.addresses[address] = pooledAddr
@@ -168,7 +168,7 @@ func GetPoolStats() map[string]interface{} {
 		consecutiveUnpaid, isAtRisk := pool.GetGapLimitStatus()
 
 		stats[siteName] = map[string]interface{}{
-			"total_addresses":     len(pool.addresses),
+			"total_addresses":    len(pool.addresses),
 			"available":          availableCount,
 			"reserved":           reservedCount,
 			"used":               usedCount,

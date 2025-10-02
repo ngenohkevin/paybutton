@@ -3770,11 +3770,11 @@ func getGapLimitStatus(c *gin.Context) {
 
 			status[site] = map[string]interface{}{
 				"consecutive_unpaid": consecutiveUnpaid,
-				"is_at_risk":        isAtRisk,
-				"total_addresses":   siteMap["total_addresses"],
-				"available":         siteMap["available"],
-				"reserved":          siteMap["reserved"],
-				"used":              siteMap["used"],
+				"is_at_risk":         isAtRisk,
+				"total_addresses":    siteMap["total_addresses"],
+				"available":          siteMap["available"],
+				"reserved":           siteMap["reserved"],
+				"used":               siteMap["used"],
 			}
 		}
 	}

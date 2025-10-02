@@ -222,7 +222,7 @@ func (p *AddressPool) recycleExpiredReservationsInternal() {
 			// When in fallback mode, recycle more aggressively
 			recycleTimeout = 24 * time.Hour
 		}
-		
+
 		// Only recycle if reserved for more than recycleTimeout without payment
 		if poolAddr.ReservedAt != nil && now.Sub(*poolAddr.ReservedAt) > recycleTimeout {
 			// Before recycling, check if address has received funds
@@ -237,23 +237,19 @@ func (p *AddressPool) recycleExpiredReservationsInternal() {
 				usedAddressesFound++
 				log.Printf("Moved funded address %s to used addresses (reserved by %s)", addr, poolAddr.ReservedFor)
 			} else {
-				// Only recycle if address is less than 7 days old and has no funds
-				if now.Sub(poolAddr.CreatedAt) < 7*24*time.Hour {
-					// Double-check this address is not in usedAddrs before recycling
-					if _, isUsed := p.usedAddrs[addr]; !isUsed {
-						// Reset reservation info before adding back to pool
-						poolAddr.ReservedAt = nil
-						poolAddr.ReservedFor = ""
-						poolAddr.Amount = 0
-						p.availableAddrs = append(p.availableAddrs, *poolAddr)
-						recycled++
-						log.Printf("Recycled unused address %s after 72 hours (originally for %s)", addr, poolAddr.ReservedFor)
-					} else {
-						log.Printf("WARNING: Prevented recycling of used address %s", addr)
-					}
+				// Recycle ALL unused addresses regardless of age - this prevents gap limit issues
+				// Double-check this address is not in usedAddrs before recycling
+				if _, isUsed := p.usedAddrs[addr]; !isUsed {
+					// Reset reservation info before adding back to pool
+					poolAddr.ReservedAt = nil
+					poolAddr.ReservedFor = ""
+					poolAddr.Amount = 0
+					p.availableAddrs = append(p.availableAddrs, *poolAddr)
+					recycled++
+					log.Printf("Recycled unused address %s after 72 hours (originally for %s, age: %v) - GAP LIMIT PREVENTION",
+						addr, poolAddr.ReservedFor, now.Sub(poolAddr.CreatedAt).Round(time.Hour))
 				} else {
-					// Address is too old (>7 days), don't recycle it
-					log.Printf("Discarding old unused address %s (created %v ago)", addr, now.Sub(poolAddr.CreatedAt))
+					log.Printf("WARNING: Prevented recycling of used address %s", addr)
 				}
 			}
 			delete(p.reservedAddrs, addr)
@@ -688,16 +684,35 @@ func (p *AddressPool) RecycleExpiredReservations() int {
 	defer p.mu.Unlock()
 
 	recycled := 0
-	reservationTimeout := 24 * time.Hour // 24 hours timeout
+	reservationTimeout := 72 * time.Hour // 72 hours timeout - matches user expiry time
+	usedAddressesFound := 0
 
 	for address, addr := range p.reservedAddrs {
 		if addr.ReservedAt != nil && time.Since(*addr.ReservedAt) > reservationTimeout {
-			// Move back to available
-			addr.ReservedAt = nil
-			addr.ReservedFor = ""
-			p.availableAddrs = append(p.availableAddrs, *addr)
+			// Before recycling, check if address has received funds
+			hasBalance := p.checkAddressBalance(address)
+			if hasBalance {
+				// Move to used addresses instead of recycling
+				now := time.Now()
+				addr.UsedAt = &now
+				addr.UsedBy = addr.ReservedFor
+				p.usedAddrs[address] = addr
+				p.stats.TotalUsed++
+				usedAddressesFound++
+				log.Printf("Moved funded address %s to used addresses (reserved by %s)", address, addr.ReservedFor)
+			} else {
+				// Only recycle if address is not in usedAddrs
+				if _, isUsed := p.usedAddrs[address]; !isUsed {
+					// Move back to available pool
+					addr.ReservedAt = nil
+					addr.ReservedFor = ""
+					p.availableAddrs = append(p.availableAddrs, *addr)
+					recycled++
+					log.Printf("Recycled unused address %s (age: %v) - GAP LIMIT PREVENTION",
+						address, time.Since(*addr.ReservedAt).Round(time.Hour))
+				}
+			}
 			delete(p.reservedAddrs, address)
-			recycled++
 		}
 	}
 

@@ -10,30 +10,30 @@ import (
 type AddressStatus string
 
 const (
-	AddressStatusAvailable AddressStatus = "available"  // Can be assigned
-	AddressStatusReserved  AddressStatus = "reserved"   // Assigned, waiting for payment
-	AddressStatusUsed      AddressStatus = "used"       // Payment received
-	AddressStatusExpired   AddressStatus = "expired"    // 72h passed, ready to recycle
+	AddressStatusAvailable AddressStatus = "available" // Can be assigned
+	AddressStatusReserved  AddressStatus = "reserved"  // Assigned, waiting for payment
+	AddressStatusUsed      AddressStatus = "used"      // Payment received
+	AddressStatusExpired   AddressStatus = "expired"   // 72h passed, ready to recycle
 )
 
 type PooledAddress struct {
 	Address      string
 	Site         string
-	Email        string        // Current or last user
+	Email        string // Current or last user
 	Status       AddressStatus
-	ReservedAt   time.Time     // When it was assigned
-	LastChecked  time.Time     // Last balance check
-	PaymentCount int           // How many times it received payment
-	Index        int           // Address index in HD wallet
+	ReservedAt   time.Time // When it was assigned
+	LastChecked  time.Time // Last balance check
+	PaymentCount int       // How many times it received payment
+	Index        int       // Address index in HD wallet
 }
 
 type SiteAddressPool struct {
-	site            string
-	addresses       map[string]*PooledAddress  // address -> details
-	emailToAddress  map[string]string          // email -> current address
-	availableQueue  []string                   // FIFO queue of available addresses
-	nextIndex       int                        // Next index to generate
-	mutex           sync.RWMutex
+	site           string
+	addresses      map[string]*PooledAddress // address -> details
+	emailToAddress map[string]string         // email -> current address
+	availableQueue []string                  // FIFO queue of available addresses
+	nextIndex      int                       // Next index to generate
+	mutex          sync.RWMutex
 }
 
 var (
@@ -84,7 +84,7 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	now := time.Now()
 	for address, addr := range p.addresses {
 		if addr.Status == AddressStatusReserved &&
-		   now.Sub(addr.ReservedAt) > 72*time.Hour {
+			now.Sub(addr.ReservedAt) > 72*time.Hour {
 			// Recycle this address to prevent gap limit!
 			log.Printf("RECYCLING expired address %s (was reserved by %s) for new user %s on %s - GAP LIMIT PREVENTION",
 				address, addr.Email, email, p.site)
@@ -142,13 +142,13 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 
 	// Create new pooled address entry
 	pooledAddr := &PooledAddress{
-		Address:      address,
-		Site:         p.site,
-		Email:        email,
-		Status:       AddressStatusReserved,
-		ReservedAt:   now,
-		LastChecked:  now,
-		Index:        p.nextIndex,
+		Address:     address,
+		Site:        p.site,
+		Email:       email,
+		Status:      AddressStatusReserved,
+		ReservedAt:  now,
+		LastChecked: now,
+		Index:       p.nextIndex,
 	}
 
 	// Store in pool and increment index
@@ -196,7 +196,7 @@ func RecycleExpiredAddresses() {
 			// 1. Reserved (not paid) AND
 			// 2. Older than 72 hours
 			if addr.Status == AddressStatusReserved &&
-			   now.Sub(addr.ReservedAt) > 72*time.Hour {
+				now.Sub(addr.ReservedAt) > 72*time.Hour {
 
 				log.Printf("Recycling expired address %s from %s on %s (age: %v)",
 					address, addr.Email, siteName, now.Sub(addr.ReservedAt))

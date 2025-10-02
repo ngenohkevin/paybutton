@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o paybutton \
     main.go
 
-# Final stage - minimal image
+# Final stage - mid
 FROM alpine:latest
 
 # Install runtime dependencies

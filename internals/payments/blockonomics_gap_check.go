@@ -11,16 +11,16 @@ import (
 
 // BlockonomicsAddressInfo represents address information from Blockonomics
 type BlockonomicsAddressInfo struct {
-	Address      string  `json:"address"`
-	Paid         int64   `json:"paid"`
-	Pending      int64   `json:"pending"`
-	GapIndex     int     `json:"gap_index"`
-	LastUpdated  string  `json:"last_updated"`
+	Address     string `json:"address"`
+	Paid        int64  `json:"paid"`
+	Pending     int64  `json:"pending"`
+	GapIndex    int    `json:"gap_index"`
+	LastUpdated string `json:"last_updated"`
 }
 
 // BlockonomicsGapStatus represents the gap limit status from Blockonomics
 type BlockonomicsGapStatus struct {
-	CurrentGap       int       `json:"current_gap"`
+	CurrentGap      int       `json:"current_gap"`
 	MaxGap          int       `json:"max_gap"`
 	UnpaidAddresses []string  `json:"unpaid_addresses"`
 	LastChecked     time.Time `json:"last_checked"`

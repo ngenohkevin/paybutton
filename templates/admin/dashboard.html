@@ -83,13 +83,15 @@ function updateCharts(data) {
     }
 }
 
-// Analytics update configuration (WebSocket feeds to unified polling system)
+// Analytics update configuration (Single unified system)
 let analyticsWS = null;
 let analyticsWSReconnectDelay = 1000;
 let analyticsWSMaxReconnectDelay = 30000;
 let analyticsPollingTimer = null;
-let lastAnalyticsData = null; // Cache for WebSocket data
+let lastAnalyticsData = null; // Cache to prevent unnecessary updates
 let useWebSocketAnalytics = true;
+let updateDebounceTimer = null; // Prevent rapid updates
+let lastUpdateTime = 0; // Track last update timestamp
 
 // Initialize analytics WebSocket connection
 function initAnalyticsWebSocket() {
@@ -164,13 +166,36 @@ function initAnalyticsWebSocket() {
     }
 }
 
-// Unified analytics update processor
+// Unified analytics update processor with debouncing
 function processAnalyticsUpdate(data, source) {
+    const now = Date.now();
+
+    // Debounce: Ignore updates that come within 1 second of each other
+    if (now - lastUpdateTime < 1000) {
+        console.log(`Debouncing ${source} update - too soon after last update`);
+        // Clear existing debounce timer
+        if (updateDebounceTimer) {
+            clearTimeout(updateDebounceTimer);
+        }
+        // Schedule update for later
+        updateDebounceTimer = setTimeout(() => {
+            processAnalyticsUpdate(data, source + '_debounced');
+        }, 1000);
+        return;
+    }
+
     console.log(`Processing analytics update from ${source}`);
-    
-    // Always update the cache
+    lastUpdateTime = now;
+
+    // Check if data actually changed before updating UI
+    if (lastAnalyticsData && JSON.stringify(data) === JSON.stringify(lastAnalyticsData)) {
+        console.log(`Skipping ${source} update - data unchanged`);
+        return;
+    }
+
+    // Update the cache
     lastAnalyticsData = data;
-    
+
     // Update the UI with the data
     updateAnalyticsWidget(data);
 }
@@ -275,15 +300,15 @@ function updateElementWithTransition(elementId, newValue) {
     }
 }
 
-// Update site breakdown table
+// Update site breakdown table - OPTIMIZED to prevent flickering
 function updateSiteBreakdownTable(sites) {
     const tableContainer = document.getElementById('site-breakdown-table');
     if (!tableContainer) return;
-    
+
     // Check if we already have a table
     const existingTable = tableContainer.querySelector('table');
-    
-    if (sites.length === 0) {
+
+    if (!sites || sites.length === 0) {
         // Only update if not already showing empty state
         if (!tableContainer.querySelector('.fa-inbox')) {
             tableContainer.innerHTML = `
@@ -298,26 +323,36 @@ function updateSiteBreakdownTable(sites) {
         }
         return;
     }
-    
-    // If we have an existing table, update values instead of recreating
+
+    // If we have an existing table, ONLY update values - DO NOT REBUILD
     if (existingTable) {
         const tbody = existingTable.querySelector('tbody');
-        const existingRows = tbody.querySelectorAll('tr');
-        
-        // Update existing rows or add new ones
+        const existingRows = Array.from(tbody.querySelectorAll('tr'));
+
+        // Update existing rows
         sites.forEach((site, index) => {
             if (existingRows[index]) {
-                // Update existing row
+                // ONLY update text content if it changed - prevents flickering
                 const row = existingRows[index];
                 const nameEl = row.querySelector('.site-name');
                 const activeEl = row.querySelector('.site-active');
                 const weeklyEl = row.querySelector('.site-weekly');
-                
-                if (nameEl) nameEl.textContent = site.name || 'Unknown';
-                if (activeEl) activeEl.textContent = site.active || 0;
-                if (weeklyEl) weeklyEl.textContent = site.weekly || 0;
+
+                const newName = site.name || 'Unknown';
+                const newActive = (site.active || 0).toString();
+                const newWeekly = (site.weekly || 0).toString();
+
+                if (nameEl && nameEl.textContent !== newName) {
+                    nameEl.textContent = newName;
+                }
+                if (activeEl && activeEl.textContent !== newActive) {
+                    activeEl.textContent = newActive;
+                }
+                if (weeklyEl && weeklyEl.textContent !== newWeekly) {
+                    weeklyEl.textContent = newWeekly;
+                }
             } else {
-                // Add new row
+                // Add new row only if needed
                 const rowClass = index % 2 === 0 ? 'bg-gray-800/50' : 'bg-gray-900/50';
                 const newRow = document.createElement('tr');
                 newRow.className = `${rowClass} hover:bg-gray-700/50 dark:hover:bg-gray-800/50 transition-colors`;
@@ -338,13 +373,15 @@ function updateSiteBreakdownTable(sites) {
                 tbody.appendChild(newRow);
             }
         });
-        
+
         // Remove extra rows if sites list is shorter
         while (existingRows.length > sites.length) {
-            tbody.removeChild(tbody.lastChild);
+            const lastRow = tbody.lastChild;
+            if (lastRow) tbody.removeChild(lastRow);
+            existingRows.pop();
         }
     } else {
-        // Create table for first time
+        // Create table for first time ONLY
         let tableHTML = `
             <table class="w-full">
                 <thead class="bg-gray-800 dark:bg-gray-900 sticky top-0">
@@ -356,7 +393,7 @@ function updateSiteBreakdownTable(sites) {
                 </thead>
                 <tbody class="divide-y divide-gray-700 dark:divide-gray-800">
         `;
-        
+
         sites.forEach((site, index) => {
             const rowClass = index % 2 === 0 ? 'bg-gray-800/50' : 'bg-gray-900/50';
             tableHTML += `
@@ -376,12 +413,12 @@ function updateSiteBreakdownTable(sites) {
                 </tr>
             `;
         });
-        
+
         tableHTML += `
                 </tbody>
             </table>
         `;
-        
+
         tableContainer.innerHTML = tableHTML;
     }
 }
@@ -405,272 +442,7 @@ function refreshSiteAnalytics() {
     }
 }
 
-// Alpine.js component for analytics widget
-document.addEventListener('alpine:init', () => {
-    Alpine.data('analyticsWidget', () => ({
-        // State
-        activeViewers: 0,
-        weeklyVisitors: 0,
-        activeSites: 0,
-        sites: [],
-        lastUpdate: null,
-        isConnected: false,
-        connectionStable: false,
-        
-        // WebSocket
-        ws: null,
-        reconnectDelay: 1000,
-        maxReconnectDelay: 30000,
-        reconnectTimer: null,
-        
-        // Ping/Pong heartbeat
-        heartbeatInterval: null,
-        heartbeatTimer: null,
-        pingInterval: 30000, // 30 seconds
-        pongTimeout: 10000, // 10 seconds to wait for pong
-        lastPongTime: null,
-        
-        // Connection state management
-        connectionAttempts: 0,
-        maxConnectionAttempts: 5,
-        lastConnectionTime: null,
-        stableConnectionDuration: 60000, // 1 minute for stable connection
-        
-        init() {
-            console.log('Initializing Alpine analytics widget');
-            // Prevent duplicate initialization
-            if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-                return;
-            }
-            
-            // Always load initial data first
-            this.loadInitialData();
-            
-            // Try to connect WebSocket, but don't block on it
-            setTimeout(() => {
-                this.connect();
-            }, 100);
-            
-            // Setup periodic fallback polling in case WebSocket fails
-            this.startFallbackPolling();
-            
-            // Setup cleanup on page unload
-            window.addEventListener('beforeunload', () => {
-                this.cleanup();
-            });
-        },
-        
-        startFallbackPolling() {
-            // Poll every 10 seconds as a fallback if WebSocket isn't working
-            const fallbackPoll = () => {
-                // Only poll if WebSocket isn't connected or stable
-                if (!this.isConnected || !this.connectionStable) {
-                    this.loadInitialData();
-                }
-                setTimeout(fallbackPoll, 10000);
-            };
-            
-            // Start fallback polling after initial WebSocket attempt
-            setTimeout(fallbackPoll, 5000);
-        },
-        
-        connect() {
-            // Prevent duplicate connections
-            if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-                console.log('Alpine WebSocket already connected or connecting');
-                return;
-            }
-            
-            // Rate limiting - don't reconnect too frequently
-            const now = Date.now();
-            if (this.lastConnectionTime && (now - this.lastConnectionTime) < 5000) {
-                console.log('Alpine WebSocket connection rate limited, waiting...');
-                setTimeout(() => this.connect(), 5000);
-                return;
-            }
-            
-            this.lastConnectionTime = now;
-            this.connectionAttempts++;
-            
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/admin/analytics`;
-            
-            try {
-                this.ws = new WebSocket(wsUrl);
-                
-                this.ws.onopen = () => {
-                    console.log('Alpine WebSocket connected');
-                    this.isConnected = true;
-                    this.connectionStable = false;
-                    this.connectionAttempts = 0;
-                    this.reconnectDelay = 1000;
-                    this.lastPongTime = Date.now();
-                    
-                    // Start heartbeat after connection is established
-                    this.startHeartbeat();
-                    
-                    // Mark connection as stable after duration
-                    setTimeout(() => {
-                        if (this.isConnected) {
-                            this.connectionStable = true;
-                            console.log('Alpine WebSocket connection stabilized');
-                        }
-                    }, this.stableConnectionDuration);
-                };
-                
-                this.ws.onmessage = (event) => {
-                    try {
-                        const message = JSON.parse(event.data);
-                        
-                        // Handle pong responses
-                        if (message.type === 'pong') {
-                            this.lastPongTime = Date.now();
-                            if (this.heartbeatTimer) {
-                                clearTimeout(this.heartbeatTimer);
-                                this.heartbeatTimer = null;
-                            }
-                            return;
-                        }
-                        
-                        // Handle analytics updates
-                        if (message.type === 'analytics_update') {
-                            this.updateData(message.data);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing message:', error);
-                    }
-                };
-                
-                this.ws.onclose = (event) => {
-                    console.log('Alpine WebSocket closed:', event.code, event.reason);
-                    this.cleanup();
-                    
-                    // Only reconnect on unexpected closures and if not at max attempts
-                    if (this.shouldReconnect(event.code) && this.connectionAttempts <= this.maxConnectionAttempts) {
-                        this.scheduleReconnect();
-                    } else if (this.connectionAttempts > this.maxConnectionAttempts) {
-                        console.log('Alpine WebSocket max reconnection attempts reached');
-                    }
-                };
-                
-                this.ws.onerror = (error) => {
-                    console.error('Alpine WebSocket error:', error);
-                };
-                
-            } catch (error) {
-                console.error('Failed to create WebSocket:', error);
-                if (this.connectionAttempts <= this.maxConnectionAttempts) {
-                    this.scheduleReconnect();
-                }
-            }
-        },
-        
-        shouldReconnect(closeCode) {
-            // Don't reconnect on normal closure or going away
-            if (closeCode === 1000 || closeCode === 1001) return false;
-            
-            // Don't reconnect if connection was never stable and we're getting consistent failures
-            if (!this.connectionStable && closeCode === 1005 && this.connectionAttempts >= 3) {
-                console.log('Alpine WebSocket unstable connection, reducing reconnection attempts');
-                return false;
-            }
-            
-            return true;
-        },
-        
-        startHeartbeat() {
-            // Clear any existing heartbeat
-            this.stopHeartbeat();
-            
-            this.heartbeatInterval = setInterval(() => {
-                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    // Send ping
-                    this.ws.send(JSON.stringify({ type: 'ping' }));
-                    
-                    // Set timeout for pong response
-                    this.heartbeatTimer = setTimeout(() => {
-                        console.log('Alpine WebSocket pong timeout, connection may be dead');
-                        if (this.ws) {
-                            this.ws.close(1000, 'Pong timeout');
-                        }
-                    }, this.pongTimeout);
-                }
-            }, this.pingInterval);
-        },
-        
-        stopHeartbeat() {
-            if (this.heartbeatInterval) {
-                clearInterval(this.heartbeatInterval);
-                this.heartbeatInterval = null;
-            }
-            if (this.heartbeatTimer) {
-                clearTimeout(this.heartbeatTimer);
-                this.heartbeatTimer = null;
-            }
-        },
-        
-        cleanup() {
-            this.isConnected = false;
-            this.connectionStable = false;
-            this.stopHeartbeat();
-            
-            if (this.ws) {
-                // Remove event listeners to prevent reconnection
-                this.ws.onopen = null;
-                this.ws.onmessage = null;
-                this.ws.onclose = null;
-                this.ws.onerror = null;
-                
-                if (this.ws.readyState === WebSocket.OPEN) {
-                    this.ws.close(1000, 'Page unloading');
-                }
-                this.ws = null;
-            }
-        },
-        
-        scheduleReconnect() {
-            if (this.reconnectTimer) return;
-            
-            console.log(`Alpine WebSocket scheduling reconnect in ${this.reconnectDelay}ms (attempt ${this.connectionAttempts})`);
-            
-            this.reconnectTimer = setTimeout(() => {
-                this.reconnectTimer = null;
-                this.connect();
-            }, this.reconnectDelay);
-            
-            // Exponential backoff with jitter
-            this.reconnectDelay = Math.min(
-                this.reconnectDelay * 2 + Math.random() * 1000, 
-                this.maxReconnectDelay
-            );
-        },
-        
-        loadInitialData() {
-            fetch('/admin/api/dashboard-analytics')
-                .then(response => response.json())
-                .then(data => this.updateData(data))
-                .catch(error => console.error('Error loading initial data:', error));
-        },
-        
-        updateData(data) {
-            // Update state with smooth transitions
-            this.activeViewers = data.summary?.total_active || 0;
-            this.weeklyVisitors = data.summary?.total_weekly || 0;
-            this.activeSites = data.summary?.active_sites || 0;
-            this.sites = data.top_sites || [];
-            this.lastUpdate = new Date();
-        },
-        
-        refresh() {
-            this.loadInitialData();
-        },
-        
-        formatTime(date) {
-            if (!date) return '--:--:--';
-            return date.toLocaleTimeString();
-        }
-    }));
-});
+// REMOVED Alpine.js duplicate analytics system - using unified WebSocket system above
 
 // Track if analytics has been initialized
 let analyticsInitialized = false;
@@ -1038,196 +810,7 @@ function startSessionUpdates() {
     updateSessionStats();
 }
 
-// Site Analytics Functions (now using WebSocket instead of polling)
-
-function updateSiteBreakdownTable(sites) {
-    const tableEl = document.getElementById('site-breakdown-table');
-    if (!tableEl) return;
-    
-    // Update timestamp
-    const timestampEl = document.getElementById('analytics-timestamp');
-    if (timestampEl) {
-        timestampEl.textContent = new Date().toLocaleTimeString();
-    }
-    
-    if (!sites || sites.length === 0) {
-        tableEl.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-16 sm:py-12 px-4 text-gray-400">
-                <div class="w-20 h-20 sm:w-16 sm:h-16 bg-gray-700 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6 sm:mb-4 border border-gray-600">
-                    <i class="fas fa-globe text-3xl sm:text-2xl text-gray-500"></i>
-                </div>
-                <p class="text-xl sm:text-lg font-semibold mb-3 sm:mb-2 text-gray-300">No Active Sites</p>
-                <p class="text-base sm:text-sm text-center max-w-sm px-4 text-gray-400">
-                    Sites will appear here when visitors connect to your analytics service
-                </p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Build responsive card layout for mobile and table for desktop
-    let contentHTML = `
-        <!-- Mobile Card Layout (Hidden on desktop) -->
-        <div class="block lg:hidden space-y-4 p-4 sm:p-6">
-    `;
-    
-    sites.forEach((site, index) => {
-        const statusColor = site.active > 0 ? 'bg-green-400' : 'bg-gray-500';
-        const statusText = site.active > 0 ? 'Live' : 'Idle';
-        const activeColor = site.active > 0 ? 'text-emerald-300' : 'text-gray-400';
-        const bgGradient = site.active > 0 
-            ? 'bg-gradient-to-br from-emerald-800 to-emerald-900 border-emerald-600' 
-            : 'bg-gradient-to-br from-gray-700 to-gray-800 border-gray-600';
-        
-        contentHTML += `
-            <div class="relative ${bgGradient} border rounded-2xl p-6 transition-all duration-200 hover:shadow-2xl transform hover:scale-102 shadow-xl">
-                <div class="absolute top-4 right-4">
-                    <div class="flex items-center space-x-2 px-3 py-1 bg-black bg-opacity-20 rounded-full border border-opacity-30 ${site.active > 0 ? 'border-green-400' : 'border-gray-500'}">
-                        <div class="w-2 h-2 ${statusColor} rounded-full ${site.active > 0 ? 'animate-pulse' : ''} shadow-sm"></div>
-                        <span class="text-xs font-bold text-white">${statusText}</span>
-                    </div>
-                </div>
-                <div class="space-y-5">
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg border border-blue-500 border-opacity-30">
-                            <i class="fas fa-globe text-blue-200 text-lg"></i>
-                        </div>
-                        <div class="flex-1 min-w-0 pr-12">
-                            <p class="text-lg font-black text-white truncate mb-1" title="${site.name}">
-                                ${site.name}
-                            </p>
-                            <p class="text-sm text-gray-300 font-semibold">Site #${index + 1}</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="text-center bg-gray-800 bg-opacity-60 rounded-xl p-4 shadow-inner border border-gray-600 border-opacity-30">
-                            <div class="text-3xl font-black ${activeColor} mb-1">${site.active}</div>
-                            <div class="text-xs text-gray-300 font-bold uppercase tracking-wide">Active Now</div>
-                            ${site.active > 0 ? '<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse mx-auto mt-2 shadow-sm"></div>' : ''}
-                        </div>
-                        <div class="text-center bg-gray-800 bg-opacity-60 rounded-xl p-4 shadow-inner border border-gray-600 border-opacity-30">
-                            <div class="text-3xl font-black text-indigo-300 mb-1">${site.weekly || 0}</div>
-                            <div class="text-xs text-gray-300 font-bold uppercase tracking-wide">This Week</div>
-                            <div class="w-2 h-2 bg-indigo-400 rounded-full mx-auto mt-2"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    contentHTML += `
-        </div>
-        
-        <!-- Desktop Table Layout (Hidden on mobile/tablet) -->
-        <div class="hidden lg:block">
-            <table class="w-full">
-                <thead class="bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-600">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            <div class="flex items-center space-x-2">
-                                <i class="fas fa-globe text-blue-500"></i>
-                                <span>Site</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-4 text-center text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            <div class="flex items-center justify-center space-x-2">
-                                <i class="fas fa-eye text-emerald-500"></i>
-                                <span>Active</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-4 text-center text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            <div class="flex items-center justify-center space-x-2">
-                                <i class="fas fa-calendar-week text-indigo-500"></i>
-                                <span>Weekly</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-4 text-center text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                            <div class="flex items-center justify-center space-x-2">
-                                <i class="fas fa-signal text-teal-500"></i>
-                                <span>Status</span>
-                            </div>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-    `;
-    
-    sites.forEach((site, index) => {
-        const statusColor = site.active > 0 
-            ? 'bg-green-500 text-white' 
-            : 'bg-gray-400 dark:bg-gray-600 text-white';
-        const statusText = site.active > 0 ? 'Live' : 'Idle';
-        const statusIcon = site.active > 0 ? 'fas fa-broadcast-tower' : 'fas fa-pause';
-        const activeColor = site.active > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500';
-        const rowBg = site.active > 0 
-            ? 'bg-green-50/30 dark:bg-green-900/10 hover:bg-green-50 dark:hover:bg-green-900/20' 
-            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700';
-        
-        contentHTML += `
-            <tr class="${rowBg} transition-all duration-200 hover:shadow-sm">
-                <td class="px-6 py-4">
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-                            <i class="fas fa-globe text-white text-sm"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center space-x-2">
-                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate max-w-48" title="${site.name}">
-                                    ${site.name}
-                                </p>
-                                ${site.active > 0 ? '<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>' : ''}
-                            </div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                                Site #${index + 1}
-                            </p>
-                        </div>
-                    </div>
-                </td>
-                <td class="px-6 py-4 text-center">
-                    <div class="flex flex-col items-center space-y-1">
-                        <span class="text-2xl font-black ${activeColor}">${site.active}</span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">viewers</span>
-                    </div>
-                </td>
-                <td class="px-6 py-4 text-center">
-                    <div class="flex flex-col items-center space-y-1">
-                        <span class="text-xl font-bold text-indigo-600 dark:text-indigo-400">${site.weekly || 0}</span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">total</span>
-                    </div>
-                </td>
-                <td class="px-6 py-4 text-center">
-                    <span class="inline-flex items-center px-3 py-2 rounded-full text-sm font-bold ${statusColor} shadow-sm">
-                        <i class="${statusIcon} mr-2 text-xs ${site.active > 0 ? 'animate-pulse' : ''}"></i>
-                        ${statusText}
-                    </span>
-                </td>
-            </tr>
-        `;
-    });
-    
-    contentHTML += `
-                </tbody>
-            </table>
-        </div>
-    `;
-    
-    tableEl.innerHTML = contentHTML;
-    
-    // Add smooth entrance animations
-    setTimeout(() => {
-        const cards = tableEl.querySelectorAll('div[class*="hover:scale-102"], tr');
-        cards.forEach((card, index) => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(10px)';
-            setTimeout(() => {
-                card.style.transition = 'all 0.3s ease-out';
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, index * 50);
-        });
-    }, 10);
-}
+// REMOVED duplicate updateSiteBreakdownTable function - using optimized version above
 
 function startSiteAnalyticsUpdates() {
     // Try WebSocket first for instant updates, fallback to 5s polling as per analytics.md
@@ -1245,26 +828,19 @@ function startSiteAnalyticsUpdates() {
 // Start session and site analytics updates when dashboard loads
 document.body.addEventListener('htmx:afterSettle', function(event) {
     if (event.target.id === 'dashboard-content') {
+        // Prevent duplicate initialization
+        if (analyticsInitialized) {
+            console.log('Analytics already initialized, skipping...');
+            return;
+        }
+
+        analyticsInitialized = true;
+
         // Start session updates along with chart updates
         setTimeout(startSessionUpdates, 500);
-        
-        // Start site analytics updates - Initialize both old system and Alpine.js
+
+        // Start site analytics updates (WebSocket with polling fallback)
         setTimeout(startSiteAnalyticsUpdates, 600);
-        
-        // Also ensure Alpine.js analytics widget loads data immediately
-        setTimeout(() => {
-            // Try to trigger Alpine.js data loading if available
-            const analyticsWidget = document.querySelector('[x-data="analyticsWidget"]');
-            if (analyticsWidget && analyticsWidget._x_dataStack) {
-                const component = analyticsWidget._x_dataStack[0];
-                if (component && typeof component.loadInitialData === 'function') {
-                    component.loadInitialData();
-                }
-            }
-            
-            // Fallback: Load initial analytics data directly
-            loadInitialAnalytics();
-        }, 800);
     }
 });
 

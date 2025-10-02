@@ -59,7 +59,7 @@ func GetBalance(c *gin.Context) {
 			"rate":        rate,
 		})
 	} else if usdtRegex.MatchString(address) {
-		// Handle USDT balance
+		// Handle USDT balance (manual checking still works)
 		balance, err := payments2.GetUSDTBalance(address)
 		if err != nil {
 			// Try one more time before returning error
@@ -158,6 +158,12 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 	} else {
 		log.Printf("Unknown address format for %s, defaulting to BTC", address)
 		currencyType = "BTC"
+	}
+
+	// TEMPORARY: Disable USDT balance checking
+	if currencyType == "USDT" {
+		log.Printf("USDT balance checking is temporarily disabled for address: %s (email: %s)", address, email)
+		return
 	}
 
 	log.Printf("Starting balance check for %s address: %s", currencyType, address)
