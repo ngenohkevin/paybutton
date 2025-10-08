@@ -15,6 +15,7 @@ import (
 	"github.com/ngenohkevin/paybutton/internals/config"
 	"github.com/ngenohkevin/paybutton/internals/monitoring"
 	"github.com/ngenohkevin/paybutton/internals/payment_processing"
+	"github.com/ngenohkevin/paybutton/internals/payments"
 	"github.com/ngenohkevin/paybutton/utils"
 )
 
@@ -105,6 +106,7 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	admin.GET("/site-pools", getSitePoolsPage)
 	admin.GET("/api/site-pools/stats", getSitePoolStats)
 	admin.GET("/api/gap-limit/status", getGapLimitStatus)
+	admin.GET("/api/pool/detailed", getDetailedPoolInfo)
 
 	// Logs management endpoints
 	admin.GET("/logs", getLogsPage)
@@ -3757,27 +3759,304 @@ func getSitePoolStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-// getGapLimitStatus returns gap limit status for all sites
+// getGapLimitStatus returns comprehensive gap limit status for all sites
 func getGapLimitStatus(c *gin.Context) {
 	status := make(map[string]interface{})
 
-	// Get stats for each site
+	// Get main address pool stats
+	pool := payment_processing.GetAddressPool()
+	poolStats := pool.GetStats()
+
+	// Get gap monitor stats
+	gapMonitor := payment_processing.GetGapMonitor()
+	gapStats := gapMonitor.GetStats()
+
+	// Check Blockonomics gap status (live API check)
+	blockonomicsStatus, err := payments.CheckBlockonomicsGapLimit()
+	var blockonomicsData map[string]interface{}
+	if err != nil {
+		blockonomicsData = map[string]interface{}{
+			"error":   err.Error(),
+			"healthy": false,
+		}
+	} else {
+		blockonomicsData = map[string]interface{}{
+			"current_gap":      blockonomicsStatus.CurrentGap,
+			"max_gap":          blockonomicsStatus.MaxGap,
+			"is_at_limit":      blockonomicsStatus.IsAtLimit,
+			"unpaid_count":     len(blockonomicsStatus.UnpaidAddresses),
+			"last_checked":     blockonomicsStatus.LastChecked,
+			"healthy":          !blockonomicsStatus.IsAtLimit,
+			"warning_level":    getGapWarningLevel(blockonomicsStatus.CurrentGap, blockonomicsStatus.MaxGap),
+			"unpaid_addresses": blockonomicsStatus.UnpaidAddresses, // First 10 for debugging
+		}
+	}
+
+	// Get site-specific stats
 	siteStats := payment_processing.GetPoolStats()
+	sites := make(map[string]interface{})
 	for site, stats := range siteStats {
 		if siteMap, ok := stats.(map[string]interface{}); ok {
 			consecutiveUnpaid, _ := siteMap["consecutive_unpaid"].(int)
 			isAtRisk, _ := siteMap["gap_limit_risk"].(bool)
 
-			status[site] = map[string]interface{}{
+			sites[site] = map[string]interface{}{
 				"consecutive_unpaid": consecutiveUnpaid,
 				"is_at_risk":         isAtRisk,
 				"total_addresses":    siteMap["total_addresses"],
 				"available":          siteMap["available"],
 				"reserved":           siteMap["reserved"],
 				"used":               siteMap["used"],
+				"health_status":      getSiteHealthStatus(consecutiveUnpaid, isAtRisk),
 			}
 		}
 	}
 
+	// Get recent gap limit errors
+	recentErrors := gapMonitor.GetRecentErrors()
+	errorSummary := make([]map[string]interface{}, 0)
+	for i, err := range recentErrors {
+		if i >= 5 { // Only show last 5 errors
+			break
+		}
+		errorSummary = append(errorSummary, map[string]interface{}{
+			"timestamp": err.Timestamp.Format("2006-01-02 15:04:05"),
+			"email":     err.Email,
+			"message":   err.Message,
+		})
+	}
+
+	// Build comprehensive status
+	status = map[string]interface{}{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"overall_health": map[string]interface{}{
+			"status":           getOverallHealthStatus(poolStats, gapStats, blockonomicsStatus),
+			"pool_size":        poolStats.CurrentPoolSize,
+			"gap_limit_errors": poolStats.GapLimitErrors,
+			"should_fallback":  gapStats["should_use_fallback"],
+		},
+		"main_pool": map[string]interface{}{
+			"total_generated":     poolStats.TotalGenerated,
+			"total_used":          poolStats.TotalUsed,
+			"total_recycled":      poolStats.TotalRecycled,
+			"current_pool_size":   poolStats.CurrentPoolSize,
+			"gap_limit_errors":    poolStats.GapLimitErrors,
+			"last_gap_error":      poolStats.LastGapLimitError,
+			"utilization_percent": calculateUtilization(poolStats),
+		},
+		"gap_monitor": gapStats,
+		"blockonomics": blockonomicsData,
+		"sites":        sites,
+		"recent_errors": errorSummary,
+		"recommendations": getGapRecommendations(poolStats, gapStats, blockonomicsStatus),
+	}
+
 	c.JSON(http.StatusOK, status)
+}
+
+// Helper functions for enhanced gap status
+func getGapWarningLevel(current, max int) string {
+	ratio := float64(current) / float64(max)
+	if ratio >= 0.9 {
+		return "critical"
+	} else if ratio >= 0.7 {
+		return "warning"
+	} else if ratio >= 0.5 {
+		return "caution"
+	}
+	return "healthy"
+}
+
+func getSiteHealthStatus(consecutiveUnpaid int, isAtRisk bool) string {
+	if isAtRisk || consecutiveUnpaid >= 15 {
+		return "at_risk"
+	} else if consecutiveUnpaid >= 10 {
+		return "warning"
+	} else if consecutiveUnpaid >= 5 {
+		return "caution"
+	}
+	return "healthy"
+}
+
+func getOverallHealthStatus(poolStats payment_processing.PoolStats, gapStats map[string]interface{}, blockonomicsStatus *payments.BlockonomicsGapStatus) string {
+	// Critical conditions
+	if blockonomicsStatus != nil && blockonomicsStatus.IsAtLimit {
+		return "critical"
+	}
+	if poolStats.CurrentPoolSize == 0 {
+		return "critical"
+	}
+	if shouldFallback, ok := gapStats["should_use_fallback"].(bool); ok && shouldFallback {
+		return "critical"
+	}
+
+	// Warning conditions
+	if poolStats.CurrentPoolSize < 3 {
+		return "warning"
+	}
+	if blockonomicsStatus != nil && float64(blockonomicsStatus.CurrentGap)/float64(blockonomicsStatus.MaxGap) >= 0.7 {
+		return "warning"
+	}
+
+	// Caution conditions
+	if poolStats.GapLimitErrors > 0 {
+		return "caution"
+	}
+
+	return "healthy"
+}
+
+func calculateUtilization(stats payment_processing.PoolStats) float64 {
+	if stats.TotalGenerated == 0 {
+		return 0
+	}
+	return (float64(stats.TotalUsed) / float64(stats.TotalGenerated)) * 100
+}
+
+func getGapRecommendations(poolStats payment_processing.PoolStats, gapStats map[string]interface{}, blockonomicsStatus *payments.BlockonomicsGapStatus) []string {
+	recommendations := []string{}
+
+	// Check pool size
+	if poolStats.CurrentPoolSize == 0 {
+		recommendations = append(recommendations, "🚨 CRITICAL: Address pool is empty! Manual refill required immediately.")
+	} else if poolStats.CurrentPoolSize < 3 {
+		recommendations = append(recommendations, "⚠️ Pool running low. Consider manual refill during off-peak hours.")
+	}
+
+	// Check Blockonomics gap limit
+	if blockonomicsStatus != nil {
+		if blockonomicsStatus.IsAtLimit {
+			recommendations = append(recommendations, "🚨 CRITICAL: Blockonomics gap limit reached! "+
+				"Blockonomics is recycling old addresses. Check unpaid addresses and consider sweeping old funds.")
+		} else if float64(blockonomicsStatus.CurrentGap)/float64(blockonomicsStatus.MaxGap) >= 0.7 {
+			recommendations = append(recommendations, fmt.Sprintf("⚠️ Approaching Blockonomics gap limit: %d/%d unpaid addresses. "+
+				"Encourage payment completion or implement more aggressive address reuse.", blockonomicsStatus.CurrentGap, blockonomicsStatus.MaxGap))
+		}
+
+		// Check for unpaid addresses
+		if len(blockonomicsStatus.UnpaidAddresses) > 10 {
+			recommendations = append(recommendations, fmt.Sprintf("📊 %d unpaid addresses detected. "+
+				"Your 72-hour recycling will help manage this.", len(blockonomicsStatus.UnpaidAddresses)))
+		}
+	}
+
+	// Check gap limit errors
+	if poolStats.GapLimitErrors > 0 {
+		recommendations = append(recommendations, fmt.Sprintf("⚠️ %d gap limit errors recorded. "+
+			"Recent errors may indicate Blockonomics is recycling funded addresses. "+
+			"The balance check protection is active.", poolStats.GapLimitErrors))
+	}
+
+	// Check fallback mode
+	if shouldFallback, ok := gapStats["should_use_fallback"].(bool); ok && shouldFallback {
+		recommendations = append(recommendations, "🔄 System is using fallback mode due to gap limit issues. "+
+			"Address generation may be slower. Resolve gap limit to restore normal operation.")
+	}
+
+	// Check recycling stats
+	if poolStats.TotalRecycled > 0 {
+		recommendations = append(recommendations, fmt.Sprintf("♻️ %d addresses recycled from 72-hour expiry. "+
+			"This helps manage gap limit effectively.", poolStats.TotalRecycled))
+	}
+
+	if len(recommendations) == 0 {
+		recommendations = append(recommendations, "✅ All systems operating normally. No action required.")
+	}
+
+	return recommendations
+}
+
+// getDetailedPoolInfo returns detailed information about addresses in the pool
+func getDetailedPoolInfo(c *gin.Context) {
+	pool := payment_processing.GetAddressPool()
+	detailed := pool.GetDetailedInfo()
+
+	// Enhance with balance checks for sample addresses
+	if available, ok := detailed["available"].([]map[string]interface{}); ok {
+		for i := range available {
+			if i < 5 { // Only check first 5 to avoid slowness
+				// Note: We don't check balance here to keep response fast
+				// Balance checking happens during recycling and refill
+				available[i]["note"] = "Balance verified during pool refill"
+			}
+		}
+	}
+
+	// Add recycling information
+	if reserved, ok := detailed["reserved"].([]map[string]interface{}); ok {
+		for i := range reserved {
+			if reservedAt, ok := reserved[i]["reserved_at"].(*time.Time); ok && reservedAt != nil {
+				age := time.Since(*reservedAt)
+				reserved[i]["age_hours"] = int(age.Hours())
+				reserved[i]["expires_in_hours"] = int(72 - age.Hours())
+
+				if age.Hours() >= 72 {
+					reserved[i]["status"] = "expired_pending_recycle"
+				} else if age.Hours() >= 60 {
+					reserved[i]["status"] = "expiring_soon"
+				} else {
+					reserved[i]["status"] = "active"
+				}
+			}
+		}
+	}
+
+	// Add usage statistics for used addresses
+	if used, ok := detailed["used"].([]map[string]interface{}); ok {
+		for i := range used {
+			if usedAt, ok := used[i]["used_at"].(*time.Time); ok && usedAt != nil {
+				age := time.Since(*usedAt)
+				used[i]["age_hours"] = int(age.Hours())
+				used[i]["age_days"] = int(age.Hours() / 24)
+			}
+		}
+	}
+
+	// Add summary statistics
+	summary := map[string]interface{}{
+		"total_available": len(detailed["available"].([]map[string]interface{})),
+		"total_reserved":  len(detailed["reserved"].([]map[string]interface{})),
+		"total_used":      len(detailed["used"].([]map[string]interface{})),
+		"expiring_soon":   countExpiringSoon(detailed["reserved"].([]map[string]interface{})),
+		"already_expired": countExpired(detailed["reserved"].([]map[string]interface{})),
+	}
+
+	response := map[string]interface{}{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"summary":   summary,
+		"stats":     detailed["stats"],
+		"config":    detailed["config"],
+		"available": detailed["available"],
+		"reserved":  detailed["reserved"],
+		"used":      detailed["used"],
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// Helper functions for detailed pool info
+func countExpiringSoon(reserved []map[string]interface{}) int {
+	count := 0
+	for _, r := range reserved {
+		if reservedAt, ok := r["reserved_at"].(*time.Time); ok && reservedAt != nil {
+			age := time.Since(*reservedAt)
+			if age.Hours() >= 60 && age.Hours() < 72 {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func countExpired(reserved []map[string]interface{}) int {
+	count := 0
+	for _, r := range reserved {
+		if reservedAt, ok := r["reserved_at"].(*time.Time); ok && reservedAt != nil {
+			age := time.Since(*reservedAt)
+			if age.Hours() >= 72 {
+				count++
+			}
+		}
+	}
+	return count
 }

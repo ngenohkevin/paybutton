@@ -20,6 +20,25 @@
 
     <!-- Pool Overview Cards -->
     <div class="dashboard-grid mb-8">
+        <!-- Blockonomics Gap Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-shield-alt text-purple-500 mr-2"></i>Gap Limit Status
+                </h3>
+            </div>
+            <div class="card-body">
+                <div id="gap-status" class="space-y-4">
+                    <!-- Loading skeleton -->
+                    <div class="animate-pulse">
+                        <div class="loading-skeleton h-4 w-3/4 mb-2"></div>
+                        <div class="loading-skeleton h-4 w-1/2 mb-2"></div>
+                        <div class="loading-skeleton h-4 w-5/6"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Pool Statistics Card -->
         <div class="card">
             <div class="card-header">
@@ -236,19 +255,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadPoolData() {
     try {
-        console.log('Fetching pool data from /admin/pool/details...');
-        const response = await fetch('/admin/pool/details');
-        console.log('Response status:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            const errorText = await response.text();
+        console.log('Fetching pool data from /admin/api/pool/detailed...');
+
+        // Load both pool detailed and gap status in parallel
+        const [poolResponse, gapResponse] = await Promise.all([
+            fetch('/admin/api/pool/detailed'),
+            fetch('/admin/api/gap-limit/status')
+        ]);
+
+        if (!poolResponse.ok || !gapResponse.ok) {
+            const errorText = await poolResponse.text();
             console.error('Response error:', errorText);
-            
-            // Check if it's a redirect to login page
-            if (response.status === 302 || errorText.includes('login')) {
+
+            if (poolResponse.status === 302 || errorText.includes('login')) {
                 console.error('Authentication required - redirecting to login');
                 showNotification('error', 'Authentication required. Please log in to view pool data.');
-                // Redirect to login if we're not authenticated
                 if (window.location.pathname.startsWith('/admin/') && !window.location.pathname.includes('/login')) {
                     setTimeout(() => {
                         window.location.href = '/admin/login';
@@ -256,20 +277,24 @@ async function loadPoolData() {
                 }
                 return;
             }
-            
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+            throw new Error(`HTTP ${poolResponse.status}: ${poolResponse.statusText}`);
         }
-        
-        poolData = await response.json();
+
+        poolData = await poolResponse.json();
+        const gapData = await gapResponse.json();
+
         console.log('Pool data loaded:', poolData);
+        console.log('Gap status loaded:', gapData);
+
         updatePoolDisplay();
-        
+        updateGapStatus(gapData);
+
     } catch (error) {
         console.error('Error loading pool data:', error);
-        
-        // More detailed error handling
+
         let errorMessage = 'Failed to load pool data: ' + error.message;
-        
+
         if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
             errorMessage = 'Network error: Unable to connect to server. Please check your connection.';
         } else if (error.message.includes('401') || error.message.includes('403')) {
@@ -277,10 +302,9 @@ async function loadPoolData() {
         } else if (error.message.includes('404')) {
             errorMessage = 'Pool details endpoint not found. Please contact support.';
         }
-        
+
         showNotification('error', errorMessage);
-        
-        // Show fallback message in the stats area with more user-friendly text
+
         document.getElementById('pool-stats').innerHTML = `
             <div class="text-center py-8">
                 <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
@@ -303,38 +327,93 @@ function updatePoolDisplay() {
     updateAddressLists();
 }
 
+function updateGapStatus(gapData) {
+    if (!gapData) return;
+
+    const overall = gapData.overall_health || {};
+    const healthColor = {
+        'healthy': 'text-green-500',
+        'caution': 'text-yellow-500',
+        'warning': 'text-orange-500',
+        'critical': 'text-red-500'
+    }[overall.status] || 'text-gray-500';
+
+    const healthIcon = {
+        'healthy': 'fa-check-circle',
+        'caution': 'fa-exclamation-circle',
+        'warning': 'fa-exclamation-triangle',
+        'critical': 'fa-times-circle'
+    }[overall.status] || 'fa-question-circle';
+
+    let recommendationsHtml = '';
+    if (gapData.recommendations && gapData.recommendations.length > 0) {
+        recommendationsHtml = `
+            <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                    <i class="fas fa-lightbulb mr-1"></i>Recommendations
+                </h4>
+                <ul class="text-xs space-y-1">
+                    ${gapData.recommendations.map(rec => `<li class="text-blue-700 dark:text-blue-300">• ${rec}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    const gapHtml = `
+        <div class="text-center mb-4">
+            <i class="fas ${healthIcon} ${healthColor} text-4xl mb-2"></i>
+            <p class="text-lg font-semibold ${healthColor}">${overall.status ? overall.status.toUpperCase() : 'UNKNOWN'}</p>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Utilization</span>
+            <span class="metric-value">${overall.utilization || 0}%</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Total Sites</span>
+            <span class="metric-value">${overall.total_sites || 0}</span>
+        </div>
+        ${recommendationsHtml}
+    `;
+
+    document.getElementById('gap-status').innerHTML = gapHtml;
+}
+
 function updatePoolStats() {
     console.log('Updating pool stats...');
-    const stats = poolData.stats || {};
-    console.log('Stats object:', stats);
-    
+    const summary = poolData.summary || {};
+    console.log('Summary object:', summary);
+
     const statsHtml = `
         <div class="metric-item">
-            <span class="metric-label">Current Pool Size</span>
-            <span class="metric-value success">${stats.current_pool_size || 0}</span>
+            <span class="metric-label">Total Addresses</span>
+            <span class="metric-value">${summary.total_addresses || 0}</span>
         </div>
         <div class="metric-item">
-            <span class="metric-label">Total Generated</span>
-            <span class="metric-value">${stats.total_generated || 0}</span>
+            <span class="metric-label">Available</span>
+            <span class="metric-value success">${summary.available_count || 0}</span>
         </div>
         <div class="metric-item">
-            <span class="metric-label">Total Used</span>
-            <span class="metric-value">${stats.total_used || 0}</span>
+            <span class="metric-label">Reserved</span>
+            <span class="metric-value warning">${summary.reserved_count || 0}</span>
         </div>
         <div class="metric-item">
-            <span class="metric-label">Total Recycled</span>
-            <span class="metric-value success">${stats.total_recycled || 0}</span>
+            <span class="metric-label">Used</span>
+            <span class="metric-value">${summary.used_count || 0}</span>
         </div>
         <div class="metric-item">
-            <span class="metric-label">Gap Limit Errors</span>
-            <span class="metric-value ${(stats.gap_limit_errors || 0) > 0 ? 'danger' : 'success'}">${stats.gap_limit_errors || 0}</span>
+            <span class="metric-label">Recycled</span>
+            <span class="metric-value success">${summary.recycled_count || 0}</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Next Index</span>
+            <span class="metric-value">${summary.next_index || 0}</span>
         </div>
     `;
-    
+
     console.log('Generated stats HTML:', statsHtml);
     const statsElement = document.getElementById('pool-stats');
     console.log('Stats element found:', !!statsElement);
-    
+
     if (statsElement) {
         statsElement.innerHTML = statsHtml;
         console.log('Stats HTML updated successfully');
@@ -370,23 +449,39 @@ function updateAddressLists() {
         </div>
     `);
     
-    // Update reserved addresses
-    updateAddressList('reserved-addresses', reserved, (addr) => `
-        <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-b-0">
-            <div class="flex justify-between items-start">
-                <div class="flex-1 min-w-0">
-                    <div class="font-mono text-sm text-gray-900 dark:text-white truncate">${addr.address}</div>
-                    <div class="text-xs text-gray-500 mt-1">
-                        Reserved: ${formatDate(addr.reserved_at)} • ${addr.reserved_for || 'Unknown'}
+    // Update reserved addresses with expiry information
+    updateAddressList('reserved-addresses', reserved, (addr) => {
+        const expiryInfo = addr.expires_in_hours !== undefined ?
+            `<span class="${addr.expires_in_hours < 12 ? 'text-red-500' : 'text-yellow-500'}">
+                Expires in ${addr.expires_in_hours}h
+            </span>` : '';
+
+        const statusBadge = addr.status === 'expired_pending_recycle' ?
+            '<span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">EXPIRED</span>' :
+            addr.status === 'expiring_soon' ?
+            '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">EXPIRING</span>' : '';
+
+        return `
+            <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-b-0">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <div class="font-mono text-sm text-gray-900 dark:text-white truncate">${addr.address}</div>
+                            ${statusBadge}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            Reserved: ${formatDate(addr.reserved_at)} • ${addr.reserved_for || 'Unknown'}
+                            ${expiryInfo ? ' • ' + expiryInfo : ''}
+                        </div>
                     </div>
+                    <button onclick="releaseReservation('${addr.address}')"
+                            class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 ml-2">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
-                <button onclick="releaseReservation('${addr.address}')" 
-                        class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 ml-2">
-                    <i class="fas fa-times"></i>
-                </button>
             </div>
-        </div>
-    `);
+        `;
+    });
     
     // Update used addresses
     updateAddressList('used-addresses', used, (addr) => `

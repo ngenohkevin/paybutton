@@ -94,15 +94,14 @@ func GetBlockonomicsAddresses() ([]BlockonomicsAddressInfo, error) {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		Addresses []BlockonomicsAddressInfo `json:"addresses"`
-	}
+	// Blockonomics API returns an array directly, not wrapped in an object
+	var addresses []BlockonomicsAddressInfo
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&addresses); err != nil {
 		return nil, err
 	}
 
-	return result.Addresses, nil
+	return addresses, nil
 }
 
 // RecoverFromGapLimit attempts to recover from gap limit by marking old unpaid addresses
