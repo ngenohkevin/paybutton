@@ -40,12 +40,16 @@ type BlockStreamResponse struct {
 type MempoolSpaceResponse struct {
 	Address    string `json:"address"`
 	ChainStats struct {
-		FundedTxoSum int64 `json:"funded_txo_sum"`
-		SpentTxoSum  int64 `json:"spent_txo_sum"`
+		FundedTxoSum  int64 `json:"funded_txo_sum"`
+		SpentTxoSum   int64 `json:"spent_txo_sum"`
+		TxCount       int   `json:"tx_count"`
+		FundedTxoCount int  `json:"funded_txo_count"`
+		SpentTxoCount  int  `json:"spent_txo_count"`
 	} `json:"chain_stats"`
 	MempoolStats struct {
 		FundedTxoSum int64 `json:"funded_txo_sum"`
 		SpentTxoSum  int64 `json:"spent_txo_sum"`
+		TxCount      int   `json:"tx_count"`
 	} `json:"mempool_stats"`
 }
 
@@ -259,7 +263,9 @@ func GetBitcoinAddressBalanceWithBlockStream(address string) (int64, error) {
 	return 0, fmt.Errorf("all retry attempts failed")
 }
 
-func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
+// CheckAddressHistoryWithMempoolSpace checks if an address has transaction history
+// Returns: (balance, txCount, error)
+func CheckAddressHistoryWithMempoolSpace(address string) (int64, int, error) {
 	url := fmt.Sprintf("https://mempool.space/api/address/%s", address)
 
 	// Wait for rate limiter permission
@@ -268,7 +274,7 @@ func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
 
 	rateLimiter := GetRateLimiter()
 	if err := rateLimiter.WaitForPermission(ctx, "mempoolspace"); err != nil {
-		return 0, fmt.Errorf("rate limiter timeout: %w", err)
+		return 0, 0, fmt.Errorf("rate limiter timeout: %w", err)
 	}
 
 	client := &http.Client{Timeout: 15 * time.Second}
@@ -278,14 +284,14 @@ func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
 	for attempt := 0; attempt < retries; attempt++ {
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			return 0, fmt.Errorf("failed to create request: %w", err)
+			return 0, 0, fmt.Errorf("failed to create request: %w", err)
 		}
 		req.Header.Set("User-Agent", "PayButton/1.0 (Bitcoin Balance Checker)")
 
 		resp, err := client.Do(req)
 		if err != nil {
 			if attempt == retries-1 {
-				return 0, fmt.Errorf("failed to fetch balance after %d attempts: %w", retries, err)
+				return 0, 0, fmt.Errorf("failed to fetch balance after %d attempts: %w", retries, err)
 			}
 			time.Sleep(baseDelay * time.Duration(1<<attempt))
 			continue
@@ -301,7 +307,7 @@ func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
 		if resp.StatusCode == 429 || resp.StatusCode == 503 {
 			if attempt == retries-1 {
 				body, _ := io.ReadAll(resp.Body)
-				return 0, fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
+				return 0, 0, fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
 			}
 			time.Sleep(baseDelay * time.Duration(1<<attempt))
 			continue
@@ -309,12 +315,12 @@ func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			return 0, fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
+			return 0, 0, fmt.Errorf("error fetching balance, status code: %v, response: %s", resp.StatusCode, body)
 		}
 
 		var balanceResponse MempoolSpaceResponse
 		if err := json.NewDecoder(resp.Body).Decode(&balanceResponse); err != nil {
-			return 0, fmt.Errorf("failed to parse balance response: %w", err)
+			return 0, 0, fmt.Errorf("failed to parse balance response: %w", err)
 		}
 
 		// Calculate balance: (funded - spent) + mempool
@@ -322,10 +328,19 @@ func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
 		mempoolBalance := balanceResponse.MempoolStats.FundedTxoSum - balanceResponse.MempoolStats.SpentTxoSum
 		totalBalance := confirmedBalance + mempoolBalance
 
-		return totalBalance, nil
+		// Get total transaction count (confirmed + mempool)
+		totalTxCount := balanceResponse.ChainStats.TxCount + balanceResponse.MempoolStats.TxCount
+
+		return totalBalance, totalTxCount, nil
 	}
 
-	return 0, fmt.Errorf("all retry attempts failed")
+	return 0, 0, fmt.Errorf("all retry attempts failed")
+}
+
+// GetBitcoinAddressBalanceWithMempoolSpace returns only balance (for backward compatibility)
+func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
+	balance, _, err := CheckAddressHistoryWithMempoolSpace(address)
+	return balance, err
 }
 
 func GetBitcoinAddressBalanceWithTrezor(address string) (int64, error) {

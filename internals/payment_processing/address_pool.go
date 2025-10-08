@@ -143,20 +143,20 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 				continue
 			}
 
-			// CRITICAL: Check if Blockonomics recycled a funded address
-			balance, err := GetBitcoinAddressBalanceWithFallbackFresh(addr, blockCypherToken)
+			// CRITICAL: Check if Blockonomics recycled a used address (balance OR transaction history)
+			balance, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(addr)
 			if err != nil {
-				log.Printf("⚠️ WARNING: Could not verify balance for emergency address %s: %v", addr, err)
+				log.Printf("⚠️ WARNING: Could not verify address %s: %v", addr, err)
 				// Accept anyway in emergency (user is waiting)
-			} else if balance > 0 {
-				log.Printf("🚨 CRITICAL: Emergency generation got FUNDED address %s with %d sats (attempt %d/3)", addr, balance, attempt)
+			} else if balance > 0 || txCount > 0 {
+				log.Printf("🚨 CRITICAL: Emergency generation got USED address %s (balance: %d sats, txs: %d) - attempt %d/3", addr, balance, txCount, attempt)
 				p.stats.GapLimitErrors++
 				p.stats.LastGapLimitError = time.Now()
 				if attempt < 3 {
 					time.Sleep(2 * time.Second)
 					continue
 				}
-				return "", fmt.Errorf("all emergency address generation attempts returned funded addresses - gap limit crisis")
+				return "", fmt.Errorf("all emergency address generation attempts returned used addresses - gap limit crisis")
 			}
 
 			// Success - clean address generated
@@ -340,16 +340,16 @@ func (p *AddressPool) refillPool() {
 			continue
 		}
 
-		// CRITICAL: Check if Blockonomics recycled an old funded address
+		// CRITICAL: Check if Blockonomics recycled an old used address (balance OR transaction history)
 		// This happens when gap limit forces Blockonomics to reuse old addresses
-		balance, err := GetBitcoinAddressBalanceWithFallbackFresh(addr, blockCypherToken)
+		balance, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(addr)
 		if err != nil {
-			log.Printf("⚠️ WARNING: Could not verify balance for newly generated address %s: %v", addr, err)
-			// Continue anyway - blocking on balance check failures would prevent refills
-		} else if balance > 0 {
-			// CRITICAL: Blockonomics recycled a funded address!
-			log.Printf("🚨 CRITICAL: Blockonomics recycled FUNDED address %s with %d sats!", addr, balance)
-			log.Printf("🚨 This address was used before and still has funds - SKIPPING!")
+			log.Printf("⚠️ WARNING: Could not verify address %s: %v", addr, err)
+			// Continue anyway - blocking on check failures would prevent refills
+		} else if balance > 0 || txCount > 0 {
+			// CRITICAL: Blockonomics recycled a used address!
+			log.Printf("🚨 CRITICAL: Blockonomics recycled USED address %s (balance: %d sats, txs: %d)!", addr, balance, txCount)
+			log.Printf("🚨 This address was used before - SKIPPING!")
 			log.Printf("🚨 Gap limit reached - need to resolve unpaid addresses")
 
 			p.mu.Lock()
@@ -731,28 +731,33 @@ func (p *AddressPool) ExportUsedAddressesCSV(filter string) string {
 	return csv
 }
 
-// checkAddressBalance verifies if an address has received funds
-// CRITICAL: Uses FRESH balance check (bypasses cache) to prevent recycling funded addresses
+// checkAddressBalance verifies if an address has received funds OR has transaction history
+// CRITICAL: Uses Mempool.space to check BOTH balance AND transaction count
+// This prevents recycling ANY address that has been used before (even if empty)
 func (p *AddressPool) checkAddressBalance(address string) bool {
-	// CRITICAL FIX: Use FRESH balance check, NOT cached data
-	// This prevents recycling addresses that received late payments
-	balance, err := GetBitcoinAddressBalanceWithFallbackFresh(address, blockCypherToken)
+	// Use Mempool.space for fast, reliable balance AND transaction history check
+	balance, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(address)
 	if err != nil {
-		// If we can't check balance, be conservative and assume it might have funds
+		// If we can't check, be conservative and assume it might be used
 		// This prevents recycling addresses we can't verify
-		log.Printf("⚠️ WARNING: Could not check balance for address %s during recycling: %v", address, err)
-		log.Printf("⚠️ Treating as FUNDED (will NOT recycle) to be safe")
+		log.Printf("⚠️ WARNING: Could not check address %s during recycling: %v", address, err)
+		log.Printf("⚠️ Treating as USED (will NOT recycle) to be safe")
 		return true
 	}
 
+	// Check BOTH balance AND transaction history
 	if balance > 0 {
-		log.Printf("🚨 Address %s has BALANCE: %d satoshis - will NOT recycle", address, balance)
-	} else {
-		log.Printf("✅ Address %s confirmed clean (0 balance) - safe to recycle", address)
+		log.Printf("🚨 Address %s has BALANCE: %d satoshis (%d txs) - will NOT recycle", address, balance, txCount)
+		return true
 	}
 
-	// Consider any balance > 0 satoshis as "has funds"
-	return balance > 0
+	if txCount > 0 {
+		log.Printf("🚨 Address %s has TRANSACTION HISTORY: %d transactions (balance: %d sats) - will NOT recycle", address, txCount, balance)
+		return true
+	}
+
+	log.Printf("✅ Address %s confirmed CLEAN (0 balance, 0 txs) - safe to recycle", address)
+	return false
 }
 
 // RecycleExpiredReservations returns the count of recycled addresses for admin feedback
