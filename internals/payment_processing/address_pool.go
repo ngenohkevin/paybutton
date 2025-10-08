@@ -126,24 +126,54 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 
 	// Get address from pool
 	if len(p.availableAddrs) == 0 {
-		// Try to generate one address urgently
-		addr, err := p.generateSingleAddress()
-		if err != nil {
-			p.stats.GapLimitErrors++
-			p.stats.LastGapLimitError = time.Now()
-			return "", fmt.Errorf("no addresses available in pool and failed to generate: %v", err)
+		// EMERGENCY: Pool is empty, need to generate address urgently
+		log.Printf("⚠️ POOL EMPTY: Generating emergency address for %s (this will be slow)", email)
+
+		// Try up to 3 times to get a clean address
+		for attempt := 1; attempt <= 3; attempt++ {
+			addr, err := p.generateSingleAddress()
+			if err != nil {
+				p.stats.GapLimitErrors++
+				p.stats.LastGapLimitError = time.Now()
+				log.Printf("Emergency generation attempt %d/3 failed: %v", attempt, err)
+				if attempt == 3 {
+					return "", fmt.Errorf("no addresses available in pool and failed to generate after 3 attempts: %v", err)
+				}
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			// CRITICAL: Check if Blockonomics recycled a funded address
+			balance, err := GetBitcoinAddressBalanceWithFallbackFresh(addr, blockCypherToken)
+			if err != nil {
+				log.Printf("⚠️ WARNING: Could not verify balance for emergency address %s: %v", addr, err)
+				// Accept anyway in emergency (user is waiting)
+			} else if balance > 0 {
+				log.Printf("🚨 CRITICAL: Emergency generation got FUNDED address %s with %d sats (attempt %d/3)", addr, balance, attempt)
+				p.stats.GapLimitErrors++
+				p.stats.LastGapLimitError = time.Now()
+				if attempt < 3 {
+					time.Sleep(2 * time.Second)
+					continue
+				}
+				return "", fmt.Errorf("all emergency address generation attempts returned funded addresses - gap limit crisis")
+			}
+
+			// Success - clean address generated
+			now := time.Now()
+			poolAddr := &PoolAddress{
+				Address:     addr,
+				CreatedAt:   now,
+				ReservedAt:  &now,
+				ReservedFor: email,
+				Amount:      amount,
+			}
+			p.reservedAddrs[addr] = poolAddr
+			log.Printf("✅ Emergency address %s generated successfully for %s", addr, email)
+			return addr, nil
 		}
 
-		now := time.Now()
-		poolAddr := &PoolAddress{
-			Address:     addr,
-			CreatedAt:   now,
-			ReservedAt:  &now,
-			ReservedFor: email,
-			Amount:      amount,
-		}
-		p.reservedAddrs[addr] = poolAddr
-		return addr, nil
+		return "", fmt.Errorf("failed to generate clean emergency address after 3 attempts")
 	}
 
 	// Take address from pool, but ensure it's not already used
@@ -308,6 +338,28 @@ func (p *AddressPool) refillPool() {
 				break
 			}
 			continue
+		}
+
+		// CRITICAL: Check if Blockonomics recycled an old funded address
+		// This happens when gap limit forces Blockonomics to reuse old addresses
+		balance, err := GetBitcoinAddressBalanceWithFallbackFresh(addr, blockCypherToken)
+		if err != nil {
+			log.Printf("⚠️ WARNING: Could not verify balance for newly generated address %s: %v", addr, err)
+			// Continue anyway - blocking on balance check failures would prevent refills
+		} else if balance > 0 {
+			// CRITICAL: Blockonomics recycled a funded address!
+			log.Printf("🚨 CRITICAL: Blockonomics recycled FUNDED address %s with %d sats!", addr, balance)
+			log.Printf("🚨 This address was used before and still has funds - SKIPPING!")
+			log.Printf("🚨 Gap limit reached - need to resolve unpaid addresses")
+
+			p.mu.Lock()
+			p.stats.GapLimitErrors++
+			p.stats.LastGapLimitError = time.Now()
+			p.mu.Unlock()
+
+			failures++
+			// TODO: Send Telegram alert to admin
+			continue // Skip this address, don't add to pool
 		}
 
 		p.mu.Lock()
@@ -488,6 +540,21 @@ func (p *AddressPool) ForceRefill() error {
 				continue
 			}
 
+			// CRITICAL: Check if Blockonomics recycled an old funded address
+			balance, err := GetBitcoinAddressBalanceWithFallbackFresh(addr, blockCypherToken)
+			if err != nil {
+				log.Printf("⚠️ WARNING: Could not verify balance for address %s during manual refill: %v", addr, err)
+				// Continue anyway
+			} else if balance > 0 {
+				log.Printf("🚨 CRITICAL: Manual refill got FUNDED address %s with %d sats - SKIPPING!", addr, balance)
+				p.mu.Lock()
+				p.stats.GapLimitErrors++
+				p.stats.LastGapLimitError = time.Now()
+				p.mu.Unlock()
+				failures++
+				continue
+			}
+
 			p.mu.Lock()
 			p.availableAddrs = append(p.availableAddrs, PoolAddress{
 				Address:   addr,
@@ -665,13 +732,23 @@ func (p *AddressPool) ExportUsedAddressesCSV(filter string) string {
 }
 
 // checkAddressBalance verifies if an address has received funds
+// CRITICAL: Uses FRESH balance check (bypasses cache) to prevent recycling funded addresses
 func (p *AddressPool) checkAddressBalance(address string) bool {
-	// Use the existing balance checking function from balance_ops.go
-	balance, err := GetBitcoinAddressBalanceWithFallback(address, blockCypherToken)
+	// CRITICAL FIX: Use FRESH balance check, NOT cached data
+	// This prevents recycling addresses that received late payments
+	balance, err := GetBitcoinAddressBalanceWithFallbackFresh(address, blockCypherToken)
 	if err != nil {
 		// If we can't check balance, be conservative and assume it might have funds
-		log.Printf("Warning: Could not check balance for address %s during recycling: %v", address, err)
+		// This prevents recycling addresses we can't verify
+		log.Printf("⚠️ WARNING: Could not check balance for address %s during recycling: %v", address, err)
+		log.Printf("⚠️ Treating as FUNDED (will NOT recycle) to be safe")
 		return true
+	}
+
+	if balance > 0 {
+		log.Printf("🚨 Address %s has BALANCE: %d satoshis - will NOT recycle", address, balance)
+	} else {
+		log.Printf("✅ Address %s confirmed clean (0 balance) - safe to recycle", address)
 	}
 
 	// Consider any balance > 0 satoshis as "has funds"

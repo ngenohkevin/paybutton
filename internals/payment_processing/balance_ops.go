@@ -449,6 +449,13 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 	}
 }
 
+// GetBitcoinAddressBalanceWithFallbackFresh - Gets balance WITHOUT using cache
+// Used for critical operations like address recycling where stale data could cause issues
+func GetBitcoinAddressBalanceWithFallbackFresh(address, token string) (int64, error) {
+	log.Printf("🔍 FRESH balance check for %s (bypassing cache)", address)
+	return getBitcoinAddressBalanceInternal(address, token, false)
+}
+
 func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) {
 	// Check cache first
 	cache := payments2.GetBalanceCache()
@@ -456,6 +463,12 @@ func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 		log.Printf("Using cached balance for address %s: %d satoshis", address, cachedBalance)
 		return cachedBalance, nil
 	}
+
+	return getBitcoinAddressBalanceInternal(address, token, true)
+}
+
+// getBitcoinAddressBalanceInternal - Internal function that does the actual balance checking
+func getBitcoinAddressBalanceInternal(address, token string, useCache bool) (int64, error) {
 
 	circuitManager := payments2.GetCircuitBreakerManager()
 
@@ -492,10 +505,13 @@ func GetBitcoinAddressBalanceWithFallback(address, token string) (int64, error) 
 			continue
 		}
 
-		// Success - record it, cache it, and return
+		// Success - record it, optionally cache it, and return
 		circuitManager.OnSuccess(provider.name)
-		cache.Set(address, balance)
-		log.Printf("Balance check via %s for %s: %d satoshis", provider.name, address, balance)
+		if useCache {
+			cache := payments2.GetBalanceCache()
+			cache.Set(address, balance)
+		}
+		log.Printf("Balance check via %s for %s: %d satoshis (cached: %v)", provider.name, address, balance, useCache)
 		return balance, nil
 	}
 
