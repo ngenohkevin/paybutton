@@ -20,4 +20,9 @@ main
 test-analytics.html
 test_analytics.html
 test_analytics_production.html
+test-analytics-tracking.html
 test_build
+test_build_*
+paybutton
+gap_recovery_data.json
+check_funded_addresses.sh
