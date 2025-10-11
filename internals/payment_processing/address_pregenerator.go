@@ -291,6 +291,19 @@ func generateAddressForSite(site string, index int) (string, int, error) {
 		// Check if address has ANY history (balance OR transactions)
 		if balance > 0 || txCount > 0 {
 			log.Printf("🚨 CRITICAL: Address %s at index %d has HISTORY (balance: %d sats, txs: %d) - SKIPPING", address, currentIndex, balance, txCount)
+
+			// Mark this index as skipped in the pool to prevent gap limit counting
+			pool := GetSitePool(site)
+			pool.mutex.Lock()
+			pool.addresses[address] = &PooledAddress{
+				Address:     address,
+				Site:        site,
+				Status:      AddressStatusSkipped,
+				Index:       currentIndex,
+				LastChecked: time.Now(),
+			}
+			pool.mutex.Unlock()
+
 			log.Printf("🚨 Trying next index %d for site %s", currentIndex+1, site)
 			continue // Try next index
 		}

@@ -16,6 +16,7 @@ const (
 	AddressStatusReserved  AddressStatus = "reserved"  // Assigned, waiting for payment
 	AddressStatusUsed      AddressStatus = "used"      // Payment received
 	AddressStatusExpired   AddressStatus = "expired"   // 72h passed, ready to recycle
+	AddressStatusSkipped   AddressStatus = "skipped"   // Has history, permanently skipped
 )
 
 type PooledAddress struct {
@@ -304,17 +305,30 @@ func (p *SiteAddressPool) GetGapLimitStatus() (consecutiveUnpaid int, isAtRisk b
 	unpaidStreak := 0
 	maxStreak := 0
 
-	// Check consecutive unpaid addresses
+	// Check consecutive unpaid addresses (excluding skipped addresses with history)
 	for i := config.StartIndex; i < p.nextIndex && i <= config.EndIndex; i++ {
-		found := false
+		foundPaid := false
+		foundSkipped := false
+
 		for _, addr := range p.addresses {
-			if addr.Index == i && addr.Status == AddressStatusUsed {
-				found = true
-				unpaidStreak = 0
-				break
+			if addr.Index == i {
+				if addr.Status == AddressStatusUsed {
+					// Paid address - reset streak
+					foundPaid = true
+					unpaidStreak = 0
+					break
+				} else if addr.Status == AddressStatusSkipped {
+					// Skipped address (has history) - treat as "paid" for gap limit purposes
+					// This prevents skipped addresses from counting toward gap limit
+					foundSkipped = true
+					unpaidStreak = 0
+					break
+				}
 			}
 		}
-		if !found {
+
+		// Only count as unpaid if it's not paid AND not skipped
+		if !foundPaid && !foundSkipped {
 			unpaidStreak++
 			if unpaidStreak > maxStreak {
 				maxStreak = unpaidStreak
