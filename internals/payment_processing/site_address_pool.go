@@ -5,6 +5,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com/ngenohkevin/paybutton/internals/payments"
 )
 
 type AddressStatus string
@@ -111,6 +113,38 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 		p.availableQueue = p.availableQueue[1:]
 
 		pooledAddr := p.addresses[address]
+
+		// SMART RE-CHECK: Only verify if address has been sitting in pool for a while
+		// Recent addresses (< 10 min) are trusted, old ones get re-checked for safety
+		addressAge := now.Sub(pooledAddr.LastChecked)
+		needsRecheck := addressAge > 10*time.Minute
+
+		if needsRecheck {
+			// Address has been in pool > 10 min, do quick safety check
+			balance, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(address)
+			if err != nil {
+				// If check fails, use address anyway (already verified during generation)
+				log.Printf("⚠️ Warning: Could not re-verify old pooled address %s (age: %v): %v",
+					address, addressAge.Round(time.Minute), err)
+			} else if balance > 0 || txCount > 0 {
+				// CRITICAL: Pooled address was compromised!
+				log.Printf("🚨 CRITICAL: Old pooled address %s has HISTORY (balance: %d, txs: %d) - SKIPPING!",
+					address, balance, txCount)
+				log.Printf("🚨 Address age: %v - this should never happen!", addressAge.Round(time.Minute))
+
+				// Try to get another address from pool
+				if len(p.availableQueue) > 0 {
+					return p.GetOrReuseAddress(email, amount) // Recursive call to try next address
+				}
+				// No more pool addresses, fall through to on-demand generation
+				log.Printf("⚠️ Pool exhausted, generating on-demand for %s", email)
+			} else {
+				log.Printf("✅ Re-verified old pooled address %s (age: %v) - clean",
+					address, addressAge.Round(time.Minute))
+			}
+		}
+
+		// Address is clean (either recent or re-verified), assign it
 		pooledAddr.Email = email
 		pooledAddr.Status = AddressStatusReserved
 		pooledAddr.ReservedAt = now
@@ -118,8 +152,13 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 
 		p.emailToAddress[email] = address
 
-		log.Printf("Assigned pooled address %s to %s on %s (pool size: %d remaining)",
-			address, email, p.site, len(p.availableQueue))
+		if needsRecheck {
+			log.Printf("Assigned re-verified pooled address %s to %s on %s (pool size: %d remaining)",
+				address, email, p.site, len(p.availableQueue))
+		} else {
+			log.Printf("Assigned pooled address %s to %s on %s (pool size: %d remaining) ⚡ INSTANT",
+				address, email, p.site, len(p.availableQueue))
+		}
 		return address, nil
 	}
 
@@ -134,7 +173,8 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	}
 
 	// Generate the address using the site-specific index
-	address, err := generateAddressForSite(p.site, p.nextIndex)
+	// This will automatically skip addresses with transaction history
+	address, actualIndex, err := generateAddressForSite(p.site, p.nextIndex)
 	if err != nil {
 		log.Printf("Failed to generate on-demand address for %s on %s: %v", email, p.site, err)
 		return "", err
@@ -148,13 +188,13 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 		Status:      AddressStatusReserved,
 		ReservedAt:  now,
 		LastChecked: now,
-		Index:       p.nextIndex,
+		Index:       actualIndex,
 	}
 
-	// Store in pool and increment index
+	// Store in pool and update index to the next one after the actually used index
 	p.addresses[address] = pooledAddr
 	p.emailToAddress[email] = address
-	p.nextIndex++
+	p.nextIndex = actualIndex + 1
 
 	// Register address-to-site mapping
 	RegisterAddressForSite(address, p.site)
@@ -190,6 +230,7 @@ func RecycleExpiredAddresses() {
 
 		now := time.Now()
 		recycled := 0
+		skipped := 0
 
 		for address, addr := range pool.addresses {
 			// Recycle addresses that are:
@@ -198,8 +239,38 @@ func RecycleExpiredAddresses() {
 			if addr.Status == AddressStatusReserved &&
 				now.Sub(addr.ReservedAt) > 72*time.Hour {
 
-				log.Printf("Recycling expired address %s from %s on %s (age: %v)",
+				log.Printf("Attempting to recycle expired address %s from %s on %s (age: %v)",
 					address, addr.Email, siteName, now.Sub(addr.ReservedAt))
+
+				// CRITICAL: Check if address received payment during the 72 hours
+				// Someone might have paid after the monitoring stopped
+				balance, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(address)
+				if err != nil {
+					log.Printf("⚠️ WARNING: Could not verify address %s during recycling: %v", address, err)
+					log.Printf("⚠️ Skipping recycling to be safe (will retry next hour)")
+					skipped++
+					continue
+				}
+
+				if balance > 0 || txCount > 0 {
+					// Address received payment! Don't recycle, mark as USED
+					log.Printf("🚨 Address %s received late payment (balance: %d, txs: %d) - marking as USED instead of recycling",
+						address, balance, txCount)
+
+					addr.Status = AddressStatusUsed
+					addr.PaymentCount++
+
+					// Remove from email mapping
+					if addr.Email != "" {
+						delete(pool.emailToAddress, addr.Email)
+					}
+
+					skipped++
+					continue
+				}
+
+				// Address is clean, safe to recycle
+				log.Printf("✅ Address %s verified clean (0 balance, 0 txs) - recycling to pool", address)
 
 				// Remove from current user
 				if addr.Email != "" {
@@ -209,6 +280,7 @@ func RecycleExpiredAddresses() {
 				// Mark as available and add back to queue
 				addr.Status = AddressStatusAvailable
 				addr.Email = ""
+				addr.LastChecked = now // Update last checked time for age-based re-verification
 				pool.availableQueue = append(pool.availableQueue, address)
 				recycled++
 			}
@@ -216,8 +288,9 @@ func RecycleExpiredAddresses() {
 
 		pool.mutex.Unlock()
 
-		if recycled > 0 {
-			log.Printf("Recycled %d addresses for site %s - preventing gap limit", recycled, siteName)
+		if recycled > 0 || skipped > 0 {
+			log.Printf("Recycling complete for site %s: %d recycled (clean), %d skipped (late payment/error)",
+				siteName, recycled, skipped)
 		}
 	}
 }
