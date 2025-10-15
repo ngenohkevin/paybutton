@@ -453,8 +453,12 @@ func cleanupExpiredPayments() {
 			log.Printf("❌ Failed to mark payment %s as expired: %v", payment.PaymentID, err)
 			continue
 		}
+		emailStr := "N/A"
+		if payment.Email != nil {
+			emailStr = *payment.Email
+		}
 		log.Printf("⏰ Marked payment %s as expired (address: %s, email: %s)",
-			payment.PaymentID, payment.Address, payment.Email)
+			payment.PaymentID, payment.Address, emailStr)
 	}
 
 	log.Printf("✅ Cleanup complete: marked %d payments as expired", len(expiredPayments))
