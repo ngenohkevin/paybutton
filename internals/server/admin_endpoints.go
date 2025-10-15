@@ -3924,6 +3924,8 @@ func getGapLimitStatus(c *gin.Context) {
 			"pool_size":        poolStats.CurrentPoolSize,
 			"gap_limit_errors": poolStats.GapLimitErrors,
 			"should_fallback":  gapStats["should_use_fallback"],
+			"utilization":      calculateUtilization(poolStats),
+			"total_sites":      len(sites),
 		},
 		"main_pool": map[string]interface{}{
 			"total_generated":     poolStats.TotalGenerated,
