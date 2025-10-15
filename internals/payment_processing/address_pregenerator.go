@@ -1,10 +1,12 @@
 package payment_processing
 
 import (
+	"context"
 	"fmt"
-	"github.com/ngenohkevin/paybutton/internals/payments"
 	"log"
 	"time"
+
+	"github.com/ngenohkevin/paybutton/internals/payments"
 )
 
 // PreGenerateAddressPool - Generate addresses in bulk to avoid gaps
@@ -87,6 +89,25 @@ func PreGenerateAddressPool(site string, count int) error {
 func InitializeAddressPools() {
 	log.Println("Initializing address pools for all sites...")
 
+	// Initialize persistence layer
+	persistence := NewPoolPersistence()
+
+	// Load state from database if enabled
+	if persistence.IsEnabled() {
+		log.Println("Loading address pools from database...")
+		for siteName := range SiteRegistry {
+			pool := GetSitePool(siteName)
+			pool.persistence = persistence
+
+			if err := pool.LoadFromDatabase(); err != nil {
+				log.Printf("⚠️ Failed to load pool state for %s: %v", siteName, err)
+				log.Printf("⚠️ Starting fresh for %s", siteName)
+			}
+		}
+	} else {
+		log.Println("Database persistence disabled - running in memory-only mode")
+	}
+
 	// PRE-GENERATE addresses with history checks in background
 	// This provides instant address assignment while ensuring clean addresses
 	log.Println("Starting background address pre-generation with history verification...")
@@ -94,6 +115,10 @@ func InitializeAddressPools() {
 	// Start background pool maintainer for each site
 	for siteName := range SiteRegistry {
 		site := siteName // Capture for goroutine
+		pool := GetSitePool(site)
+		if pool.persistence == nil {
+			pool.persistence = persistence // Ensure all pools have persistence reference
+		}
 		go maintainSiteAddressPool(site)
 	}
 
@@ -133,14 +158,27 @@ func maintainSiteAddressPool(site string) {
 	maxPoolSize := 10 // Maximum to pre-generate
 	refillThreshold := 3 // Refill when pool drops to this size
 
-	// Initial generation
-	log.Printf("Pre-generating initial address pool for site %s...", site)
-	if err := refillSitePool(site, minPoolSize, maxPoolSize); err != nil {
-		log.Printf("Warning: Initial pool generation for %s failed: %v", site, err)
+	// Check if pool already has addresses from database before generating
+	pool := GetSitePool(site)
+	pool.mutex.RLock()
+	currentSize := len(pool.availableQueue)
+	pool.mutex.RUnlock()
+
+	// Only generate if pool is below threshold (avoid generating on every restart)
+	if currentSize >= refillThreshold {
+		log.Printf("Skipping initial generation for %s - pool already has %d addresses (threshold: %d)",
+			site, currentSize, refillThreshold)
+	} else {
+		// Initial generation only when truly needed
+		log.Printf("Pre-generating initial address pool for site %s (current: %d, need: %d)...",
+			site, currentSize, minPoolSize)
+		if err := refillSitePool(site, minPoolSize, maxPoolSize); err != nil {
+			log.Printf("Warning: Initial pool generation for %s failed: %v", site, err)
+		}
 	}
 
-	// Monitor and refill every 5 minutes
-	ticker := time.NewTicker(5 * time.Minute)
+	// Monitor and refill every 30 minutes (reduced from 5 to save CPU/API calls)
+	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -222,6 +260,15 @@ func refillSitePool(site string, minSize, maxSize int) error {
 		pool.availableQueue = append(pool.availableQueue, address)
 		pool.nextIndex = actualIndex + 1
 
+		// Save to database
+		if pool.persistence != nil && pool.persistence.IsEnabled() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = pool.persistence.SaveAddress(ctx, pooledAddr)
+			_ = pool.persistence.AddToQueue(ctx, site, address)
+			_ = pool.persistence.SavePoolState(ctx, site, pool.nextIndex)
+			cancel()
+		}
+
 		pool.mutex.Unlock()
 
 		// Register address-to-site mapping
@@ -233,8 +280,8 @@ func refillSitePool(site string, minSize, maxSize int) error {
 		log.Printf("✅ Added verified address %s to pool for %s (pool size: %d/%d)",
 			address, site, currentSize+generated, minSize)
 
-		// Small delay to avoid rate limiting mempool.space
-		time.Sleep(1 * time.Second)
+		// Increased delay to reduce CPU and API load (from 1s to 3s)
+		time.Sleep(3 * time.Second)
 	}
 
 	if generated > 0 {
@@ -295,13 +342,22 @@ func generateAddressForSite(site string, index int) (string, int, error) {
 			// Mark this index as skipped in the pool to prevent gap limit counting
 			pool := GetSitePool(site)
 			pool.mutex.Lock()
-			pool.addresses[address] = &PooledAddress{
+			skippedAddr := &PooledAddress{
 				Address:     address,
 				Site:        site,
 				Status:      AddressStatusSkipped,
 				Index:       currentIndex,
 				LastChecked: time.Now(),
 			}
+			pool.addresses[address] = skippedAddr
+
+			// Save to database
+			if pool.persistence != nil && pool.persistence.IsEnabled() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = pool.persistence.SaveAddress(ctx, skippedAddr)
+				cancel()
+			}
+
 			pool.mutex.Unlock()
 
 			log.Printf("🚨 Trying next index %d for site %s", currentIndex+1, site)

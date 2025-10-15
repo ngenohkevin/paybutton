@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/ngenohkevin/paybutton/internals/analytics"
 	"github.com/ngenohkevin/paybutton/internals/config"
+	"github.com/ngenohkevin/paybutton/internals/database"
 	"github.com/ngenohkevin/paybutton/internals/monitoring"
 	"github.com/ngenohkevin/paybutton/internals/payment_processing"
 	"github.com/ngenohkevin/paybutton/internals/payments"
@@ -37,7 +39,9 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	// Protected admin routes
 	admin.Use(auth.AdminMiddleware())
 	admin.GET("/", func(c *gin.Context) { c.Redirect(http.StatusFound, "/admin/dashboard") })
-	admin.GET("/dashboard", auth.DashboardHandler)
+	// Use new database-backed dashboard handler
+	admin.GET("/dashboard", auth.DashboardHandlerDB)
+	admin.GET("/api/dashboard-stats", GetDashboardStatsAPI)
 
 	// WebSocket endpoint for real-time updates
 	admin.GET("/ws", handleAdminWebSocket)
@@ -107,6 +111,8 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	admin.GET("/api/site-pools/stats", getSitePoolStats)
 	admin.GET("/api/gap-limit/status", getGapLimitStatus)
 	admin.GET("/api/pool/detailed", getDetailedPoolInfo)
+	admin.GET("/api/pool/recycling-stats", getPoolRecyclingStatsAPI)
+	admin.GET("/api/pool/recent-activity", getRecentAddressActivityAPI)
 
 	// Logs management endpoints
 	admin.GET("/logs", getLogsPage)
@@ -143,6 +149,14 @@ func RegisterAdminEndpoints(router *gin.Engine, auth *AdminAuth) {
 	configAPI.POST("/update-section", updateConfigurationSection)
 	configAPI.POST("/reset-defaults", resetToDefaultConfiguration)
 	configAPI.POST("/rollback", rollbackConfiguration)
+
+	// Payment Tracking endpoints - use database-backed handlers
+	admin.GET("/payments", getPaymentsPageDB)
+	paymentAPI := admin.Group("/api/payments")
+	paymentAPI.GET("", GetPaymentsAPIHandler)
+	paymentAPI.GET("/stats", GetPaymentStatsAPIHandler)
+	paymentAPI.GET("/:id", GetPaymentDetailsAPIHandler)
+	paymentAPI.GET("/export", exportPaymentsAPI) // Keep export as is for now
 
 	// Session management endpoints
 	admin.GET("/sessions", getSessionsPage)
@@ -190,10 +204,20 @@ func getSystemStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, status)
 }
 
-// getPoolStats returns address pool statistics
+// getPoolStats returns address pool statistics from database
 func getPoolStats(c *gin.Context) {
-	pool := payment_processing.GetAddressPool()
-	stats := pool.GetStats()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stats, err := GetPoolStatsFromDB(ctx)
+	if err != nil {
+		log.Printf("Error fetching pool stats from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to fetch pool statistics",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, stats)
 }
 
@@ -309,9 +333,32 @@ func getSystemStatusHTML(c *gin.Context) {
 	gap := payment_processing.GetGapMonitor()
 	limiter := payment_processing.GetRateLimiter()
 
-	poolStats := pool.GetStats()
 	gapStats := gap.GetStats()
 	limiterStats := limiter.GetStats()
+
+	// Fetch pool stats from database instead of in-memory
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Get pool stats from database
+	poolStatsDB, err := GetPoolStatsFromDB(ctx)
+	var currentPoolSize int = 0
+	var totalGenerated int = 0
+	var recycledAddresses int64 = 0
+
+	if err != nil {
+		log.Printf("Error fetching pool stats from DB in getSystemStatusHTML: %v", err)
+		// Fallback to in-memory pool if DB fails
+		poolStats := pool.GetStats()
+		currentPoolSize = poolStats.CurrentPoolSize
+		totalGenerated = poolStats.TotalGenerated
+	} else {
+		currentPoolSize = poolStatsDB.CurrentPoolSize
+		totalGenerated = poolStatsDB.TotalGenerated
+		recycledAddresses = poolStatsDB.RecycledAddresses
+		log.Printf("DEBUG getSystemStatusHTML: Using DB stats - CurrentPoolSize=%d, TotalGenerated=%d, Recycled=%d",
+			currentPoolSize, totalGenerated, recycledAddresses)
+	}
 
 	// Generate HTML response
 	html := fmt.Sprintf(`
@@ -711,9 +758,9 @@ func getSystemStatusHTML(c *gin.Context) {
 			</div>
 		</div>
 	</div>`,
-		poolStats.CurrentPoolSize,
-		poolStats.TotalGenerated,
-		poolStats.TotalRecycled,
+		currentPoolSize,    // From database
+		totalGenerated,     // From database
+		recycledAddresses,  // From database
 		getGapRatioColor(gapStats),
 		getGapRatioDisplay(gapStats),
 		getPaidAddresses(gapStats),
@@ -925,7 +972,18 @@ func getRateLimiterPage(c *gin.Context) {
 
 // Placeholder functions for HTMX responses
 func getPoolStatsHTML(c *gin.Context) {
-	stats := payment_processing.GetAddressPool().GetStats()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stats, err := GetPoolStatsFromDB(ctx)
+	if err != nil {
+		log.Printf("Error fetching pool stats from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to fetch pool statistics",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, stats)
 }
 
@@ -939,10 +997,23 @@ func getRateLimitStatsHTML(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-// getPoolDetails returns detailed pool information for the management page
+// getPoolDetails returns detailed pool information for the management page from database
 func getPoolDetails(c *gin.Context) {
-	pool := payment_processing.GetAddressPool()
-	details := pool.GetDetailedInfo()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get site from query parameter, default to "default"
+	site := c.DefaultQuery("site", "default")
+	limit := 20 // Limit number of addresses returned
+
+	details, err := GetDetailedPoolInfoFromDB(ctx, site, limit)
+	if err != nil {
+		log.Printf("Error fetching pool details from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to fetch pool details",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, details)
 }
@@ -3966,10 +4037,33 @@ func getGapRecommendations(poolStats payment_processing.PoolStats, gapStats map[
 	return recommendations
 }
 
-// getDetailedPoolInfo returns detailed information about addresses in the pool
+// getDetailedPoolInfo returns detailed information about addresses in the pool from database
 func getDetailedPoolInfo(c *gin.Context) {
-	pool := payment_processing.GetAddressPool()
-	detailed := pool.GetDetailedInfo()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get site from query parameter, default to "default"
+	site := c.DefaultQuery("site", "default")
+	limit := 50 // Show more details for this endpoint
+
+	// If site is "default", get aggregated data across all sites
+	var detailed map[string]interface{}
+	var err error
+
+	if site == "default" {
+		// Get counts across all sites
+		detailed, err = GetDetailedPoolInfoAllSites(ctx, limit)
+	} else {
+		detailed, err = GetDetailedPoolInfoFromDB(ctx, site, limit)
+	}
+
+	if err != nil {
+		log.Printf("Error fetching detailed pool info from DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to fetch detailed pool information",
+		})
+		return
+	}
 
 	// Enhance with balance checks for sample addresses
 	if available, ok := detailed["available"].([]map[string]interface{}); ok {
@@ -4012,23 +4106,40 @@ func getDetailedPoolInfo(c *gin.Context) {
 		}
 	}
 
-	// Add summary statistics
+	// Get overall pool stats for summary
+	poolStats, err := GetPoolStatsFromDB(ctx)
+	if err != nil {
+		log.Printf("Error fetching pool stats for summary: %v", err)
+		// Continue with partial data
+	}
+
+	// Add summary statistics matching frontend expectations
 	summary := map[string]interface{}{
-		"total_available": len(detailed["available"].([]map[string]interface{})),
-		"total_reserved":  len(detailed["reserved"].([]map[string]interface{})),
-		"total_used":      len(detailed["used"].([]map[string]interface{})),
-		"expiring_soon":   countExpiringSoon(detailed["reserved"].([]map[string]interface{})),
-		"already_expired": countExpired(detailed["reserved"].([]map[string]interface{})),
+		"total_addresses":  poolStats.TotalAddresses,
+		"available_count":  detailed["available_count"],
+		"reserved_count":   detailed["reserved_count"],
+		"used_count":       detailed["used_count"],
+		"recycled_count":   poolStats.RecycledAddresses,
+		"next_index":       0, // Will be populated from pool state if needed
+		"expiring_soon":    countExpiringSoon(detailed["reserved"].([]map[string]interface{})),
+		"already_expired":  countExpired(detailed["reserved"].([]map[string]interface{})),
+	}
+
+	// Add pool configuration (currently using default values, can be moved to DB later)
+	config := map[string]interface{}{
+		"min_pool_size":      5,   // Minimum addresses to keep in pool
+		"max_pool_size":      50,  // Maximum addresses in pool
+		"refill_threshold":   3,   // Trigger refill when below this
 	}
 
 	response := map[string]interface{}{
-		"timestamp": time.Now().Format(time.RFC3339),
-		"summary":   summary,
-		"stats":     detailed["stats"],
-		"config":    detailed["config"],
-		"available": detailed["available"],
-		"reserved":  detailed["reserved"],
-		"used":      detailed["used"],
+		"timestamp":       time.Now().Format(time.RFC3339),
+		"summary":         summary,
+		"config":          config,
+		"recycling_stats": detailed["recycling_stats"],
+		"available":       detailed["available"],
+		"reserved":        detailed["reserved"],
+		"used":            detailed["used"],
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -4059,4 +4170,123 @@ func countExpired(reserved []map[string]interface{}) int {
 		}
 	}
 	return count
+}
+
+// getPoolRecyclingStatsAPI returns address recycling statistics from database
+func getPoolRecyclingStatsAPI(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	site := c.DefaultQuery("site", "default")
+
+	if database.Queries == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	stats, err := database.Queries.GetRecyclingStats(ctx, site)
+	if err != nil {
+		log.Printf("Error fetching recycling stats: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch recycling statistics"})
+		return
+	}
+
+	// Extract maxReuseCount from interface{} type
+	maxReuseCount := int32(0)
+	if stats.MaxReuseCount != nil {
+		switch v := stats.MaxReuseCount.(type) {
+		case int32:
+			maxReuseCount = v
+		case int64:
+			maxReuseCount = int32(v)
+		case float64:
+			maxReuseCount = int32(v)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"site":                    site,
+		"reused_addresses":        stats.ReusedAddresses,
+		"recycled_addresses":      stats.RecycledAddresses,
+		"recent_reservations_24h": stats.RecentReservations,
+		"recent_payments_24h":     stats.RecentPayments,
+		"total_payments":          stats.TotalPaymentsProcessed,
+		"max_reuse_count":         maxReuseCount,
+	})
+}
+
+// getRecentAddressActivityAPI returns recent address activity from database
+func getRecentAddressActivityAPI(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	site := c.DefaultQuery("site", "default")
+
+	activities, err := GetRecentAddressActivityFromDB(ctx, site)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Format activities for frontend
+	formattedActivities := make([]gin.H, 0, len(activities))
+	for _, activity := range activities {
+		// Format email (mask if present)
+		email := "N/A"
+		if emailStr, ok := activity["email"].(*string); ok && emailStr != nil && *emailStr != "" {
+			email = *emailStr
+			// Mask email for privacy (show first 3 chars + domain)
+			if len(email) > 5 {
+				atIdx := -1
+				for i, ch := range email {
+					if ch == '@' {
+						atIdx = i
+						break
+					}
+				}
+				if atIdx > 3 {
+					email = email[:3] + "***" + email[atIdx:]
+				}
+			}
+		}
+
+		// Format timestamps
+		var reservedAt, usedAt string
+		if reservedAtTime, ok := activity["reserved_at"].(*time.Time); ok && reservedAtTime != nil {
+			reservedAt = reservedAtTime.Format("2006-01-02 15:04:05")
+		}
+		if usedAtTime, ok := activity["used_at"].(*time.Time); ok && usedAtTime != nil {
+			usedAt = usedAtTime.Format("2006-01-02 15:04:05")
+		}
+
+		// Payment count
+		paymentCount := int32(0)
+		if pc, ok := activity["payment_count"].(*int32); ok && pc != nil {
+			paymentCount = *pc
+		}
+
+		// Last checked
+		lastChecked := ""
+		if lc, ok := activity["last_checked"].(time.Time); ok {
+			lastChecked = lc.Format("2006-01-02 15:04:05")
+		}
+
+		formattedActivities = append(formattedActivities, gin.H{
+			"address":       activity["address"],
+			"site":          activity["site"],
+			"status":        activity["status"],
+			"email":         email,
+			"payment_count": paymentCount,
+			"activity_type": activity["activity_type"],
+			"reserved_at":   reservedAt,
+			"used_at":       usedAt,
+			"last_checked":  lastChecked,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"site":       site,
+		"activities": formattedActivities,
+		"count":      len(formattedActivities),
+	})
 }

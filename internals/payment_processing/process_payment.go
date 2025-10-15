@@ -224,11 +224,42 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 	log.Printf(logMessage)
 
 	// Track session for admin dashboard
+	paymentID := fmt.Sprintf("pay-%s-%d", strings.ReplaceAll(email, "@", "-"), time.Now().Unix())
 	if SessionTracker != nil {
 		sessionID := fmt.Sprintf("%s-%d", address, time.Now().Unix())
 		userAgent := c.GetHeader("User-Agent")
-		paymentID := fmt.Sprintf("pay-%s-%d", strings.ReplaceAll(email, "@", "-"), time.Now().Unix())
 		SessionTracker(sessionID, address, userAgent, clientIP, email, priceUSD, paymentID)
+	}
+
+	// Create payment record in database
+	if generateBtcAddress {
+		paymentPersistence := NewPaymentPersistence()
+		if paymentPersistence.IsEnabled() {
+			ctx := c.Request.Context()
+			expiresAt := time.Now().Add(72 * time.Hour)
+
+			// Get BTC price
+			priceBTC, _ := utils.ConvertToBitcoinUSD(priceUSD)
+
+			_, err := paymentPersistence.CreatePayment(ctx, PaymentParams{
+				PaymentID:             paymentID,
+				Address:               address,
+				Site:                  site,
+				AmountBTC:             priceBTC,
+				AmountUSD:             priceUSD,
+				Currency:              "BTC",
+				Email:                 email,
+				OrderID:               description, // Using description as order ID for now
+				UserAgent:             c.GetHeader("User-Agent"),
+				IPAddress:             clientIP,
+				RequiredConfirmations: 1,
+				ExpiresAt:             expiresAt,
+			})
+
+			if err != nil {
+				log.Printf("Failed to create payment record: %v", err)
+			}
+		}
 	}
 
 	botLogMessage := fmt.Sprintf(
@@ -369,11 +400,40 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		responseData["qr_code"] = fmt.Sprintf("bitcoin:%s", address)
 
 		// Track session for admin dashboard
+		paymentID := fmt.Sprintf("fastpay-%s-%d", strings.ReplaceAll(req.Email, "@", "-"), time.Now().Unix())
 		if SessionTracker != nil {
 			sessionID := fmt.Sprintf("%s-%d", address, time.Now().Unix())
 			userAgent := c.GetHeader("User-Agent")
-			paymentID := fmt.Sprintf("fastpay-%s-%d", strings.ReplaceAll(req.Email, "@", "-"), time.Now().Unix())
 			SessionTracker(sessionID, address, userAgent, clientIP, req.Email, priceUSD, paymentID)
+		}
+
+		// Create payment record in database
+		paymentPersistence := NewPaymentPersistence()
+		if paymentPersistence.IsEnabled() {
+			ctx := c.Request.Context()
+			expiresAt := time.Now().Add(72 * time.Hour)
+
+			// Get BTC price
+			priceBTC, _ := utils.ConvertToBitcoinUSD(priceUSD)
+
+			_, err := paymentPersistence.CreatePayment(ctx, PaymentParams{
+				PaymentID:             paymentID,
+				Address:               address,
+				Site:                  req.Site,
+				AmountBTC:             priceBTC,
+				AmountUSD:             priceUSD,
+				Currency:              "BTC",
+				Email:                 req.Email,
+				OrderID:               req.Description, // Using description as order ID
+				UserAgent:             c.GetHeader("User-Agent"),
+				IPAddress:             clientIP,
+				RequiredConfirmations: 1,
+				ExpiresAt:             expiresAt,
+			})
+
+			if err != nil {
+				log.Printf("Failed to create fast payment record: %v", err)
+			}
 		}
 
 		priceBTC, err := utils.ConvertToBitcoinUSD(priceUSD)

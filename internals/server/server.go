@@ -172,13 +172,25 @@ func (s *Server) Start() error {
 			// We don't need this here, using update.Message.Chat.ID directly
 			// chatID := payment_processing.GetChatID()
 
-			// Handle manual product delivery for USDT and BTC
-			if strings.HasPrefix(message, "/deliver") || strings.HasPrefix(message, "!deliver") {
+			// Handle manual product delivery for USDT and BTC (DWebstore)
+			if strings.HasPrefix(message, "/dwebstore") || strings.HasPrefix(message, "!dwebstore") {
 				// Extract the command part
 				commandParts := strings.SplitN(message, " ", 2)
 				if len(commandParts) < 2 {
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-						"❌ Invalid format. Use:\n/deliver <email> <n> <product>\nor\n/deliver **Email:** `email` **Name:** `name` **Product:** `product`")
+					helpText := "📦 *DWebstore Product Delivery*\n\n" +
+						"Sends digital products with .rpsx file attachments.\n\n" +
+						"*Format 1:* Simple\n" +
+						"`/dwebstore <email> <name> <product>`\n\n" +
+						"*Example:*\n" +
+						"`/dwebstore user@example.com John \"Premium Log\"`\n" +
+						"`/dwebstore buyer@email.com Sarah \"$500 Visa Log\"`\n\n" +
+						"*Format 2:* Notification\n" +
+						"`/dwebstore **Email:** `email` **Name:** `name` **Product:** `product``\n\n" +
+						"*Example:*\n" +
+						"`/dwebstore **Email:** `user@example.com` **Name:** `John` **Product:** `Premium Log``"
+
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpText)
+					msg.ParseMode = tgbotapi.ModeMarkdown
 					safeBotSend(msg)
 					c.JSON(http.StatusOK, gin.H{"ok": true})
 					return
@@ -216,6 +228,67 @@ func (s *Server) Start() error {
 					// Edit the previous message to show success
 					editMsg := tgbotapi.NewEditMessageText(update.Message.Chat.ID, statusMsgSent.MessageID,
 						fmt.Sprintf("✅ Product delivered successfully to %s!", email))
+					safeBotSend(editMsg)
+				}
+			} else if strings.HasPrefix(message, "/kuiper") || strings.HasPrefix(message, "!kuiper") {
+				// Handle manual product delivery for Kuiper store
+				commandParts := strings.SplitN(message, " ", 2)
+				if len(commandParts) < 2 {
+					helpText := "🌌 *Kuiper Product Delivery*\n\n" +
+						"Sends digital products with .lsky file attachments.\n" +
+						"*Special:* Clone Cards get shipping confirmation email instead.\n\n" +
+						"*Format 1:* Simple\n" +
+						"`/kuiper <email> <name> <product>`\n\n" +
+						"*Example:*\n" +
+						"`/kuiper user@example.com John \"$500 Log\"`\n" +
+						"`/kuiper buyer@email.com Sarah \"Clone Cards\"`\n\n" +
+						"*Format 2:* Notification\n" +
+						"`/kuiper **Email:** `email` **Name:** `name` **Product:** `product``\n\n" +
+						"*Example:*\n" +
+						"`/kuiper **Email:** `user@example.com` **Name:** `John` **Product:** `$500 Log``\n\n" +
+						"📧 *Email includes:*\n" +
+						"• Regular products: .lsky file + LSKY decryption tool instructions\n" +
+						"• Clone Cards: Payment confirmation + shipping prep notice"
+
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpText)
+					msg.ParseMode = tgbotapi.ModeMarkdown
+					safeBotSend(msg)
+					c.JSON(http.StatusOK, gin.H{"ok": true})
+					return
+				}
+
+				// Get the command content (everything after the first space)
+				commandContent := commandParts[1]
+
+				// Parse the delivery command
+				email, name, product, err := payment_processing.ParseDeliveryCommand(commandContent)
+				if err != nil {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+						fmt.Sprintf("❌ Failed to parse command: %v", err))
+					safeBotSend(msg)
+					c.JSON(http.StatusOK, gin.H{"ok": true})
+					return
+				}
+
+				// Use default name if empty
+				if name == "" {
+					name = "Customer"
+				}
+
+				// Send the product email with progress indication
+				statusMsg := tgbotapi.NewMessage(update.Message.Chat.ID,
+					fmt.Sprintf("⏳ Processing Kuiper delivery for %s...", email))
+				statusMsgSent, _ := safeBotSend(statusMsg)
+
+				err = payment_processing.HandleManualProductDeliveryWithSite(email, name, product, "kuiper", bot, update.Message.Chat.ID)
+				if err != nil {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+						fmt.Sprintf("❌ Kuiper delivery failed: %v", err))
+					safeBotSend(msg)
+				} else {
+					// Edit the previous message to show success
+					editMsg := tgbotapi.NewEditMessageText(update.Message.Chat.ID, statusMsgSent.MessageID,
+						fmt.Sprintf("✅ Kuiper product delivered successfully to %s!", email))
 					safeBotSend(editMsg)
 				}
 			} else if strings.HasPrefix(message, "/balance") || strings.HasPrefix(message, "!balance") {
@@ -276,20 +349,25 @@ func (s *Server) Start() error {
 				}
 			} else if strings.HasPrefix(message, "/help") || strings.HasPrefix(message, "!help") {
 				// Send help information
-				helpMsg := "Manual Delivery Commands\n\n" +
-					"1. Product Delivery\n" +
-					"   Two formats available:\n\n" +
-					"   /deliver <email> <n> <product>\n" +
-					"   Example: /deliver user@example.com John \"Premium Log\"\n\n" +
-					"   OR\n\n" +
-					"   /deliver <notification>\n" +
-					"   Example: /deliver **Email:** user@example.com **Name:** John **Product:** Premium Log\n\n" +
-					"2. Balance Added Email\n" +
-					"   /balance <email> <n> <amount>\n\n" +
-					"   Example: /balance user@example.com John 49.99\n\n" +
-					"These commands let you manually process USDT or other cryptocurrency transactions."
+				helpMsg := "📋 *Manual Delivery Commands*\n\n" +
+					"*1️⃣ DWebstore Product Delivery (.rpsx files)*\n" +
+					"   `/dwebstore <email> <name> <product>`\n" +
+					"   Example: `/dwebstore user@example.com John \"Premium Log\"`\n\n" +
+					"   OR use notification format:\n" +
+					"   `/dwebstore **Email:** `user@example.com` **Name:** `John` **Product:** `Premium Log``\n\n" +
+					"*2️⃣ Kuiper Product Delivery (.lsky files)*\n" +
+					"   `/kuiper <email> <name> <product>`\n" +
+					"   Example: `/kuiper user@example.com John \"$500 Log\"`\n\n" +
+					"   OR use notification format:\n" +
+					"   `/kuiper **Email:** `user@example.com` **Name:** `John` **Product:** `$500 Log``\n\n" +
+					"   ⚠️ *Special:* Clone Cards orders get shipping confirmation instead of file attachment\n\n" +
+					"*3️⃣ Balance Added Email (Cardershaven)*\n" +
+					"   `/balance <email> <name> <amount>`\n" +
+					"   Example: `/balance user@example.com John 49.99`\n\n" +
+					"*Note:* These commands manually process payments when automatic delivery fails or for USDT transactions."
 
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpMsg)
+				msg.ParseMode = tgbotapi.ModeMarkdown
 				safeBotSend(msg)
 			}
 		}
@@ -441,13 +519,25 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 		if update.Message != nil {
 			message := update.Message.Text
 
-			// Handle manual product delivery for USDT and BTC
-			if strings.HasPrefix(message, "/deliver") || strings.HasPrefix(message, "!deliver") {
+			// Handle manual product delivery for USDT and BTC (DWebstore)
+			if strings.HasPrefix(message, "/dwebstore") || strings.HasPrefix(message, "!dwebstore") {
 				// Extract the command part
 				commandParts := strings.SplitN(message, " ", 2)
 				if len(commandParts) < 2 {
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-						"❌ Invalid format. Use:\n/deliver <email> <n> <product>\nor\n/deliver **Email:** `email` **Name:** `name` **Product:** `product`")
+					helpText := "📦 *DWebstore Product Delivery*\n\n" +
+						"Sends digital products with .rpsx file attachments.\n\n" +
+						"*Format 1:* Simple\n" +
+						"`/dwebstore <email> <name> <product>`\n\n" +
+						"*Example:*\n" +
+						"`/dwebstore user@example.com John \"Premium Log\"`\n" +
+						"`/dwebstore buyer@email.com Sarah \"$500 Visa Log\"`\n\n" +
+						"*Format 2:* Notification\n" +
+						"`/dwebstore **Email:** `email` **Name:** `name` **Product:** `product``\n\n" +
+						"*Example:*\n" +
+						"`/dwebstore **Email:** `user@example.com` **Name:** `John` **Product:** `Premium Log``"
+
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpText)
+					msg.ParseMode = tgbotapi.ModeMarkdown
 					safeBotSend(msg)
 					c.JSON(http.StatusOK, gin.H{"ok": true})
 					return
@@ -485,6 +575,67 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 					// Edit the previous message to show success
 					editMsg := tgbotapi.NewEditMessageText(update.Message.Chat.ID, statusMsgSent.MessageID,
 						fmt.Sprintf("✅ Product delivered successfully to %s!", email))
+					safeBotSend(editMsg)
+				}
+			} else if strings.HasPrefix(message, "/kuiper") || strings.HasPrefix(message, "!kuiper") {
+				// Handle manual product delivery for Kuiper store
+				commandParts := strings.SplitN(message, " ", 2)
+				if len(commandParts) < 2 {
+					helpText := "🌌 *Kuiper Product Delivery*\n\n" +
+						"Sends digital products with .lsky file attachments.\n" +
+						"*Special:* Clone Cards get shipping confirmation email instead.\n\n" +
+						"*Format 1:* Simple\n" +
+						"`/kuiper <email> <name> <product>`\n\n" +
+						"*Example:*\n" +
+						"`/kuiper user@example.com John \"$500 Log\"`\n" +
+						"`/kuiper buyer@email.com Sarah \"Clone Cards\"`\n\n" +
+						"*Format 2:* Notification\n" +
+						"`/kuiper **Email:** `email` **Name:** `name` **Product:** `product``\n\n" +
+						"*Example:*\n" +
+						"`/kuiper **Email:** `user@example.com` **Name:** `John` **Product:** `$500 Log``\n\n" +
+						"📧 *Email includes:*\n" +
+						"• Regular products: .lsky file + LSKY decryption tool instructions\n" +
+						"• Clone Cards: Payment confirmation + shipping prep notice"
+
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpText)
+					msg.ParseMode = tgbotapi.ModeMarkdown
+					safeBotSend(msg)
+					c.JSON(http.StatusOK, gin.H{"ok": true})
+					return
+				}
+
+				// Get the command content (everything after the first space)
+				commandContent := commandParts[1]
+
+				// Parse the delivery command
+				email, name, product, err := payment_processing.ParseDeliveryCommand(commandContent)
+				if err != nil {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+						fmt.Sprintf("❌ Failed to parse command: %v", err))
+					safeBotSend(msg)
+					c.JSON(http.StatusOK, gin.H{"ok": true})
+					return
+				}
+
+				// Use default name if empty
+				if name == "" {
+					name = "Customer"
+				}
+
+				// Send the product email with progress indication
+				statusMsg := tgbotapi.NewMessage(update.Message.Chat.ID,
+					fmt.Sprintf("⏳ Processing Kuiper delivery for %s...", email))
+				statusMsgSent, _ := safeBotSend(statusMsg)
+
+				err = payment_processing.HandleManualProductDeliveryWithSite(email, name, product, "kuiper", bot, update.Message.Chat.ID)
+				if err != nil {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID,
+						fmt.Sprintf("❌ Kuiper delivery failed: %v", err))
+					safeBotSend(msg)
+				} else {
+					// Edit the previous message to show success
+					editMsg := tgbotapi.NewEditMessageText(update.Message.Chat.ID, statusMsgSent.MessageID,
+						fmt.Sprintf("✅ Kuiper product delivered successfully to %s!", email))
 					safeBotSend(editMsg)
 				}
 			} else if strings.HasPrefix(message, "/balance") || strings.HasPrefix(message, "!balance") {
@@ -545,20 +696,25 @@ func (s *Server) StartWithContext(ctx context.Context) error {
 				}
 			} else if strings.HasPrefix(message, "/help") || strings.HasPrefix(message, "!help") {
 				// Send help information
-				helpMsg := "Manual Delivery Commands\n\n" +
-					"1. Product Delivery\n" +
-					"   Two formats available:\n\n" +
-					"   /deliver <email> <n> <product>\n" +
-					"   Example: /deliver user@example.com John \"Premium Log\"\n\n" +
-					"   OR\n\n" +
-					"   /deliver <notification>\n" +
-					"   Example: /deliver **Email:** user@example.com **Name:** John **Product:** Premium Log\n\n" +
-					"2. Balance Added Email\n" +
-					"   /balance <email> <n> <amount>\n\n" +
-					"   Example: /balance user@example.com John 49.99\n\n" +
-					"These commands let you manually process USDT or other cryptocurrency transactions."
+				helpMsg := "📋 *Manual Delivery Commands*\n\n" +
+					"*1️⃣ DWebstore Product Delivery (.rpsx files)*\n" +
+					"   `/dwebstore <email> <name> <product>`\n" +
+					"   Example: `/dwebstore user@example.com John \"Premium Log\"`\n\n" +
+					"   OR use notification format:\n" +
+					"   `/dwebstore **Email:** `user@example.com` **Name:** `John` **Product:** `Premium Log``\n\n" +
+					"*2️⃣ Kuiper Product Delivery (.lsky files)*\n" +
+					"   `/kuiper <email> <name> <product>`\n" +
+					"   Example: `/kuiper user@example.com John \"$500 Log\"`\n\n" +
+					"   OR use notification format:\n" +
+					"   `/kuiper **Email:** `user@example.com` **Name:** `John` **Product:** `$500 Log``\n\n" +
+					"   ⚠️ *Special:* Clone Cards orders get shipping confirmation instead of file attachment\n\n" +
+					"*3️⃣ Balance Added Email (Cardershaven)*\n" +
+					"   `/balance <email> <name> <amount>`\n" +
+					"   Example: `/balance user@example.com John 49.99`\n\n" +
+					"*Note:* These commands manually process payments when automatic delivery fails or for USDT transactions."
 
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpMsg)
+				msg.ParseMode = tgbotapi.ModeMarkdown
 				safeBotSend(msg)
 			}
 		}

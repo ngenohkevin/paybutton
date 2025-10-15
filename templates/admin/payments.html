@@ -1,0 +1,554 @@
+{{define "content"}}
+<div class="animate-fade-in">
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div class="mb-4 sm:mb-0">
+            <h1 class="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
+                <i class="fas fa-dollar-sign mr-3 text-green-600"></i>Payment Tracking
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2 text-sm">Monitor and manage all payment transactions</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <button onclick="refreshPayments()" class="btn btn-secondary">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
+            <button onclick="exportPayments()" class="btn btn-primary">
+                <i class="fas fa-download mr-2"></i>Export CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- Payment Statistics Cards -->
+    <div class="dashboard-grid mb-8">
+        <!-- Total Payments Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-list text-blue-500 mr-2"></i>Total Payments
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-blue-600 dark:text-blue-400" id="total-payments">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">All time</div>
+            </div>
+        </div>
+
+        <!-- Completed Payments Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-check-circle text-green-500 mr-2"></i>Completed
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-green-600 dark:text-green-400" id="completed-payments">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">Successfully processed</div>
+            </div>
+        </div>
+
+        <!-- Pending Payments Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-clock text-yellow-500 mr-2"></i>Pending
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-yellow-600 dark:text-yellow-400" id="pending-payments">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">Awaiting confirmation</div>
+            </div>
+        </div>
+
+        <!-- Total Revenue Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-coins text-purple-500 mr-2"></i>Total Revenue
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-purple-600 dark:text-purple-400" id="total-revenue">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2" id="total-btc">-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="card mb-8">
+        <div class="card-body">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Search -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-search mr-2"></i>Search
+                    </label>
+                    <input type="text" id="search-input" placeholder="Email, address, payment ID..."
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                                  focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           onkeyup="debounceSearch(this.value)">
+                </div>
+
+                <!-- Site Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-globe mr-2"></i>Site
+                    </label>
+                    <select id="site-filter" onchange="filterPayments()"
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                   bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <option value="">All Sites</option>
+                        <option value="dwebstore">DWebStore</option>
+                        <option value="cardershaven">CardersHaven</option>
+                        <option value="ganymede">Ganymede</option>
+                    </select>
+                </div>
+
+                <!-- Status Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-filter mr-2"></i>Status
+                    </label>
+                    <select id="status-filter" onchange="filterPayments()"
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                   bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="detected">Detected</option>
+                        <option value="confirming">Confirming</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="completed">Completed</option>
+                        <option value="expired">Expired</option>
+                    </select>
+                </div>
+
+                <!-- Date Range -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-calendar mr-2"></i>Date Range
+                    </label>
+                    <select id="date-filter" onchange="filterPayments()"
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                   bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="all" selected>All Time</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-table mr-2"></i>Recent Payments
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Payment ID
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Email
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Amount
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Site
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Status
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Created
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="payments-table-body" class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                        <!-- Loading state -->
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center">
+                                <div class="flex flex-col justify-center items-center">
+                                    <div class="loading-spinner mb-4"></div>
+                                    <span class="text-gray-600 dark:text-gray-300">Loading payments...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination" class="mt-6 flex justify-between items-center">
+                <div class="text-sm text-gray-600 dark:text-gray-300">
+                    Showing <span id="showing-from">0</span> to <span id="showing-to">0</span> of <span id="total-records">0</span> payments
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="previousPage()" id="prev-btn" class="btn btn-secondary" disabled>
+                        <i class="fas fa-chevron-left mr-2"></i>Previous
+                    </button>
+                    <button onclick="nextPage()" id="next-btn" class="btn btn-secondary">
+                        Next<i class="fas fa-chevron-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Details Modal -->
+<div id="payment-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-info-circle mr-2 text-blue-600"></i>Payment Details
+                </h2>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div id="payment-details-content">
+                <!-- Details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let pageSize = 20;
+let totalPages = 1;
+let searchTimeout;
+let refreshInterval = null;
+let isPageVisible = !document.hidden;
+
+// Track page visibility for CPU optimization
+document.addEventListener('visibilitychange', function() {
+    isPageVisible = !document.hidden;
+    if (isPageVisible) {
+        // Refresh immediately when tab becomes visible
+        loadPaymentStats();
+        loadPayments();
+    }
+});
+
+// Load payments on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadPaymentStats();
+    loadPayments();
+
+    // Optimized auto-refresh: 60 seconds (reduced from 30s) + visibility check
+    refreshInterval = setInterval(() => {
+        if (isPageVisible) {  // Only refresh visible tabs
+            loadPaymentStats();
+            loadPayments();
+        }
+    }, 60000);
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    if (searchTimeout) clearTimeout(searchTimeout);
+});
+
+// Load payment statistics
+async function loadPaymentStats() {
+    try {
+        const site = document.getElementById('site-filter').value || 'all';
+        const response = await fetch(`/admin/api/payments/stats?site=${site}`);
+        const data = await response.json();
+
+        document.getElementById('total-payments').textContent = data.total_payments || 0;
+        document.getElementById('completed-payments').textContent = data.completed_count || 0;
+        document.getElementById('pending-payments').textContent = data.pending_count || 0;
+        document.getElementById('total-revenue').textContent = '$' + (data.total_usd || 0).toFixed(2);
+        document.getElementById('total-btc').textContent = (data.total_btc || 0).toFixed(8) + ' BTC';
+    } catch (error) {
+        console.error('Failed to load payment stats:', error);
+    }
+}
+
+// Load payments list
+async function loadPayments() {
+    try {
+        const site = document.getElementById('site-filter').value;
+        const status = document.getElementById('status-filter').value;
+        const search = document.getElementById('search-input').value;
+        const dateRange = document.getElementById('date-filter').value;
+
+        const params = new URLSearchParams({
+            page: currentPage,
+            limit: pageSize,
+            site: site,
+            status: status,
+            search: search,
+            date_range: dateRange
+        });
+
+        const response = await fetch(`/admin/api/payments?${params}`);
+        const data = await response.json();
+
+        displayPayments(data.payments || []);
+        updatePagination(data.total || 0);
+    } catch (error) {
+        console.error('Failed to load payments:', error);
+        document.getElementById('payments-table-body').innerHTML = `
+            <tr>
+                <td colspan="7" class="px-6 py-8 text-center text-red-600 dark:text-red-400">
+                    <i class="fas fa-exclamation-circle mr-2"></i>Failed to load payments
+                </td>
+            </tr>
+        `;
+    }
+}
+
+// Display payments in table
+function displayPayments(payments) {
+    const tbody = document.getElementById('payments-table-body');
+
+    if (payments.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="px-6 py-8 text-center text-gray-600 dark:text-gray-300">
+                    <i class="fas fa-inbox mr-2"></i>No payments found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = payments.map(payment => `
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-mono text-gray-900 dark:text-white">
+                    ${payment.payment_id.substring(0, 12)}...
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900 dark:text-white">${payment.email || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                    $${(payment.amount_usd || 0).toFixed(2)}
+                </div>
+                <div class="text-xs text-gray-500">${(payment.amount_btc || 0).toFixed(8)} BTC</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    ${payment.site}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                ${getStatusBadge(payment.status)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                ${formatDate(payment.created_at)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <button onclick="viewPaymentDetails('${payment.payment_id}')" class="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                    <i class="fas fa-eye mr-1"></i>View
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Get status badge HTML
+function getStatusBadge(status) {
+    const badges = {
+        'pending': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-clock mr-1"></i>Pending</span>',
+        'detected': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800"><i class="fas fa-eye mr-1"></i>Detected</span>',
+        'confirming': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800"><i class="fas fa-spinner mr-1"></i>Confirming</span>',
+        'confirmed': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check mr-1"></i>Confirmed</span>',
+        'completed': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-double mr-1"></i>Completed</span>',
+        'expired': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-times mr-1"></i>Expired</span>'
+    };
+    return badges[status] || status;
+}
+
+// Format date
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Update pagination
+function updatePagination(total) {
+    totalPages = Math.ceil(total / pageSize);
+    const from = (currentPage - 1) * pageSize + 1;
+    const to = Math.min(currentPage * pageSize, total);
+
+    document.getElementById('showing-from').textContent = from;
+    document.getElementById('showing-to').textContent = to;
+    document.getElementById('total-records').textContent = total;
+
+    document.getElementById('prev-btn').disabled = currentPage === 1;
+    document.getElementById('next-btn').disabled = currentPage >= totalPages;
+}
+
+// View payment details
+async function viewPaymentDetails(paymentId) {
+    try {
+        const response = await fetch(`/admin/api/payments/${paymentId}`);
+        const payment = await response.json();
+
+        document.getElementById('payment-details-content').innerHTML = `
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Payment ID</label>
+                        <div class="text-sm font-mono text-gray-900 dark:text-white mt-1">${payment.payment_id}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Status</label>
+                        <div class="mt-1">${getStatusBadge(payment.status)}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Email</label>
+                        <div class="text-sm text-gray-900 dark:text-white mt-1">${payment.email || 'N/A'}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Site</label>
+                        <div class="text-sm text-gray-900 dark:text-white mt-1">${payment.site}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Amount (USD)</label>
+                        <div class="text-sm font-semibold text-gray-900 dark:text-white mt-1">$${(payment.amount_usd || 0).toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Amount (BTC)</label>
+                        <div class="text-sm font-semibold text-gray-900 dark:text-white mt-1">${(payment.amount_btc || 0).toFixed(8)} BTC</div>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Bitcoin Address</label>
+                        <div class="text-sm font-mono text-gray-900 dark:text-white mt-1 break-all">${payment.address}</div>
+                    </div>
+                    ${payment.tx_hash ? `
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Transaction Hash</label>
+                            <div class="text-sm font-mono text-gray-900 dark:text-white mt-1 break-all">${payment.tx_hash}</div>
+                        </div>
+                    ` : ''}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Confirmations</label>
+                        <div class="text-sm text-gray-900 dark:text-white mt-1">${payment.confirmations || 0}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Required Confirmations</label>
+                        <div class="text-sm text-gray-900 dark:text-white mt-1">${payment.required_confirmations || 1}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Email Sent</label>
+                        <div class="text-sm mt-1">${payment.email_sent ? '✅ Yes' : '❌ No'}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Telegram Sent</label>
+                        <div class="text-sm mt-1">${payment.telegram_sent ? '✅ Yes' : '❌ No'}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Created At</label>
+                        <div class="text-sm text-gray-900 dark:text-white mt-1">${new Date(payment.created_at).toLocaleString()}</div>
+                    </div>
+                    ${payment.confirmed_at ? `
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Confirmed At</label>
+                            <div class="text-sm text-gray-900 dark:text-white mt-1">${new Date(payment.confirmed_at).toLocaleString()}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        document.getElementById('payment-modal').classList.remove('hidden');
+    } catch (error) {
+        console.error('Failed to load payment details:', error);
+        alert('Failed to load payment details');
+    }
+}
+
+// Close modal
+function closeModal() {
+    document.getElementById('payment-modal').classList.add('hidden');
+}
+
+// Filter payments
+function filterPayments() {
+    currentPage = 1;
+    loadPaymentStats();
+    loadPayments();
+}
+
+// Debounced search
+function debounceSearch(value) {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        currentPage = 1;
+        loadPayments();
+    }, 500);
+}
+
+// Refresh payments
+function refreshPayments() {
+    loadPaymentStats();
+    loadPayments();
+}
+
+// Export payments
+function exportPayments() {
+    const site = document.getElementById('site-filter').value;
+    const status = document.getElementById('status-filter').value;
+    const search = document.getElementById('search-input').value;
+    const dateRange = document.getElementById('date-filter').value;
+
+    const params = new URLSearchParams({
+        site: site,
+        status: status,
+        search: search,
+        date_range: dateRange
+    });
+
+    window.location.href = `/admin/api/payments/export?${params}`;
+}
+
+// Pagination
+function previousPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        loadPayments();
+    }
+}
+
+function nextPage() {
+    if (currentPage < totalPages) {
+        currentPage++;
+        loadPayments();
+    }
+}
+</script>
+{{end}}

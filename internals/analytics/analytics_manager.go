@@ -1049,7 +1049,8 @@ func (am *AnalyticsManager) rotateHourlyDataForSite(siteName string) {
 
 // cleanupRoutine runs periodic cleanup of stale connections
 func (am *AnalyticsManager) cleanupRoutine() {
-	ticker := time.NewTicker(60 * time.Second)
+	// Reduced from 60s to 5 minutes to save CPU - stale connections don't need aggressive cleanup
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	for {

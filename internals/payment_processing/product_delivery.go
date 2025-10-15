@@ -49,24 +49,31 @@ func handleWebhookUpdates(bot *tgbotapi.BotAPI) {
 }
 
 // HandleAutomaticDelivery sends a product email when a payment is confirmed
-// Only delivers products for sites named "Dwebstore"
+// Only delivers products for sites named "Dwebstore" and "Kuiper"
 func HandleAutomaticDelivery(email, userName, productName, site string, bot *tgbotapi.BotAPI) error {
 	log.Printf("Handling automatic delivery request for %s: %s (site: %s)", email, productName, site)
 
 	// Check if site is authorized for automatic product delivery
-	if site != "Dwebstore" && site != "dwebstore" {
+	siteLower := strings.ToLower(site)
+	if siteLower != "dwebstore" && siteLower != "kuiper" {
 		log.Printf("Automatic delivery skipped: site '%s' is not authorized for product delivery", site)
 		return fmt.Errorf("site '%s' is not authorized for automatic product delivery", site)
 	}
 
-	// Send the product email
-	err := utils.ProductEmail(email, userName, productName)
+	// Send the product email based on site
+	var err error
+	if siteLower == "kuiper" {
+		err = utils.KuiperProductEmail(email, userName, productName)
+	} else {
+		err = utils.ProductEmail(email, userName, productName)
+	}
+
 	if err != nil {
 		log.Printf("Error in automatic product delivery: %s", err)
 
 		// Notify the bot of failure
 		if bot != nil {
-			deliveryFailMsg := utils.BuildProductPayloadForBot(email, userName, productName, "failed")
+			deliveryFailMsg := utils.BuildProductPayloadForBot(email, userName, productName, "failed", site)
 			failMsg := tgbotapi.NewMessage(chatID, deliveryFailMsg)
 			failMsg.ParseMode = tgbotapi.ModeMarkdown
 			_, _ = bot.Send(failMsg)
@@ -77,7 +84,7 @@ func HandleAutomaticDelivery(email, userName, productName, site string, bot *tgb
 
 	// Notify the bot of success
 	if bot != nil {
-		deliverySuccessMsg := utils.BuildProductPayloadForBot(email, userName, productName, "delivery")
+		deliverySuccessMsg := utils.BuildProductPayloadForBot(email, userName, productName, "delivery", site)
 		successMsg := tgbotapi.NewMessage(chatID, deliverySuccessMsg)
 		successMsg.ParseMode = tgbotapi.ModeMarkdown
 		_, _ = bot.Send(successMsg)
@@ -89,16 +96,29 @@ func HandleAutomaticDelivery(email, userName, productName, site string, bot *tgb
 
 // HandleManualProductDelivery sends a product delivery manually for USDT payments
 func HandleManualProductDelivery(email, userName, productName string, bot *tgbotapi.BotAPI, chatID int64) error {
-	log.Printf("Handling manual product delivery request for %s: %s", email, productName)
+	// Default to Dwebstore for backward compatibility
+	return HandleManualProductDeliveryWithSite(email, userName, productName, "dwebstore", bot, chatID)
+}
 
-	// Send the product email
-	err := utils.ProductEmail(email, userName, productName)
+// HandleManualProductDeliveryWithSite sends a product delivery manually with site specification
+func HandleManualProductDeliveryWithSite(email, userName, productName, site string, bot *tgbotapi.BotAPI, chatID int64) error {
+	log.Printf("Handling manual product delivery request for %s: %s (site: %s)", email, productName, site)
+
+	// Send the product email based on site
+	siteLower := strings.ToLower(site)
+	var err error
+	if siteLower == "kuiper" {
+		err = utils.KuiperProductEmail(email, userName, productName)
+	} else {
+		err = utils.ProductEmail(email, userName, productName)
+	}
+
 	if err != nil {
 		log.Printf("Error in manual product delivery: %s", err)
 
 		// Notify the bot of failure
 		if bot != nil {
-			deliveryFailMsg := utils.BuildProductPayloadForBot(email, userName, productName, "failed")
+			deliveryFailMsg := utils.BuildProductPayloadForBot(email, userName, productName, "failed", site)
 			failMsg := tgbotapi.NewMessage(chatID, deliveryFailMsg)
 			failMsg.ParseMode = tgbotapi.ModeMarkdown
 			_, _ = bot.Send(failMsg)
@@ -109,13 +129,13 @@ func HandleManualProductDelivery(email, userName, productName string, bot *tgbot
 
 	// Notify the bot of success
 	if bot != nil {
-		deliverySuccessMsg := utils.BuildProductPayloadForBot(email, userName, productName, "delivery")
+		deliverySuccessMsg := utils.BuildProductPayloadForBot(email, userName, productName, "delivery", site)
 		successMsg := tgbotapi.NewMessage(chatID, deliverySuccessMsg)
 		successMsg.ParseMode = tgbotapi.ModeMarkdown
 		_, _ = bot.Send(successMsg)
 	}
 
-	log.Printf("Manual product delivery successful for %s", email)
+	log.Printf("Manual product delivery successful for %s (site: %s)", email, site)
 	return nil
 }
 

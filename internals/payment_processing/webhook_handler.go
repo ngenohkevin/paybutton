@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/ngenohkevin/paybutton/internals/database"
+	dbgen "github.com/ngenohkevin/paybutton/internals/db"
 	"github.com/ngenohkevin/paybutton/utils"
 )
 
@@ -94,6 +95,22 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 		SessionStatusUpdater(payload.Address, "completed")
 	}
 
+	// Update payment record in database
+	paymentPersistence := NewPaymentPersistence()
+	var currentPayment *dbgen.Payment
+	if paymentPersistence.IsEnabled() {
+		ctx := c.Request.Context()
+		payment, err := paymentPersistence.GetPaymentByAddress(ctx, payload.Address)
+		if err == nil && payment != nil {
+			currentPayment = payment
+			// Update with webhook transaction details
+			_ = paymentPersistence.UpdatePaymentTransaction(ctx, payment.PaymentID, payload.TxID, payload.Confirmations)
+			_ = paymentPersistence.UpdatePaymentConfirmed(ctx, payment.PaymentID, payload.Confirmations)
+			_ = paymentPersistence.MarkWebhookSent(ctx, payment.PaymentID)
+			log.Printf("✅ Webhook: Updated payment record %s: confirmed via webhook", payment.PaymentID)
+		}
+	}
+
 	// Send Telegram notification
 	confirmationTime := getCurrentTimestamp()
 	botLogMessage := fmt.Sprintf(
@@ -102,9 +119,12 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 
 	msg := tgbotapi.NewMessage(chatID, botLogMessage)
 	msg.ParseMode = tgbotapi.ModeMarkdown
+	webhookTelegramSent := false
 	_, err = bot.Send(msg)
 	if err != nil {
 		log.Printf("Error sending webhook notification to bot: %s", err)
+	} else {
+		webhookTelegramSent = true
 	}
 
 	// Try to get username from database (but don't fail if not found)
@@ -154,6 +174,23 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 			log.Printf("Skipping webhook product delivery for %s as product not found in session", email)
 		}
 
+		// Track notifications for product delivery
+		if paymentPersistence.IsEnabled() && currentPayment != nil {
+			ctx := c.Request.Context()
+			if webhookTelegramSent {
+				err := paymentPersistence.MarkTelegramSent(ctx, currentPayment.PaymentID)
+				if err != nil {
+					log.Printf("❌ Webhook: Failed to mark telegram as sent for payment %s: %v", currentPayment.PaymentID, err)
+				}
+			}
+			err := paymentPersistence.UpdatePaymentCompleted(ctx, currentPayment.PaymentID)
+			if err != nil {
+				log.Printf("❌ Webhook: Failed to mark payment completed %s: %v", currentPayment.PaymentID, err)
+			} else {
+				log.Printf("✅ Webhook: Payment %s completed (telegram_sent: %v)", currentPayment.PaymentID, webhookTelegramSent)
+			}
+		}
+
 	} else {
 		// CARDERSHAVEN or other sites: Balance update flow
 		log.Printf("🚀 Webhook: Cardershaven/other payment detected - processing balance update for %s", email)
@@ -167,6 +204,7 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 		}
 
 		// Send balance confirmation email
+		emailSent := false
 		if userName != "User" {
 			log.Println("📧 Sending webhook confirmation email to user:", email)
 			err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSDRounded))
@@ -174,9 +212,33 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 				log.Printf("Error sending webhook email to user %s: %s", email, err)
 			} else {
 				log.Println("✅ Webhook confirmation email sent successfully to user:", email)
+				emailSent = true
 			}
 		} else {
 			log.Printf("Skipping webhook email send for %s as user not found in database", email)
+		}
+
+		// Track notifications for balance update
+		if paymentPersistence.IsEnabled() && currentPayment != nil {
+			ctx := c.Request.Context()
+			if emailSent {
+				err := paymentPersistence.MarkEmailSent(ctx, currentPayment.PaymentID)
+				if err != nil {
+					log.Printf("❌ Webhook: Failed to mark email as sent for payment %s: %v", currentPayment.PaymentID, err)
+				}
+			}
+			if webhookTelegramSent {
+				err := paymentPersistence.MarkTelegramSent(ctx, currentPayment.PaymentID)
+				if err != nil {
+					log.Printf("❌ Webhook: Failed to mark telegram as sent for payment %s: %v", currentPayment.PaymentID, err)
+				}
+			}
+			err := paymentPersistence.UpdatePaymentCompleted(ctx, currentPayment.PaymentID)
+			if err != nil {
+				log.Printf("❌ Webhook: Failed to mark payment completed %s: %v", currentPayment.PaymentID, err)
+			} else {
+				log.Printf("✅ Webhook: Payment %s completed (email_sent: %v, telegram_sent: %v)", currentPayment.PaymentID, emailSent, webhookTelegramSent)
+			}
 		}
 	}
 

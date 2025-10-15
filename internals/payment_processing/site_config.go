@@ -42,6 +42,13 @@ var SiteRegistry = map[string]SiteConfig{
 		EndIndex:      29999,
 		DatabaseTable: "",
 	},
+	"kuiper": {
+		Name:          "Kuiper",
+		Type:          SiteTypeProductDelivery,
+		StartIndex:    30000,
+		EndIndex:      39999,
+		DatabaseTable: "",
+	},
 }
 
 // Store address-to-site mapping

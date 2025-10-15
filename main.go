@@ -44,7 +44,7 @@ func main() {
 		slog.String("environment", cfg.Environment),
 	)
 
-	//Init the DB with connection pooling
+	//Init the DB with connection pooling (Supabase - for other app data)
 	err := database.InitDBWithConfig(cfg.MaxIdleConns, cfg.MaxOpenConns, cfg.ConnMaxLifetime)
 	if err != nil {
 		logger.Error("Error initializing database:", slog.String("error", err.Error()))
@@ -54,7 +54,20 @@ func main() {
 	//closing the db when the app exits
 	defer database.CloseDB()
 
-	// Initialize address pools for all sites
+	// Initialize PayButton pool database (separate Postgres for address pool persistence)
+	if database.IsEnabled() {
+		if err := database.Initialize(); err != nil {
+			logger.Error("⚠️ Failed to initialize pool database - running in memory-only mode",
+				slog.String("error", err.Error()))
+		} else {
+			defer database.Close()
+			logger.Info("✅ PayButton pool database initialized successfully")
+		}
+	} else {
+		logger.Info("⚠️ Pool persistence disabled - running in memory-only mode")
+	}
+
+	// Initialize address pools for all sites (will load from database if enabled)
 	payment_processing.InitializeAddressPools()
 
 	srv, err := server.NewServerWithConfig(logger, cfg)

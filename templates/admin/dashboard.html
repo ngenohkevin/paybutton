@@ -1,5 +1,5 @@
 {{define "content"}}
-<div id="auto-refresh" hx-get="/admin/api/status" hx-trigger="load, refresh" hx-target="#dashboard-content" hx-swap="innerHTML">
+<div id="auto-refresh" hx-get="/admin/api/status" hx-trigger="load" hx-target="#dashboard-content" hx-swap="innerHTML">
     <!-- Header Section -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div class="mb-4 sm:mb-0">
@@ -23,94 +23,65 @@
 
     <!-- Dashboard Content -->
     <div id="dashboard-content">
-        <!-- Loading state -->
+        <!-- Loading state - ANIMATIONS DISABLED for CPU optimization -->
         <div class="flex flex-col justify-center items-center py-16">
             <div class="loading-spinner mb-4"></div>
-            <span class="text-gray-600 dark:text-gray-300 animate-pulse">Loading system status...</span>
-            <div class="flex space-x-2 mt-4">
-                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.1s;"></div>
-                <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
-            </div>
+            <span class="text-gray-600 dark:text-gray-300">Loading system status...</span>
         </div>
     </div>
 </div>
 
 <script>
-// Real-time chart updates with enhanced styling
-let poolChart, gapChart, rateLimitChart;
-
+// CHARTS REMOVED - No chart update logic needed
 function updateCharts(data) {
-    try {
-        // Address Pool Chart
-        if (poolChart && data.components && data.components.address_pool) {
-            const pool = data.components.address_pool;
-            // Match actual JSON field names from PoolStats struct
-            const available = pool.current_pool_size || 0;
-            const totalGenerated = pool.total_generated || 0;
-            const totalUsed = pool.total_used || 0;
-            const reserved = Math.max(0, totalGenerated - available - totalUsed);
-            
-            poolChart.data.datasets[0].data = [available, totalUsed + reserved];
-            poolChart.data.labels = [`Available (${available})`, `Used/Reserved (${totalUsed + reserved})`];
-            poolChart.update('none');
-        }
-        
-        // Gap Monitor Chart
-        if (gapChart && data.components && data.components.gap_monitor) {
-            const gap = data.components.gap_monitor;
-            const paid = gap.paid_addresses || 0;
-            const unpaid = gap.unpaid_addresses || 0;
-            
-            gapChart.data.datasets[0].data = [paid, unpaid];
-            gapChart.data.labels = [`Paid (${paid})`, `Unpaid (${unpaid})`];
-            gapChart.update('none');
-        }
-        
-        // Rate Limiter Chart
-        if (rateLimitChart && data.components && data.components.rate_limiter) {
-            const rate = data.components.rate_limiter;
-            const available = rate.global_tokens || 0;
-            const max = rate.global_max || 100;
-            const used = Math.max(0, max - available);
-            
-            rateLimitChart.data.datasets[0].data = [available, used];
-            rateLimitChart.data.labels = [`Available (${available})`, `Used (${used})`];
-            rateLimitChart.update('none');
-        }
-    } catch (error) {
-        console.error('Error updating charts:', error);
-    }
+    console.log('Chart updates disabled - charts have been removed');
+    // No charts to update
 }
 
 // Analytics update configuration (Single unified system)
 let analyticsWS = null;
-let analyticsWSReconnectDelay = 1000;
-let analyticsWSMaxReconnectDelay = 30000;
+let analyticsWSReconnectDelay = 5000; // Increased initial delay
+let analyticsWSMaxReconnectDelay = 60000; // Increased max delay
 let analyticsPollingTimer = null;
 let lastAnalyticsData = null; // Cache to prevent unnecessary updates
-let useWebSocketAnalytics = true;
+let useWebSocketAnalytics = false; // Disabled - WebSocket endpoint not implemented
 let updateDebounceTimer = null; // Prevent rapid updates
 let lastUpdateTime = 0; // Track last update timestamp
+let wsReconnectAttempts = 0;
+let maxWSReconnectAttempts = 3; // Stop after 3 failed attempts
 
-// Initialize analytics WebSocket connection
+// Initialize analytics WebSocket connection - DISABLED TO REDUCE CPU
 function initAnalyticsWebSocket() {
+    // WebSocket disabled - analytics endpoint not implemented
+    console.log('WebSocket analytics disabled - using polling only');
+    return;
+
+    /* DISABLED - Causes excessive CPU usage from reconnection attempts
     // Prevent duplicate connections
     if (analyticsWS && (analyticsWS.readyState === WebSocket.OPEN || analyticsWS.readyState === WebSocket.CONNECTING)) {
         console.log('Analytics WebSocket already connected or connecting');
         return;
     }
-    
+
+    // Stop trying after max attempts
+    if (wsReconnectAttempts >= maxWSReconnectAttempts) {
+        console.log('Max WebSocket reconnect attempts reached, using polling only');
+        useWebSocketAnalytics = false;
+        return;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/admin/analytics`;
-    
+
     try {
         analyticsWS = new WebSocket(wsUrl);
-        
+        wsReconnectAttempts++;
+
         analyticsWS.onopen = function(event) {
             console.log('Analytics WebSocket connected');
-            analyticsWSReconnectDelay = 1000; // Reset reconnect delay on successful connection
-            
+            wsReconnectAttempts = 0; // Reset on successful connection
+            analyticsWSReconnectDelay = 5000;
+
             // Stop any polling fallback if WebSocket is now connected
             if (analyticsPollingTimer) {
                 clearTimeout(analyticsPollingTimer);
@@ -118,7 +89,7 @@ function initAnalyticsWebSocket() {
                 console.log('Stopped polling fallback - WebSocket reconnected');
             }
         };
-        
+
         analyticsWS.onmessage = function(event) {
             try {
                 const message = JSON.parse(event.data);
@@ -131,39 +102,27 @@ function initAnalyticsWebSocket() {
                 console.error('Error parsing analytics WebSocket message:', error);
             }
         };
-        
+
         analyticsWS.onclose = function(event) {
             console.log('Analytics WebSocket closed, code:', event.code);
             analyticsWS = null;
-            
-            // Only switch to polling on permanent failures (not temporary disconnects)
-            if (event.code !== 1000 && event.code !== 1001 && analyticsWSReconnectDelay < analyticsWSMaxReconnectDelay) {
-                // Attempt reconnection with exponential backoff
-                setTimeout(() => {
-                    if (useWebSocketAnalytics && !analyticsWS) {
-                        console.log('Attempting WebSocket reconnection...');
-                        initAnalyticsWebSocket();
-                    }
-                }, analyticsWSReconnectDelay);
-                analyticsWSReconnectDelay = Math.min(analyticsWSReconnectDelay * 2, analyticsWSMaxReconnectDelay);
-            } else if (useWebSocketAnalytics) {
-                console.log('WebSocket permanently closed, switching to 5-second polling fallback');
-                useWebSocketAnalytics = false;
+
+            // Switch to polling instead of reconnecting
+            console.log('WebSocket closed, using polling fallback');
+            useWebSocketAnalytics = false;
+            if (!analyticsPollingTimer) {
                 initAnalyticsPolling();
             }
         };
-        
+
         analyticsWS.onerror = function(error) {
             console.error('Analytics WebSocket error:', error);
         };
-        
+
     } catch (error) {
         console.error('Failed to create analytics WebSocket:', error);
-        // Fallback to periodic retry
-        setTimeout(() => {
-            initAnalyticsWebSocket();
-        }, analyticsWSReconnectDelay);
     }
+    */
 }
 
 // Unified analytics update processor with debouncing
@@ -220,17 +179,18 @@ function loadInitialAnalytics() {
         });
 }
 
-// Polling fallback as specified in analytics.md (5-second updates)
+// Polling fallback with REDUCED frequency to prevent CPU overload (changed to 30s)
 function initAnalyticsPolling() {
-    // Clear any existing polling to prevent duplicates
-    if (analyticsPollingTimer) {
+    // CRITICAL: Clear any existing polling to prevent duplicates and leaks
+    if (analyticsPollingTimer !== null) {
         clearTimeout(analyticsPollingTimer);
         analyticsPollingTimer = null;
+        console.log('Cleared existing analytics polling timer');
     }
-    
+
     function pollAnalytics() {
-        // Only poll if WebSocket is not active
-        if (!useWebSocketAnalytics && !analyticsWS) {
+        // Only poll if WebSocket is not active AND page is visible
+        if (!useWebSocketAnalytics && !analyticsWS && !document.hidden) {
             fetch('/admin/api/dashboard-analytics')
                 .then(response => response.json())
                 .then(data => {
@@ -238,25 +198,28 @@ function initAnalyticsPolling() {
                     if (!useWebSocketAnalytics && !analyticsWS) {
                         processAnalyticsUpdate(data, 'polling_fallback');
                     }
-                    // Schedule next poll in 5 seconds (as per analytics.md requirement)
-                    if (!useWebSocketAnalytics && !analyticsWS) {
-                        analyticsPollingTimer = setTimeout(pollAnalytics, 5000);
+                    // Schedule next poll in 30 seconds (REDUCED from 5s to save CPU)
+                    if (!useWebSocketAnalytics && !analyticsWS && analyticsPollingTimer === null) {
+                        analyticsPollingTimer = setTimeout(pollAnalytics, 30000);
                     }
                 })
                 .catch(error => {
                     console.error('Error polling analytics:', error);
                     // Retry with longer delay on error, but only if still in polling mode
-                    if (!useWebSocketAnalytics && !analyticsWS) {
-                        analyticsPollingTimer = setTimeout(pollAnalytics, 10000);
+                    if (!useWebSocketAnalytics && !analyticsWS && analyticsPollingTimer === null) {
+                        analyticsPollingTimer = setTimeout(pollAnalytics, 60000);
                     }
                 });
+        } else if (document.hidden && analyticsPollingTimer === null) {
+            // If page is hidden, check again in 60 seconds
+            analyticsPollingTimer = setTimeout(pollAnalytics, 60000);
         }
     }
-    
+
     // Start polling only if WebSocket is not active
     if (!useWebSocketAnalytics && !analyticsWS) {
         pollAnalytics();
-        console.log('Started 5-second analytics polling as per analytics.md spec');
+        console.log('Started 30-second analytics polling (reduced from 5s to save CPU)');
     }
 }
 
@@ -481,159 +444,31 @@ function getChartTheme() {
     };
 }
 
+// CHARTS COMPLETELY REMOVED - Replaced with simple HTML to eliminate GPU usage
 function initializeCharts() {
-    const theme = getChartTheme();
-    
-    // Destroy existing charts if they exist
-    if (poolChart) {
-        poolChart.destroy();
-        poolChart = null;
-    }
-    if (gapChart) {
-        gapChart.destroy();
-        gapChart = null;
-    }
-    if (rateLimitChart) {
-        rateLimitChart.destroy();
-        rateLimitChart = null;
-    }
-    
-    // Common chart options
-    const commonOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: {
-                    color: theme.textColor,
-                    padding: 20,
-                    usePointStyle: true,
-                    font: {
-                        size: 12,
-                        family: 'Inter'
-                    }
-                }
-            },
-            tooltip: {
-                backgroundColor: theme.backgroundColor,
-                titleColor: theme.textColor,
-                bodyColor: theme.textColor,
-                borderColor: theme.borderColor,
-                borderWidth: 1,
-                cornerRadius: 8,
-                padding: 12,
-                displayColors: true,
-                titleFont: {
-                    family: 'Inter',
-                    size: 14,
-                    weight: 'bold'
-                },
-                bodyFont: {
-                    family: 'Inter',
-                    size: 13
-                }
-            }
-        },
-        animation: {
-            animateScale: true,
-            animateRotate: true,
-            duration: 800,
-            easing: 'easeInOutQuart'
-        }
-    };
-
-    // Initialize Address Pool Chart
-    const poolCtx = document.getElementById('poolChart');
-    if (poolCtx) {
-        poolChart = new Chart(poolCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Available', 'Used/Reserved'],
-                datasets: [{
-                    data: [0, 0],
-                    backgroundColor: ['#10B981', '#EF4444'],
-                    borderWidth: 3,
-                    borderColor: theme.backgroundColor,
-                    hoverBackgroundColor: ['#059669', '#DC2626'],
-                    hoverBorderWidth: 4,
-                    cutout: '60%'
-                }]
-            },
-            options: commonOptions
-        });
-    }
-    
-    // Initialize Gap Monitor Chart
-    const gapCtx = document.getElementById('gapChart');
-    if (gapCtx) {
-        gapChart = new Chart(gapCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Paid', 'Unpaid'],
-                datasets: [{
-                    data: [0, 0],
-                    backgroundColor: ['#10B981', '#F59E0B'],
-                    borderWidth: 3,
-                    borderColor: theme.backgroundColor,
-                    hoverBackgroundColor: ['#059669', '#D97706'],
-                    hoverBorderWidth: 4,
-                    cutout: '60%'
-                }]
-            },
-            options: commonOptions
-        });
-    }
-    
-    // Initialize Rate Limiter Chart
-    const rateCtx = document.getElementById('rateLimitChart');
-    if (rateCtx) {
-        rateLimitChart = new Chart(rateCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Available Tokens', 'Used Tokens'],
-                datasets: [{
-                    data: [0, 0],
-                    backgroundColor: ['#3B82F6', '#9CA3AF'],
-                    borderWidth: 3,
-                    borderColor: theme.backgroundColor,
-                    hoverBackgroundColor: ['#2563EB', '#6B7280'],
-                    hoverBorderWidth: 4,
-                    cutout: '60%'
-                }]
-            },
-            options: commonOptions
-        });
-    }
+    console.log('⚠️ Chart.js REMOVED - Using simple HTML elements instead to eliminate GPU CPU usage');
+    // No charts to initialize
 }
 
-// Re-initialize charts on theme change
-document.addEventListener('themechange', function() {
-    setTimeout(initializeCharts, 100);
-});
+// No theme change handling needed
+// document.addEventListener('themechange', function() {});
 
-// Update charts periodically with real data
-let chartUpdateInterval;
+// Update charts periodically with real data - REDUCED frequency to save CPU
+let chartUpdateInterval = null;
 
 function startChartUpdates() {
-    // Clear any existing interval
-    if (chartUpdateInterval) {
-        clearInterval(chartUpdateInterval);
-    }
-    
-    // Update charts every 5 seconds
-    chartUpdateInterval = setInterval(() => {
-        if (poolChart || gapChart || rateLimitChart) {
-            fetch('/admin/status')
-                .then(response => response.json())
-                .then(data => {
-                    updateCharts(data);
-                })
-                .catch(error => {
-                    console.error('Error updating charts:', error);
-                });
-        }
-    }, 5000);
+    // DISABLED: Chart polling disabled to eliminate CPU usage
+    // Charts will only update on manual refresh
+    console.log('⚠️ Chart auto-updates DISABLED - use manual refresh button to update charts');
+
+    // chartUpdateInterval = setInterval(() => {
+    //     if ((poolChart || gapChart || rateLimitChart) && !document.hidden) {
+    //         fetch('/admin/status')
+    //             .then(response => response.json())
+    //             .then(data => updateCharts(data))
+    //             .catch(error => console.error('Error updating charts:', error));
+    //     }
+    // }, 30000);
 }
 
 // Start chart updates when dashboard loads
@@ -694,18 +529,26 @@ const customStyles = `
     transform: scale(1.02);
 }
 
-/* Pulse animation for live indicators */
-@keyframes pulse-green {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
+/* DISABLE ALL ANIMATIONS TO REDUCE CPU USAGE */
+* {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
 }
 
-.animate-pulse-green {
-    animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+/* Keep only essential non-CPU-intensive styles */
+.animate-pulse-green,
+.animate-pulse,
+.animate-bounce,
+.animate-spin,
+.animate-fade-in,
+.animate-slide-up {
+    animation: none !important;
+}
+
+/* Disable will-change to prevent GPU layer creation */
+* {
+    will-change: auto !important;
 }
 
 /* Gradient text animation */
@@ -774,56 +617,92 @@ const customStyles = `
 // Insert styles into head
 document.head.insertAdjacentHTML('beforeend', customStyles);
 
-// Session Analytics Functions
-let sessionUpdateInterval;
+// Session Analytics Functions - REDUCED frequency to save CPU
+let sessionUpdateInterval = null;
 
 function updateSessionStats() {
+    // Only update if page is visible
+    if (document.hidden) return;
+
     fetch('/admin/api/dashboard-sessions')
         .then(response => response.json())
         .then(data => {
             // Update dashboard session metrics
-            document.getElementById('dashboard-active-sessions').textContent = data.active_sessions || 0;
-            document.getElementById('dashboard-websocket-count').textContent = data.websocket_count || 0;
-            document.getElementById('dashboard-payment-rate').textContent = data.payment_rate ? data.payment_rate.toFixed(1) + '%' : '0%';
-            document.getElementById('dashboard-paid-amount').textContent = '$' + (data.paid_amount ? data.paid_amount.toFixed(2) : '0.00');
+            const activeSessionsEl = document.getElementById('dashboard-active-sessions');
+            const websocketEl = document.getElementById('dashboard-websocket-count');
+            const paymentRateEl = document.getElementById('dashboard-payment-rate');
+            const paidAmountEl = document.getElementById('dashboard-paid-amount');
+
+            if (activeSessionsEl) activeSessionsEl.textContent = data.active_sessions || 0;
+            if (websocketEl) websocketEl.textContent = data.websocket_count || 0;
+            if (paymentRateEl) paymentRateEl.textContent = data.payment_rate ? data.payment_rate.toFixed(1) + '%' : '0%';
+            if (paidAmountEl) paidAmountEl.textContent = '$' + (data.paid_amount ? data.paid_amount.toFixed(2) : '0.00');
         })
         .catch(error => {
             console.error('Error updating session stats:', error);
-            // Set fallback values on error
-            document.getElementById('dashboard-active-sessions').textContent = '0';
-            document.getElementById('dashboard-websocket-count').textContent = '0';
-            document.getElementById('dashboard-payment-rate').textContent = '0%';
-            document.getElementById('dashboard-paid-amount').textContent = '$0.00';
         });
 }
 
 function startSessionUpdates() {
-    // Clear any existing interval
-    if (sessionUpdateInterval) {
-        clearInterval(sessionUpdateInterval);
-    }
-    
-    // Update session stats every 10 seconds
-    sessionUpdateInterval = setInterval(updateSessionStats, 10000);
-    
-    // Initial update
+    // DISABLED: Session polling disabled to eliminate CPU usage
+    // Session stats will only update on manual refresh
+    console.log('⚠️ Session auto-updates DISABLED - use manual refresh button to update stats');
+
+    // Initial update only
     updateSessionStats();
+
+    // sessionUpdateInterval = setInterval(() => {
+    //     if (!document.hidden) {
+    //         updateSessionStats();
+    //     }
+    // }, 30000);
 }
 
 // REMOVED duplicate updateSiteBreakdownTable function - using optimized version above
 
 function startSiteAnalyticsUpdates() {
-    // Try WebSocket first for instant updates, fallback to 5s polling as per analytics.md
-    if (useWebSocketAnalytics && typeof WebSocket !== 'undefined') {
-        initAnalyticsWebSocket();
-    } else {
-        console.log('WebSocket not available, using 5-second polling as per analytics.md');
-        initAnalyticsPolling();
-    }
-    
-    // Load initial data
+    // DISABLED: Analytics polling disabled to eliminate CPU usage
+    // Analytics will only update on manual refresh
+    console.log('⚠️ Analytics auto-updates DISABLED - use manual refresh button to update analytics');
+
+    // Load initial data only
     loadInitialAnalytics();
+
+    // Polling disabled
+    // if (useWebSocketAnalytics && typeof WebSocket !== 'undefined') {
+    //     initAnalyticsWebSocket();
+    // } else {
+    //     initAnalyticsPolling();
+    // }
 }
+
+// CRITICAL: Clean up ALL intervals before HTMX swap to prevent leaks
+document.body.addEventListener('htmx:beforeSwap', function(event) {
+    if (event.target.id === 'dashboard-content') {
+        console.log('🧹 Cleaning up intervals before HTMX swap...');
+
+        // Clear all dashboard intervals
+        if (chartUpdateInterval !== null) {
+            clearInterval(chartUpdateInterval);
+            chartUpdateInterval = null;
+        }
+        if (sessionUpdateInterval !== null) {
+            clearInterval(sessionUpdateInterval);
+            sessionUpdateInterval = null;
+        }
+        if (analyticsPollingTimer !== null) {
+            clearTimeout(analyticsPollingTimer);
+            analyticsPollingTimer = null;
+        }
+
+        // Charts already removed - no cleanup needed
+
+        // Reset initialization flag
+        analyticsInitialized = false;
+
+        console.log('✅ Cleanup complete');
+    }
+});
 
 // Start session and site analytics updates when dashboard loads
 document.body.addEventListener('htmx:afterSettle', function(event) {
@@ -835,6 +714,7 @@ document.body.addEventListener('htmx:afterSettle', function(event) {
         }
 
         analyticsInitialized = true;
+        console.log('🚀 Initializing dashboard updates...');
 
         // Start session updates along with chart updates
         setTimeout(startSessionUpdates, 500);
@@ -844,16 +724,38 @@ document.body.addEventListener('htmx:afterSettle', function(event) {
     }
 });
 
-// Clean up intervals and WebSocket when navigating away
+// Clean up intervals and WebSocket when navigating away or page hidden
 window.addEventListener('beforeunload', () => {
     if (sessionUpdateInterval) {
         clearInterval(sessionUpdateInterval);
+    }
+    if (chartUpdateInterval) {
+        clearInterval(chartUpdateInterval);
     }
     if (analyticsWS) {
         analyticsWS.close();
     }
     if (analyticsPollingTimer) {
         clearTimeout(analyticsPollingTimer);
+    }
+    console.log('Dashboard cleanup: All intervals and WebSocket connections closed');
+    // Charts already removed
+});
+
+// Pause updates when page is hidden to save CPU
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        console.log('Page hidden - pausing dashboard updates to save CPU');
+    } else {
+        console.log('Page visible - resuming dashboard updates');
+        // Trigger immediate update when page becomes visible
+        if (typeof updateSessionStats === 'function') updateSessionStats();
+        if (typeof updateCharts === 'function') {
+            fetch('/admin/status')
+                .then(response => response.json())
+                .then(data => updateCharts(data))
+                .catch(error => console.error('Error updating charts:', error));
+        }
     }
 });
 </script>

@@ -1,6 +1,7 @@
 package payment_processing
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -37,6 +38,7 @@ type SiteAddressPool struct {
 	availableQueue []string                  // FIFO queue of available addresses
 	nextIndex      int                       // Next index to generate
 	mutex          sync.RWMutex
+	persistence    *PoolPersistence // Database persistence layer
 }
 
 var (
@@ -65,6 +67,49 @@ func GetSitePool(site string) *SiteAddressPool {
 	return pool
 }
 
+// LoadFromDatabase loads pool state from database
+func (p *SiteAddressPool) LoadFromDatabase() error {
+	if p.persistence == nil || !p.persistence.IsEnabled() {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Load nextIndex from database
+	nextIndex, err := p.persistence.LoadPoolState(ctx, p.site)
+	if err != nil {
+		return fmt.Errorf("failed to load pool state: %w", err)
+	}
+	p.nextIndex = nextIndex
+	log.Printf("✅ Loaded nextIndex=%d for site %s from database", nextIndex, p.site)
+
+	// Load all addresses from database
+	addresses, err := p.persistence.LoadAllAddresses(ctx, p.site)
+	if err != nil {
+		return fmt.Errorf("failed to load addresses: %w", err)
+	}
+
+	for _, addr := range addresses {
+		p.addresses[addr.Address] = addr
+		if addr.Email != "" && addr.Status == AddressStatusReserved {
+			p.emailToAddress[addr.Email] = addr.Address
+		}
+	}
+
+	// Load queue from database
+	queue, err := p.persistence.GetAvailableQueue(ctx, p.site)
+	if err != nil {
+		return fmt.Errorf("failed to load queue: %w", err)
+	}
+	p.availableQueue = queue
+
+	log.Printf("✅ Loaded %d addresses, %d in queue for site %s",
+		len(addresses), len(queue), p.site)
+
+	return nil
+}
+
 // GetOrReuseAddress - Primary function for address assignment with aggressive reuse
 func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (string, error) {
 	p.mutex.Lock()
@@ -78,6 +123,14 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 				addr.LastChecked = time.Now()
 				log.Printf("REUSING unpaid address %s for %s on %s (reserved %v ago) - GAP LIMIT PREVENTION",
 					existingAddr, email, p.site, time.Since(addr.ReservedAt))
+
+				// Save to database
+				if p.persistence != nil && p.persistence.IsEnabled() {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					_ = p.persistence.SaveAddress(ctx, addr)
+				}
+
 				return existingAddr, nil
 			}
 		}
@@ -103,6 +156,14 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 			addr.LastChecked = now
 			addr.Status = AddressStatusReserved
 			p.emailToAddress[email] = address
+
+			// Save to database
+			if p.persistence != nil && p.persistence.IsEnabled() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = p.persistence.SaveAddress(ctx, addr)
+				_ = p.persistence.UpdateAddressReservation(ctx, address, email, now)
+			}
 
 			return address, nil
 		}
@@ -153,6 +214,15 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 
 		p.emailToAddress[email] = address
 
+		// Save to database
+		if p.persistence != nil && p.persistence.IsEnabled() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = p.persistence.SaveAddress(ctx, pooledAddr)
+			_ = p.persistence.RemoveFromQueue(ctx, p.site, address)
+			_ = p.persistence.UpdateAddressReservation(ctx, address, email, now)
+		}
+
 		if needsRecheck {
 			log.Printf("Assigned re-verified pooled address %s to %s on %s (pool size: %d remaining)",
 				address, email, p.site, len(p.availableQueue))
@@ -200,6 +270,15 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	// Register address-to-site mapping
 	RegisterAddressForSite(address, p.site)
 
+	// Save to database
+	if p.persistence != nil && p.persistence.IsEnabled() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = p.persistence.SaveAddress(ctx, pooledAddr)
+		_ = p.persistence.SavePoolState(ctx, p.site, p.nextIndex)
+		_ = p.persistence.UpdateAddressReservation(ctx, address, email, now)
+	}
+
 	log.Printf("Generated on-demand address %s for %s on %s at index %d",
 		address, email, p.site, pooledAddr.Index)
 
@@ -220,6 +299,13 @@ func (p *SiteAddressPool) MarkAddressUsed(address string) {
 		// Remove from email mapping so user gets new address next time
 		if addr.Email != "" {
 			delete(p.emailToAddress, addr.Email)
+		}
+
+		// Save to database
+		if p.persistence != nil && p.persistence.IsEnabled() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = p.persistence.MarkAddressUsed(ctx, address)
 		}
 	}
 }
@@ -266,6 +352,13 @@ func RecycleExpiredAddresses() {
 						delete(pool.emailToAddress, addr.Email)
 					}
 
+					// Save to database
+					if pool.persistence != nil && pool.persistence.IsEnabled() {
+						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+						_ = pool.persistence.MarkAddressUsed(ctx, address)
+					}
+
 					skipped++
 					continue
 				}
@@ -283,6 +376,15 @@ func RecycleExpiredAddresses() {
 				addr.Email = ""
 				addr.LastChecked = now // Update last checked time for age-based re-verification
 				pool.availableQueue = append(pool.availableQueue, address)
+
+				// Save to database
+				if pool.persistence != nil && pool.persistence.IsEnabled() {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					_ = pool.persistence.UpdateAddressStatus(ctx, address, AddressStatusAvailable)
+					_ = pool.persistence.AddToQueue(ctx, siteName, address)
+				}
+
 				recycled++
 			}
 		}

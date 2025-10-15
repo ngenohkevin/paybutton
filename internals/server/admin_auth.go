@@ -69,7 +69,7 @@ func (a *AdminAuth) loadTemplates() {
 	a.templates["dashboard"] = layoutTmpl
 
 	// Load other admin templates
-	adminTemplates := []string{"pool", "gap-monitor", "rate-limiter", "logs", "analytics", "alerts", "config", "sessions"}
+	adminTemplates := []string{"pool", "gap-monitor", "rate-limiter", "logs", "analytics", "alerts", "config", "sessions", "payments"}
 	for _, name := range adminTemplates {
 		tmplFile := filepath.Join(templateDir, name+".html")
 		if _, err := os.Stat(tmplFile); err == nil {

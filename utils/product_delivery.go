@@ -211,6 +211,229 @@ func ProductEmail(userEmail, userName, productName string) error {
 	return nil
 }
 
+// CheckIfCloneCards checks if the product is Clone Cards
+func CheckIfCloneCards(productName string) bool {
+	productNameLower := strings.ToLower(productName)
+	return strings.Contains(productNameLower, "clone cards") ||
+		strings.Contains(productNameLower, "clone card") ||
+		productNameLower == "clonecards"
+}
+
+// KuiperProductEmail sends an email with the purchased product as an attachment for Kuiper store
+func KuiperProductEmail(userEmail, userName, productName string) error {
+	log.Printf("Starting Kuiper product email delivery for: %s to %s", productName, userEmail)
+
+	// Kuiper SMTP settings
+	smtpUsername := "delivery@kuiperstore.cc"
+	smtpPassword := "85dilanwest"
+	smtpServer := "mail.perigrine.cloud"
+	smtpPort := 587
+
+	mailer := gomail.NewDialer(smtpServer, smtpPort, smtpUsername, smtpPassword)
+
+	// Configure for STARTTLS
+	mailer.SSL = false
+	mailer.TLSConfig = &tls.Config{
+		ServerName:         smtpServer,
+		InsecureSkipVerify: false,
+	}
+
+	message := gomail.NewMessage()
+	message.SetHeader("From", smtpUsername)
+	message.SetHeader("To", userEmail)
+
+	// Check if this is Clone Cards - special handling
+	isCloneCards := CheckIfCloneCards(productName)
+
+	if isCloneCards {
+		// Special email for Clone Cards - no attachment, just confirmation
+		message.SetHeader("Subject", "Payment Confirmed - Clone Cards Order")
+		message.SetBody("text/html", fmt.Sprintf(`
+<div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px; margin: auto;">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #4CAF50;">Hello %s!</h2>
+    </div>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #3B5998; font-size: 28px;">Payment Confirmed</h1>
+        <p style="font-size: 16px; line-height: 1.5; color: #555;">Thank you for your payment for <strong>%s</strong>.</p>
+    </div>
+
+    <div style="margin-bottom: 20px; padding: 20px; background-color: #e8f5e9; border: 2px solid #4CAF50; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #2e7d32; text-align: center;">✅ Order Status</h3>
+        <p style="color: #333; text-align: center; font-size: 16px; line-height: 1.6;">
+            Your payment has been successfully received and verified.<br>
+            Your <strong>Clone Cards</strong> are currently being prepared for shipping.
+        </p>
+    </div>
+
+    <div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #856404;">📦 What Happens Next:</h4>
+        <ol style="color: #856404; margin: 0; padding-left: 20px; line-height: 1.6;">
+            <li>Your Clone Cards are being prepared with the highest quality standards</li>
+            <li>Once ready, your cards will be securely packaged for shipment</li>
+            <li>You will receive a shipping confirmation email with tracking details</li>
+            <li>Estimated preparation time: 2-5 business days</li>
+        </ol>
+    </div>
+
+    <div style="margin-bottom: 20px; padding: 15px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #0c5460;">💡 Important Information:</h4>
+        <ul style="color: #0c5460; margin: 0; padding-left: 20px; line-height: 1.5;">
+            <li>Your order is being processed with discretion and security</li>
+            <li>All shipments are carefully packaged to ensure safe delivery</li>
+            <li>Please ensure your shipping address is monitored for package arrival</li>
+            <li>If you have any questions, contact our support team immediately</li>
+        </ul>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 20px;">
+        <p style="font-size: 16px; color: #555;">We appreciate your business and trust. You will be notified as soon as your order ships.</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+        <p style="font-size: 14px; color: #777;">Thank you for shopping with Kuiper!</p>
+        <p style="font-size: 12px; color: #999;">For support inquiries, please contact us through our secure channels.</p>
+    </div>
+</div>
+`, userName, productName))
+	} else {
+		// Regular digital product delivery with attachment
+		message.SetHeader("Subject", "Your Kuiper Purchase - Product Delivery")
+
+		// Generate product file content (1-4MB)
+		fileContent, err := GenerateRandomBytes(1*1024*1024, 4*1024*1024)
+		if err != nil {
+			return fmt.Errorf("error generating product file content: %w", err)
+		}
+
+		// Generate appropriate filename with .lsky extension
+		filename := GenerateKuiperProductFilename(productName)
+
+		// Attach the file using gomail's methods
+		message.Attach(
+			filename,
+			gomail.SetCopyFunc(func(w io.Writer) error {
+				_, err := w.Write(fileContent)
+				return err
+			}),
+		)
+
+		// Email body for Kuiper products
+		message.SetBody("text/html", fmt.Sprintf(`
+<div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px; margin: auto;">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #4CAF50;">Hello!</h2>
+    </div>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #3B5998; font-size: 28px;">Your Purchase is Ready</h1>
+        <p style="font-size: 16px; line-height: 1.5; color: #555;">Thank you for your purchase of <strong>%s</strong>.</p>
+        <p style="font-size: 16px; line-height: 1.5; color: #555;">Your product file has been attached to this email.</p>
+    </div>
+    <div style="margin-bottom: 20px; padding: 15px; background-color: #f0f0f0; border-left: 4px solid #4CAF50; border-radius: 3px;">
+        <h3 style="margin-top: 0; color: #333;">How to Open Your Attached File:</h3>
+        <p style="text-align: left; color: #555; margin-bottom: 15px;">The file attached to this email is in .lsky format and requires special software to open it.</p>
+
+        <p style="text-align: left; color: #555; margin-bottom: 10px;"><strong>Required Software:</strong> LSKY Decryption Tool</p>
+
+        <p style="text-align: left; color: #555; margin-bottom: 15px;">This tool is critical in ensuring the privacy and safety of your sensitive data. It provides secure decryption that protects your information during the viewing process.</p>
+
+        <p style="text-align: left; color: #555; margin-bottom: 15px;"><strong>How to get the LSKY Decryption Tool:</strong></p>
+        <ol style="text-align: left; color: #555; line-height: 1.6;">
+            <li>Open Tor browser on your computer</li>
+            <li><strong>Option 1:</strong> Navigate to the following secure location:<br>
+                <span style="font-family: monospace; background-color: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 13px; word-break: break-all;">http://kuiperoyeb6q3uuszy7quvf4mxwnvlb4ar5e2accsjkpnykwmvndxkyd.onion/products/52185567-d28a-4ad6-9ef7-a3b410998ca1</span>
+            </li>
+            <li><strong>Option 2:</strong> Visit our Kuiper store and search for <strong>"lsakey"</strong> to find the LSKY Decryption Tool</li>
+            <li>Follow the instructions on that page to get the LSKY Decryption Tool</li>
+            <li>Once you have the tool, you can safely open the .lsky file attached to this email</li>
+        </ol>
+
+        <p style="text-align: left; color: #777; font-size: 14px; margin-top: 15px;"><em>Note: You must use Tor browser to access the secure location. The LSKY Decryption Tool is essential for maintaining the security and privacy of your data when viewing .lsky files.</em></p>
+    </div>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <p style="font-size: 16px; color: #555;">If you have any questions about your purchase or need assistance, please don't hesitate to contact our support team.</p>
+    </div>
+    <div style="text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+        <p style="font-size: 14px; color: #777;">Thank you for shopping with Kuiper!</p>
+    </div>
+</div>
+`, productName))
+	}
+
+	// Send the email
+	log.Printf("Attempting to send Kuiper product delivery email to %s for product %s", userEmail, productName)
+	if err := mailer.DialAndSend(message); err != nil {
+		log.Printf("Error sending Kuiper product delivery email to %s: %v", userEmail, err)
+		return fmt.Errorf("could not send Kuiper product email: %w", err)
+	}
+
+	log.Printf("Kuiper product delivery email sent successfully to %s", userEmail)
+	return nil
+}
+
+// GenerateKuiperProductFilename creates the appropriate filename based on product name for Kuiper store
+func GenerateKuiperProductFilename(productName string) string {
+	log.Printf("Generating Kuiper filename for product: %s", productName)
+
+	// Check special cases for Visa and Mastercard
+	productLower := strings.ToLower(productName)
+	if strings.Contains(productLower, "visa") {
+		return "visa.lsky"
+	}
+	if strings.Contains(productLower, "mastercard") {
+		return "mastercard.lsky"
+	}
+
+	// Look for dollar amount using a simple string search
+	dollarIndex := strings.Index(productName, "$")
+	if dollarIndex != -1 {
+		// Find the end of the dollar amount (first space after $ or end of string)
+		amountEnd := strings.Index(productName[dollarIndex:], " ")
+		if amountEnd == -1 {
+			// No space, use the rest of the string
+			amountEnd = len(productName) - dollarIndex
+		} else {
+			amountEnd += dollarIndex
+		}
+
+		// Extract the amount and the product type
+		amount := productName[dollarIndex:amountEnd]
+		productType := ""
+		if amountEnd < len(productName) {
+			productType = strings.TrimSpace(productName[amountEnd:])
+		}
+
+		// Remove spaces and format the filename
+		productType = strings.Replace(productType, " ", "", -1)
+
+		// Check if productType already ends with "log" to avoid duplication
+		var filename string
+		productTypeLower := strings.ToLower(productType)
+		if strings.HasSuffix(productTypeLower, "log") {
+			filename = fmt.Sprintf("%s%s.lsky", amount, productType)
+		} else {
+			filename = fmt.Sprintf("%s%sLog.lsky", amount, productType)
+		}
+		log.Printf("Generated Kuiper filename with dollar amount: %s", filename)
+		return filename
+	}
+
+	// Handle other products
+	// Default case: just use the product name without spaces
+	cleanName := strings.Replace(productName, " ", "", -1)
+
+	// Check if cleanName already ends with "log" to avoid duplication
+	var filename string
+	cleanNameLower := strings.ToLower(cleanName)
+	if strings.HasSuffix(cleanNameLower, "log") {
+		filename = fmt.Sprintf("%s.lsky", cleanName)
+	} else {
+		filename = fmt.Sprintf("%sLog.lsky", cleanName)
+	}
+	log.Printf("Generated generic Kuiper filename: %s", filename)
+	return filename
+}
+
 // ParseNotification parses the notification message to extract details for delivery
 func ParseNotification(notificationText string) (email, name, product string, err error) {
 	log.Printf("Parsing notification: %s", notificationText)
@@ -257,7 +480,7 @@ func ParseNotification(notificationText string) (email, name, product string, er
 }
 
 // BuildProductPayloadForBot formats the notification for the Telegram bot
-func BuildProductPayloadForBot(email, name, product, notificationType string) string {
+func BuildProductPayloadForBot(email, name, product, notificationType, site string) string {
 	var message bytes.Buffer
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
 
@@ -265,12 +488,14 @@ func BuildProductPayloadForBot(email, name, product, notificationType string) st
 		message.WriteString("✅ *Product Delivered*\n\n")
 		message.WriteString(fmt.Sprintf("*Email:* `%s`\n", email))
 		message.WriteString(fmt.Sprintf("*Product:* `%s`\n", product))
+		message.WriteString(fmt.Sprintf("*Site:* `%s`\n", site))
 		message.WriteString(fmt.Sprintf("*Status:* `Delivered`\n"))
 		message.WriteString(fmt.Sprintf("*Time:* `%s`\n", currentTime))
 	} else {
 		message.WriteString("⚠️ *Delivery Failed*\n\n")
 		message.WriteString(fmt.Sprintf("*Email:* `%s`\n", email))
 		message.WriteString(fmt.Sprintf("*Product:* `%s`\n", product))
+		message.WriteString(fmt.Sprintf("*Site:* `%s`\n", site))
 		message.WriteString(fmt.Sprintf("*Status:* `Failed`\n"))
 		message.WriteString(fmt.Sprintf("*Time:* `%s`\n", currentTime))
 	}

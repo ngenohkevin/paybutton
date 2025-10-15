@@ -1,0 +1,417 @@
+{{define "content"}}
+<div class="animate-fade-in">
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div class="mb-4 sm:mb-0">
+            <h1 class="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
+                <i class="fas fa-tachometer-alt mr-3 text-blue-600"></i>Payment Dashboard
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2 text-sm">Database-backed analytics and real-time monitoring</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <button onclick="location.reload()" class="btn btn-secondary">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="dashboard-grid mb-8">
+        <!-- Total Payments -->
+        <div class="card hover:shadow-lg transition-shadow">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-receipt text-blue-500 mr-2"></i>Total Payments
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-blue-600 dark:text-blue-400">
+                    {{.Data.TotalPayments}}
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    <span class="text-green-600"><i class="fas fa-arrow-up mr-1"></i>{{.Data.PaymentsLast24h}}</span> in last 24h
+                </div>
+            </div>
+        </div>
+
+        <!-- Completed Payments -->
+        <div class="card hover:shadow-lg transition-shadow">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-check-circle text-green-500 mr-2"></i>Completed
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-green-600 dark:text-green-400">
+                    {{.Data.CompletedPayments}}
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    <span class="text-green-600">{{.Data.CompletedLast24h}}</span> completed today
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending/Active -->
+        <div class="card hover:shadow-lg transition-shadow">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-clock text-yellow-500 mr-2"></i>Active
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {{.Data.PendingPayments}}
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Pending + Confirming
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Revenue -->
+        <div class="card hover:shadow-lg transition-shadow">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-dollar-sign text-purple-500 mr-2"></i>Total Revenue
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-4xl font-bold text-purple-600 dark:text-purple-400">
+                    ${{printf "%.2f" .Data.TotalUSDReceived}}
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    {{printf "%.8f" .Data.TotalBTCReceived}} BTC
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Stats -->
+    <div class="card mb-8">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-calendar-day text-blue-500 mr-2"></i>Today's Activity
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-gray-900 dark:text-white">{{.Data.TotalToday}}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300 mt-1">Payments</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-green-600">{{.Data.CompletedToday}}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300 mt-1">Completed</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-blue-600">${{printf "%.2f" .Data.USDToday}}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300 mt-1">Revenue</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-purple-600">{{.Data.UniqueCustomersToday}}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300 mt-1">Customers</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Recent Payments -->
+        <div class="card">
+            <div class="card-header flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-history text-blue-500 mr-2"></i>Recent Payments
+                </h3>
+                <a href="/admin/payments" class="text-blue-600 hover:text-blue-800 text-sm">
+                    View All <i class="fas fa-arrow-right ml-1"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                {{if .Data.RecentPayments}}
+                <div class="space-y-3">
+                    {{range .Data.RecentPayments}}
+                    <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div class="flex-1">
+                            <div class="font-mono text-sm text-gray-900 dark:text-white">
+                                {{if .Email.Valid}}{{.Email.String}}{{else}}Anonymous{{end}}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                ${{printf "%.2f" .AmountUsd}} • {{.Site}}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm">
+                                {{if eq .Status "completed"}}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                        <i class="fas fa-check mr-1"></i>Done
+                                    </span>
+                                {{else if eq .Status "pending"}}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        <i class="fas fa-clock mr-1"></i>Pending
+                                    </span>
+                                {{else}}
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        {{.Status}}
+                                    </span>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-inbox text-4xl mb-3"></i>
+                    <p>No recent payments</p>
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Active Pending Payments -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-hourglass-half text-yellow-500 mr-2"></i>Active Pending
+                </h3>
+            </div>
+            <div class="card-body">
+                {{if .Data.ActivePendingPayments}}
+                <div class="space-y-3">
+                    {{range .Data.ActivePendingPayments}}
+                    <div class="flex justify-between items-center p-3 bg-yellow-50 dark:bg-yellow-900 dark:bg-opacity-20 rounded-lg">
+                        <div class="flex-1">
+                            <div class="font-mono text-sm text-gray-900 dark:text-white">
+                                {{if .Email.Valid}}{{.Email.String}}{{else}}Anonymous{{end}}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                ${{printf "%.2f" .AmountUsd}} • {{.Site}}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-yellow-600 font-semibold">
+                                {{if gt .SecondsUntilExpiry 0}}
+                                    {{printf "%.0fm" (divf .SecondsUntilExpiry 60)}} left
+                                {{else}}
+                                    Expiring soon
+                                {{end}}
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                {{.Confirmations}}/{{.RequiredConfirmations}} conf
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-check-circle text-4xl mb-3 text-green-500"></i>
+                    <p>No pending payments</p>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+
+    <!-- Site Breakdown -->
+    <div class="card mb-8">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-globe text-blue-500 mr-2"></i>Site Breakdown
+            </h3>
+        </div>
+        <div class="card-body">
+            {{if .Data.SiteBreakdown}}
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-b border-gray-200 dark:border-gray-700">
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Site</th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Total</th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Completed</th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Revenue (BTC)</th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Revenue (USD)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Data.SiteBreakdown}}
+                        <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{{.Site}}</td>
+                            <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{{.TotalPayments}}</td>
+                            <td class="px-4 py-3 text-sm text-right text-green-600">{{.CompletedPayments}}</td>
+                            <td class="px-4 py-3 text-sm text-right font-mono text-gray-700 dark:text-gray-300">
+                                {{printf "%.8f" .TotalBtc}}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white">
+                                ${{printf "%.2f" .TotalUsd}}
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            {{else}}
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-globe text-4xl mb-3"></i>
+                <p>No site data available</p>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- System Health (In-Memory Components) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Address Pool Status -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-swimming-pool text-blue-500 mr-2"></i>Address Pool
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Available:</span>
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">
+                            {{.Data.PoolStats.CurrentPoolSize}}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Total Used:</span>
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">
+                            {{.Data.PoolStats.TotalUsed}}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Generated:</span>
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">
+                            {{.Data.PoolStats.TotalGenerated}}
+                        </span>
+                    </div>
+                </div>
+                <a href="/admin/pool" class="btn btn-secondary w-full mt-4">
+                    <i class="fas fa-cog mr-2"></i>Manage Pool
+                </a>
+            </div>
+        </div>
+
+        <!-- Gap Monitor -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>Gap Monitor
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Gap Ratio:</span>
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">
+                            {{index .Data.GapStats "gap_ratio"}}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Paid:</span>
+                        <span class="text-sm font-semibold text-green-600">
+                            {{index .Data.GapStats "paid_addresses"}}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Unpaid:</span>
+                        <span class="text-sm font-semibold text-yellow-600">
+                            {{index .Data.GapStats "unpaid_addresses"}}
+                        </span>
+                    </div>
+                </div>
+                <a href="/admin/gap-monitor" class="btn btn-secondary w-full mt-4">
+                    <i class="fas fa-chart-line mr-2"></i>View Monitor
+                </a>
+            </div>
+        </div>
+
+        <!-- Sessions -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-users text-purple-500 mr-2"></i>Active Sessions
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="text-5xl font-bold text-purple-600 dark:text-purple-400">
+                        {{.Data.ActiveSessionsCount}}
+                    </div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                        Active user sessions
+                    </div>
+                </div>
+                <div class="text-sm text-center text-gray-600 dark:text-gray-300">
+                    {{.Data.SessionsLast24h}} sessions in last 24h
+                </div>
+                <a href="/admin/sessions" class="btn btn-secondary w-full mt-4">
+                    <i class="fas fa-list mr-2"></i>View Sessions
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Optimized auto-refresh with Visibility API - no full page reload
+let refreshInterval = null;
+let isPageVisible = !document.hidden;
+
+// Track page visibility
+document.addEventListener('visibilitychange', function() {
+    isPageVisible = !document.hidden;
+    if (isPageVisible) {
+        // Refresh immediately when tab becomes visible
+        refreshDashboardData();
+    }
+});
+
+// Incremental dashboard refresh (no full page reload)
+async function refreshDashboardData() {
+    if (!isPageVisible) return; // Don't refresh hidden tabs
+
+    try {
+        const response = await fetch('/admin/api/dashboard-stats');
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        // Update only changed values with smooth transitions
+        updateElement('total-payments', data.total_payments);
+        updateElement('completed-payments', data.completed_payments);
+        updateElement('pending-payments', data.pending_payments);
+        updateElement('total-revenue', '$' + (data.total_usd || 0).toFixed(2));
+        updateElement('total-btc', (data.total_btc || 0).toFixed(8) + ' BTC');
+    } catch (error) {
+        console.error('Dashboard refresh failed:', error);
+    }
+}
+
+// Smooth element update
+function updateElement(id, newValue) {
+    const element = document.getElementById(id);
+    if (!element || element.textContent === String(newValue)) return;
+
+    element.style.transition = 'opacity 0.3s ease';
+    element.style.opacity = '0.7';
+
+    requestAnimationFrame(() => {
+        element.textContent = newValue;
+        element.style.opacity = '1';
+    });
+}
+
+// Start refresh cycle (60 seconds - reduced from 30s)
+refreshInterval = setInterval(refreshDashboardData, 60000);
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) clearInterval(refreshInterval);
+});
+</script>
+{{end}}

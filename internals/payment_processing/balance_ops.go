@@ -1,6 +1,7 @@
 package payment_processing
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/ngenohkevin/paybutton/internals/database"
+	dbgen "github.com/ngenohkevin/paybutton/internals/db"
 	payments2 "github.com/ngenohkevin/paybutton/internals/payments"
 	"github.com/ngenohkevin/paybutton/utils"
 )
@@ -298,6 +300,21 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					SessionStatusUpdater(address, "completed")
 				}
 
+				// Update payment record in database - create persistence instance for entire flow
+				paymentPersistence := NewPaymentPersistence()
+				var currentPayment *dbgen.Payment
+				if paymentPersistence.IsEnabled() {
+					ctx := context.Background()
+					payment, err := paymentPersistence.GetPaymentByAddress(ctx, address)
+					if err == nil && payment != nil {
+						currentPayment = payment
+						// Update with transaction details (confirmations = 1 for BTC balance detected)
+						_ = paymentPersistence.UpdatePaymentTransaction(ctx, payment.PaymentID, "", 1)
+						_ = paymentPersistence.UpdatePaymentConfirmed(ctx, payment.PaymentID, 1)
+						log.Printf("✅ Updated payment record %s: confirmed", payment.PaymentID)
+					}
+				}
+
 				// Try to get username from the database, but don't fail if not found
 				var userName string
 				err = database.DB.QueryRow("SELECT name FROM users WHERE email = $1", email).Scan(&userName)
@@ -390,9 +407,29 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 
 					msg := tgbotapi.NewMessage(chatID, botLogMessage)
 					msg.ParseMode = tgbotapi.ModeMarkdown
+					telegramSent := false
 					_, err = bot.Send(msg)
 					if err != nil {
 						log.Printf("Error sending product delivery confirmation to bot: %s", err)
+					} else {
+						telegramSent = true
+					}
+
+					// Mark notifications sent in payment record
+					if paymentPersistence.IsEnabled() && currentPayment != nil {
+						ctx := context.Background()
+						if telegramSent {
+							err := paymentPersistence.MarkTelegramSent(ctx, currentPayment.PaymentID)
+							if err != nil {
+								log.Printf("❌ Failed to mark telegram as sent for payment %s: %v", currentPayment.PaymentID, err)
+							}
+						}
+						err := paymentPersistence.UpdatePaymentCompleted(ctx, currentPayment.PaymentID)
+						if err != nil {
+							log.Printf("❌ Failed to mark payment completed %s: %v", currentPayment.PaymentID, err)
+						} else {
+							log.Printf("✅ Payment %s completed (telegram_sent: %v)", currentPayment.PaymentID, telegramSent)
+						}
 					}
 
 				case SiteTypeBalanceUpdate:
@@ -411,6 +448,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					}
 
 					// Send balance confirmation email
+					var emailSent bool
 					if userName != "User" {
 						log.Println("Sending confirmation email to user:", email)
 						err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSD))
@@ -418,6 +456,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 							log.Printf("Error sending email to user %s: %s", email, err)
 						} else {
 							log.Println("Confirmation email sent successfully to user:", email)
+							emailSent = true
 						}
 					} else {
 						log.Printf("Skipping email send for %s as user not found in database", email)
@@ -430,9 +469,35 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 
 					msg := tgbotapi.NewMessage(chatID, botLogMessage)
 					msg.ParseMode = tgbotapi.ModeMarkdown
+					telegramSent := false
 					_, err = bot.Send(msg)
 					if err != nil {
 						log.Printf("Error sending balance confirmation to bot: %s", err)
+					} else {
+						telegramSent = true
+					}
+
+					// Mark notifications sent in payment record
+					if paymentPersistence.IsEnabled() && currentPayment != nil {
+						ctx := context.Background()
+						if emailSent {
+							err := paymentPersistence.MarkEmailSent(ctx, currentPayment.PaymentID)
+							if err != nil {
+								log.Printf("❌ Failed to mark email as sent for payment %s: %v", currentPayment.PaymentID, err)
+							}
+						}
+						if telegramSent {
+							err := paymentPersistence.MarkTelegramSent(ctx, currentPayment.PaymentID)
+							if err != nil {
+								log.Printf("❌ Failed to mark telegram as sent for payment %s: %v", currentPayment.PaymentID, err)
+							}
+						}
+						err := paymentPersistence.UpdatePaymentCompleted(ctx, currentPayment.PaymentID)
+						if err != nil {
+							log.Printf("❌ Failed to mark payment completed %s: %v", currentPayment.PaymentID, err)
+						} else {
+							log.Printf("✅ Payment %s completed (email_sent: %v, telegram_sent: %v)", currentPayment.PaymentID, emailSent, telegramSent)
+						}
 					}
 				}
 

@@ -58,9 +58,10 @@
     
     <!-- JavaScript -->
     <script src="https://unpkg.com/htmx.org@2.0.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js REMOVED to eliminate GPU CPU usage -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="/static/js/admin.js"></script>
+    <script src="/static/js/refresh-manager.js"></script>
     
     <!-- Meta tags for better mobile experience -->
     <meta name="theme-color" content="#3b82f6">
@@ -116,6 +117,9 @@
                     <div class="hidden md:ml-8 md:flex md:space-x-2 nav-links">
                         <a href="/admin/dashboard" class="nav-icon-item {{if eq .ActivePage "dashboard"}}active{{end}}" title="Dashboard">
                             <i class="fas fa-tachometer-alt"></i>
+                        </a>
+                        <a href="/admin/payments" class="nav-icon-item {{if eq .ActivePage "payments"}}active{{end}}" title="Payment Tracking">
+                            <i class="fas fa-dollar-sign"></i>
                         </a>
                         <a href="/admin/sessions" class="nav-icon-item {{if eq .ActivePage "sessions"}}active{{end}}" title="Session Management">
                             <i class="fas fa-users"></i>
@@ -175,6 +179,9 @@
             <div class="mobile-menu" id="mobile-menu">
                 <a href="/admin/dashboard" class="nav-item {{if eq .ActivePage "dashboard"}}active{{end}}">
                     <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                </a>
+                <a href="/admin/payments" class="nav-item {{if eq .ActivePage "payments"}}active{{end}}">
+                    <i class="fas fa-dollar-sign mr-2"></i>Payment Tracking
                 </a>
                 <a href="/admin/sessions" class="nav-item {{if eq .ActivePage "sessions"}}active{{end}}">
                     <i class="fas fa-users mr-2"></i>Session Management
@@ -270,7 +277,7 @@
             button.classList.toggle('active');
         }
 
-        // Update current time
+        // Update current time (runs independently, not managed by RefreshManager)
         function updateTime() {
             const now = new Date();
             const timeElement = document.getElementById('current-time');
@@ -281,15 +288,17 @@
         updateTime();
         setInterval(updateTime, 1000);
 
-        // Auto-refresh every 30 seconds (only if WebSocket is not connected)
-        setInterval(function() {
-            if (window.location.pathname.includes('/admin/dashboard')) {
-                // Only trigger refresh if WebSocket is not connected or failed
-                if (!window.wsConnection || window.wsConnection.readyState !== WebSocket.OPEN) {
-                    htmx.trigger('#auto-refresh', 'refresh');
-                }
-            }
-        }, 30000);
+        // Dashboard auto-refresh DISABLED to reduce CPU usage
+        // User must manually refresh using the refresh button
+        if (window.location.pathname.includes('/admin/dashboard')) {
+            console.log('⚠️ Auto-refresh disabled to reduce CPU usage - use manual refresh button');
+            // RefreshManager.register('dashboard-auto-refresh', function() {
+            //     const autoRefreshEl = document.getElementById('auto-refresh');
+            //     if (autoRefreshEl) {
+            //         htmx.trigger(autoRefreshEl, 'refresh');
+            //     }
+            // }, 60000);
+        }
 
         // Enhanced HTMX error handling
         document.body.addEventListener('htmx:responseError', function(event) {
