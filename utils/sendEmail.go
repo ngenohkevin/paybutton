@@ -9,15 +9,25 @@ import (
 )
 
 func SendEmail(userEmail string, userName string, amount string) error {
-	mailPass := os.Getenv("MAILGUN_PASSWORD")
-	if mailPass == "" {
-		log.Fatal("MAILGUN_PASSWORD not set in .env file")
+	smtpUser := os.Getenv("DWEBSTORE_SMTP_USER")
+	if smtpUser == "" {
+		smtpUser = "balance@cardinghaven.cc" // fallback
 	}
 
-	mailer := gomail.NewDialer("smtp.eu.mailgun.org", 465, "balance@cardinghaven.cc", mailPass)
+	mailPass := os.Getenv("DWEBSTORE_SMTP_PASSWORD")
+	if mailPass == "" {
+		log.Fatal("DWEBSTORE_SMTP_PASSWORD not set in .env file")
+	}
+
+	smtpServer := os.Getenv("DWEBSTORE_SMTP_SERVER")
+	if smtpServer == "" {
+		smtpServer = "smtp.eu.mailgun.org" // fallback
+	}
+
+	mailer := gomail.NewDialer(smtpServer, 465, smtpUser, mailPass)
 
 	message := gomail.NewMessage()
-	message.SetHeader("From", "balance@cardinghaven.cc")
+	message.SetHeader("From", smtpUser)
 	message.SetHeader("To", userEmail)
 	message.SetHeader("Subject", "Payment Successful - Balance Added")
 	message.SetBody("text/html", fmt.Sprintf(`
@@ -65,31 +75,29 @@ func SendTestEmail(to string) error {
 
 // sendSimpleTestEmail sends a test email using a simple SMTP client
 func sendSimpleTestEmail(to string) error {
-	// Use Gmail as a more reliable test provider
-	// You would need to replace these with actual credentials
-	smtpServer := "smtp.gmail.com"
-	smtpPort := 587
-
-	// For testing purposes, we could use a service like SendGrid, Mailgun, etc.
-	// For now, let's use your original Mailgun settings
-	smtpServer = "smtp.eu.mailgun.org"
-	smtpPort = 465
-	smtpUsername := "balance@cardinghaven.cc"
-
-	// Try to get password from environment
-	smtpPassword := os.Getenv("MAILGUN_PASSWORD")
-	if smtpPassword == "" {
-		log.Println("MAILGUN_PASSWORD not set, using fallback password")
-		smtpPassword = "your-smtp-password" // Replace with actual password for testing
+	smtpUser := os.Getenv("DWEBSTORE_SMTP_USER")
+	if smtpUser == "" {
+		smtpUser = "balance@cardinghaven.cc" // fallback
 	}
 
-	mailer := gomail.NewDialer(smtpServer, smtpPort, smtpUsername, smtpPassword)
+	smtpPassword := os.Getenv("DWEBSTORE_SMTP_PASSWORD")
+	if smtpPassword == "" {
+		log.Fatal("DWEBSTORE_SMTP_PASSWORD not set in .env file")
+	}
+
+	smtpServer := os.Getenv("DWEBSTORE_SMTP_SERVER")
+	if smtpServer == "" {
+		smtpServer = "smtp.eu.mailgun.org" // fallback
+	}
+	smtpPort := 465
+
+	mailer := gomail.NewDialer(smtpServer, smtpPort, smtpUser, smtpPassword)
 
 	// Set SSL for Mailgun
 	mailer.SSL = true
 
 	message := gomail.NewMessage()
-	message.SetHeader("From", smtpUsername)
+	message.SetHeader("From", smtpUser)
 	message.SetHeader("To", to)
 	message.SetHeader("Subject", "DWebstore Test Email")
 	message.SetBody("text/html", `

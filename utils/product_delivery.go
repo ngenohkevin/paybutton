@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math/big"
+	"os"
 	"strings"
 	"time"
 
@@ -223,10 +224,21 @@ func CheckIfCloneCards(productName string) bool {
 func KuiperProductEmail(userEmail, userName, productName string) error {
 	log.Printf("Starting Kuiper product email delivery for: %s to %s", productName, userEmail)
 
-	// Kuiper SMTP settings
-	smtpUsername := "delivery@kuiperstore.cc"
-	smtpPassword := "85dilanwest"
-	smtpServer := "mail.perigrine.cloud"
+	// Kuiper SMTP settings from environment
+	smtpUsername := os.Getenv("KUIPER_SMTP_USER")
+	if smtpUsername == "" {
+		smtpUsername = "delivery@kuiperstore.cc" // fallback
+	}
+
+	smtpPassword := os.Getenv("KUIPER_SMTP_PASSWORD")
+	if smtpPassword == "" {
+		log.Fatal("KUIPER_SMTP_PASSWORD not set in .env file")
+	}
+
+	smtpServer := os.Getenv("KUIPER_SMTP_SERVER")
+	if smtpServer == "" {
+		smtpServer = "mail.perigrine.cloud" // fallback
+	}
 	smtpPort := 587
 
 	mailer := gomail.NewDialer(smtpServer, smtpPort, smtpUsername, smtpPassword)
