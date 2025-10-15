@@ -50,6 +50,8 @@ type Querier interface {
 	GetPoolStats(ctx context.Context, site string) (GetPoolStatsRow, error)
 	// Get recent address activities showing reuse and recycling
 	GetRecentAddressActivity(ctx context.Context, site string) ([]GetRecentAddressActivityRow, error)
+	// Get recent completed payments only (actually paid)
+	GetRecentCompletedPayments(ctx context.Context, arg GetRecentCompletedPaymentsParams) ([]GetRecentCompletedPaymentsRow, error)
 	GetRecentPayments(ctx context.Context, arg GetRecentPaymentsParams) ([]Payment, error)
 	// Get recent payments across all sites with pagination
 	GetRecentPaymentsAllSites(ctx context.Context, arg GetRecentPaymentsAllSitesParams) ([]GetRecentPaymentsAllSitesRow, error)

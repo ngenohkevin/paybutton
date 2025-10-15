@@ -51,9 +51,10 @@ type DashboardDataDB struct {
 	ResourceStats      map[string]interface{}           `json:"resource_stats"`
 
 	// Recent activity
-	RecentPayments     []db.GetRecentPaymentsAllSitesRow `json:"recent_payments"`
-	ActivePendingPayments []db.GetActivePendingPaymentsRow `json:"active_pending_payments"`
-	SiteBreakdown      []db.GetSiteBreakdownRow         `json:"site_breakdown"`
+	RecentPayments          []db.GetRecentPaymentsAllSitesRow   `json:"recent_payments"`
+	RecentCompletedPayments []db.GetRecentCompletedPaymentsRow  `json:"recent_completed_payments"`
+	ActivePendingPayments   []db.GetActivePendingPaymentsRow    `json:"active_pending_payments"`
+	SiteBreakdown           []db.GetSiteBreakdownRow            `json:"site_breakdown"`
 
 	// Analytics data (still in memory as requested)
 	AnalyticsSummary   interface{} `json:"analytics_summary,omitempty"`
@@ -122,6 +123,17 @@ func GetDashboardDataFromDB(ctx context.Context) (*DashboardDataDB, error) {
 		log.Printf("Error fetching recent payments: %v", err)
 	} else {
 		data.RecentPayments = recentPayments
+	}
+
+	// Get recent completed payments (actually paid)
+	recentCompletedPayments, err := database.Queries.GetRecentCompletedPayments(ctx, db.GetRecentCompletedPaymentsParams{
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		log.Printf("Error fetching recent completed payments: %v", err)
+	} else {
+		data.RecentCompletedPayments = recentCompletedPayments
 	}
 
 	// Get active pending payments

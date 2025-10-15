@@ -117,11 +117,11 @@
 
     <!-- Two Column Layout -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Recent Payments -->
+        <!-- All Recent Activity -->
         <div class="card">
             <div class="card-header flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    <i class="fas fa-history text-blue-500 mr-2"></i>Recent Payments
+                    <i class="fas fa-list text-blue-500 mr-2"></i>All Recent Activity
                 </h3>
                 <a href="/admin/payments" class="text-blue-600 hover:text-blue-800 text-sm">
                     View All <i class="fas fa-arrow-right ml-1"></i>
@@ -169,18 +169,19 @@
             </div>
         </div>
 
-        <!-- Active Pending Payments -->
+        <!-- Recent Completed Payments (Actually Paid) -->
         <div class="card">
-            <div class="card-header">
+            <div class="card-header flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    <i class="fas fa-hourglass-half text-yellow-500 mr-2"></i>Active Pending
+                    <i class="fas fa-check-circle text-green-500 mr-2"></i>Recent Completed Payments
                 </h3>
+                <span class="text-sm text-gray-500">(Actually Paid)</span>
             </div>
             <div class="card-body">
-                {{if .Data.ActivePendingPayments}}
+                {{if .Data.RecentCompletedPayments}}
                 <div class="space-y-3">
-                    {{range .Data.ActivePendingPayments}}
-                    <div class="flex justify-between items-center p-3 bg-yellow-50 dark:bg-yellow-900 dark:bg-opacity-20 rounded-lg">
+                    {{range .Data.RecentCompletedPayments}}
+                    <div class="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900 dark:bg-opacity-20 rounded-lg">
                         <div class="flex-1">
                             <div class="font-mono text-sm text-gray-900 dark:text-white">
                                 {{if .Email.Valid}}{{.Email.String}}{{else}}Anonymous{{end}}
@@ -190,15 +191,15 @@
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-sm text-yellow-600 font-semibold">
-                                {{if gt .SecondsUntilExpiry 0}}
-                                    {{printf "%.0fm" (divf .SecondsUntilExpiry 60)}} left
-                                {{else}}
-                                    Expiring soon
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                <i class="fas fa-check mr-1"></i>Paid
+                            </span>
+                            <div class="text-xs text-gray-500 mt-1">
+                                {{if .ConfirmedAt.Valid}}
+                                    {{.ConfirmedAt.Time.Format "Jan 2, 15:04"}}
+                                {{else if .CompletedAt.Valid}}
+                                    {{.CompletedAt.Time.Format "Jan 2, 15:04"}}
                                 {{end}}
-                            </div>
-                            <div class="text-xs text-gray-500">
-                                {{.Confirmations}}/{{.RequiredConfirmations}} conf
                             </div>
                         </div>
                     </div>
@@ -206,8 +207,8 @@
                 </div>
                 {{else}}
                 <div class="text-center py-8 text-gray-500">
-                    <i class="fas fa-check-circle text-4xl mb-3 text-green-500"></i>
-                    <p>No pending payments</p>
+                    <i class="fas fa-inbox text-4xl mb-3"></i>
+                    <p>No completed payments yet</p>
                 </div>
                 {{end}}
             </div>

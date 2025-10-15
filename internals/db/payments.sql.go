@@ -775,6 +775,86 @@ func (q *Queries) GetPaymentsByDateRange(ctx context.Context, arg GetPaymentsByD
 	return items, nil
 }
 
+const GetRecentCompletedPayments = `-- name: GetRecentCompletedPayments :many
+SELECT
+    payment_id,
+    address,
+    site,
+    amount_btc,
+    amount_usd,
+    currency,
+    status,
+    confirmations,
+    required_confirmations,
+    email,
+    tx_hash,
+    created_at,
+    confirmed_at,
+    completed_at
+FROM payments
+WHERE status IN ('completed', 'confirmed')
+ORDER BY COALESCE(completed_at, confirmed_at, created_at) DESC
+LIMIT $1 OFFSET $2
+`
+
+type GetRecentCompletedPaymentsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetRecentCompletedPaymentsRow struct {
+	PaymentID             string             `json:"payment_id"`
+	Address               string             `json:"address"`
+	Site                  string             `json:"site"`
+	AmountBtc             pgtype.Numeric     `json:"amount_btc"`
+	AmountUsd             pgtype.Numeric     `json:"amount_usd"`
+	Currency              string             `json:"currency"`
+	Status                string             `json:"status"`
+	Confirmations         *int32             `json:"confirmations"`
+	RequiredConfirmations *int32             `json:"required_confirmations"`
+	Email                 *string            `json:"email"`
+	TxHash                *string            `json:"tx_hash"`
+	CreatedAt             time.Time          `json:"created_at"`
+	ConfirmedAt           pgtype.Timestamptz `json:"confirmed_at"`
+	CompletedAt           pgtype.Timestamptz `json:"completed_at"`
+}
+
+// Get recent completed payments only (actually paid)
+func (q *Queries) GetRecentCompletedPayments(ctx context.Context, arg GetRecentCompletedPaymentsParams) ([]GetRecentCompletedPaymentsRow, error) {
+	rows, err := q.db.Query(ctx, GetRecentCompletedPayments, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRecentCompletedPaymentsRow{}
+	for rows.Next() {
+		var i GetRecentCompletedPaymentsRow
+		if err := rows.Scan(
+			&i.PaymentID,
+			&i.Address,
+			&i.Site,
+			&i.AmountBtc,
+			&i.AmountUsd,
+			&i.Currency,
+			&i.Status,
+			&i.Confirmations,
+			&i.RequiredConfirmations,
+			&i.Email,
+			&i.TxHash,
+			&i.CreatedAt,
+			&i.ConfirmedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetRecentPayments = `-- name: GetRecentPayments :many
 SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
 WHERE site = $1
