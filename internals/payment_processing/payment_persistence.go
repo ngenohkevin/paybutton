@@ -406,3 +406,56 @@ func numericToFloat(n pgtype.Numeric) float64 {
 
 	return result
 }
+
+// StartPaymentCleanupJob runs a background job that marks expired payments
+func StartPaymentCleanupJob() {
+	log.Println("🧹 Starting payment cleanup job (runs every 10 minutes)")
+	
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	// Run immediately on startup
+	cleanupExpiredPayments()
+
+	// Then run every 10 minutes
+	for range ticker.C {
+		cleanupExpiredPayments()
+	}
+}
+
+// cleanupExpiredPayments marks all expired pending payments as expired
+func cleanupExpiredPayments() {
+	persistence := NewPaymentPersistence()
+	if !persistence.IsEnabled() {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Get all expired payments
+	expiredPayments, err := persistence.ListExpiredPayments(ctx)
+	if err != nil {
+		log.Printf("❌ Failed to list expired payments: %v", err)
+		return
+	}
+
+	if len(expiredPayments) == 0 {
+		return
+	}
+
+	log.Printf("🧹 Found %d expired payments to clean up", len(expiredPayments))
+
+	// Mark each as expired
+	for _, payment := range expiredPayments {
+		err := persistence.MarkPaymentExpired(ctx, payment.PaymentID)
+		if err != nil {
+			log.Printf("❌ Failed to mark payment %s as expired: %v", payment.PaymentID, err)
+			continue
+		}
+		log.Printf("⏰ Marked payment %s as expired (address: %s, email: %s)",
+			payment.PaymentID, payment.Address, payment.Email)
+	}
+
+	log.Printf("✅ Cleanup complete: marked %d payments as expired", len(expiredPayments))
+}

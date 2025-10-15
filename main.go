@@ -70,6 +70,9 @@ func main() {
 	// Initialize address pools for all sites (will load from database if enabled)
 	payment_processing.InitializeAddressPools()
 
+	// Start background cleanup job for expired payments
+	go payment_processing.StartPaymentCleanupJob()
+
 	srv, err := server.NewServerWithConfig(logger, cfg)
 	if err != nil {
 		logger.Error("Error creating server:", slog.String("error", err.Error()))
