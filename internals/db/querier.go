@@ -15,6 +15,8 @@ type Querier interface {
 	CountPaymentsWithFilters(ctx context.Context, arg CountPaymentsWithFiltersParams) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (AddressPoolAddress, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
+	// Delete expired payments for a specific address (used when address is recycled)
+	DeleteExpiredPaymentsByAddress(ctx context.Context, address string) error
 	DeleteOldPayments(ctx context.Context, createdAt time.Time) error
 	DeletePayment(ctx context.Context, paymentID string) error
 	// Get currently active pending payments for monitoring

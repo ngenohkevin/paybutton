@@ -407,6 +407,16 @@ func numericToFloat(n pgtype.Numeric) float64 {
 	return result
 }
 
+// DeleteExpiredPaymentsByAddress deletes all expired payment records for a specific address
+// This is called when an address is recycled to prevent duplicate entries in the UI
+func (p *PaymentPersistence) DeleteExpiredPaymentsByAddress(ctx context.Context, address string) error {
+	if !p.enabled {
+		return nil
+	}
+
+	return p.queries.DeleteExpiredPaymentsByAddress(ctx, address)
+}
+
 // StartPaymentCleanupJob runs a background job that marks expired payments
 func StartPaymentCleanupJob() {
 	log.Println("🧹 Starting payment cleanup job (runs every 10 minutes)")

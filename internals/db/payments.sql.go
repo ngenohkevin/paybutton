@@ -139,6 +139,18 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 	return i, err
 }
 
+const DeleteExpiredPaymentsByAddress = `-- name: DeleteExpiredPaymentsByAddress :exec
+DELETE FROM payments
+WHERE address = $1
+  AND status = 'expired'
+`
+
+// Delete expired payments for a specific address (used when address is recycled)
+func (q *Queries) DeleteExpiredPaymentsByAddress(ctx context.Context, address string) error {
+	_, err := q.db.Exec(ctx, DeleteExpiredPaymentsByAddress, address)
+	return err
+}
+
 const DeleteOldPayments = `-- name: DeleteOldPayments :exec
 DELETE FROM payments
 WHERE created_at < $1

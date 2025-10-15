@@ -150,6 +150,22 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 				delete(p.emailToAddress, addr.Email)
 			}
 
+			// Delete old expired payment records for this address before reassigning
+			if p.persistence != nil && p.persistence.IsEnabled() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				paymentPersistence := NewPaymentPersistence()
+				if paymentPersistence.IsEnabled() {
+					err := paymentPersistence.DeleteExpiredPaymentsByAddress(ctx, address)
+					if err != nil {
+						log.Printf("⚠️ Failed to delete expired payment for address %s: %v", address, err)
+					} else {
+						log.Printf("🗑️ Deleted expired payment record for recycled address %s", address)
+					}
+				}
+			}
+
 			// Assign to new user
 			addr.Email = email
 			addr.ReservedAt = now
