@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -109,6 +110,7 @@ func (p *PoolPersistence) SaveAddress(ctx context.Context, addr *PooledAddress) 
 	var balanceSats *int64
 	var txCount *int32
 
+	// Try to create first (for new addresses)
 	_, err := p.queries.CreateAddress(ctx, dbgen.CreateAddressParams{
 		Site:         addr.Site,
 		Address:      addr.Address,
@@ -123,6 +125,22 @@ func (p *PoolPersistence) SaveAddress(ctx context.Context, addr *PooledAddress) 
 	})
 
 	if err != nil {
+		// If address already exists (duplicate key error), update it instead
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			// Address already exists, update the reservation
+			updateErr := p.queries.UpdateAddressReservation(ctx, dbgen.UpdateAddressReservationParams{
+				Address:    addr.Address,
+				Email:      email,
+				ReservedAt: reservedAt,
+			})
+			if updateErr != nil {
+				log.Printf("❌ Failed to update address %s: %v", addr.Address, updateErr)
+				return updateErr
+			}
+			// Success - address was updated
+			return nil
+		}
+		// Different error, log and return
 		log.Printf("❌ Failed to save address %s: %v", addr.Address, err)
 		return err
 	}
