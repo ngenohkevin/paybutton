@@ -3834,9 +3834,28 @@ func getSitePoolStats(c *gin.Context) {
 func getGapLimitStatus(c *gin.Context) {
 	status := make(map[string]interface{})
 
-	// Get main address pool stats
-	pool := payment_processing.GetAddressPool()
-	poolStats := pool.GetStats()
+	// Get main address pool stats from database
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	poolStatsDB, err := GetPoolStatsFromDB(ctx)
+	var poolStats payment_processing.PoolStats
+	if err != nil {
+		log.Printf("Error fetching pool stats from DB in getGapLimitStatus: %v, falling back to in-memory", err)
+		// Fallback to in-memory pool
+		pool := payment_processing.GetAddressPool()
+		poolStats = pool.GetStats()
+	} else {
+		// Convert DB stats to PoolStats format
+		poolStats = payment_processing.PoolStats{
+			CurrentPoolSize:    poolStatsDB.CurrentPoolSize,
+			TotalGenerated:     poolStatsDB.TotalGenerated,
+			TotalUsed:          poolStatsDB.TotalUsed,
+			TotalRecycled:      poolStatsDB.TotalRecycled,
+			GapLimitErrors:     0,               // Not tracked in DB yet
+			LastGapLimitError:  time.Time{},     // Not tracked in DB yet
+		}
+	}
 
 	// Get gap monitor stats
 	gapMonitor := payment_processing.GetGapMonitor()
