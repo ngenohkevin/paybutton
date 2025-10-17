@@ -283,8 +283,8 @@ async function loadPaymentStats() {
         const data = await response.json();
 
         document.getElementById('total-payments').textContent = data.total_payments || 0;
-        document.getElementById('completed-payments').textContent = data.completed_count || 0;
-        document.getElementById('pending-payments').textContent = data.pending_count || 0;
+        document.getElementById('completed-payments').textContent = data.completed_payments || 0;
+        document.getElementById('pending-payments').textContent = data.pending_payments || 0;
         document.getElementById('total-revenue').textContent = '$' + (data.total_usd || 0).toFixed(2);
         document.getElementById('total-btc').textContent = (data.total_btc || 0).toFixed(8) + ' BTC';
     } catch (error) {
