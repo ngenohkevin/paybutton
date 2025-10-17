@@ -282,6 +282,8 @@ async function loadPaymentStats() {
         const response = await fetch(`/admin/api/payments/stats?site=${site}`);
         const data = await response.json();
 
+        console.log('Payment stats response:', data);
+
         document.getElementById('total-payments').textContent = data.total_payments || 0;
         document.getElementById('completed-payments').textContent = data.completed_payments || 0;
         document.getElementById('pending-payments').textContent = data.pending_payments || 0;
