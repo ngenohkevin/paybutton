@@ -193,10 +193,15 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	if existingAddr, exists := p.emailToAddress[email]; exists {
 		if addr := p.addresses[existingAddr]; addr != nil {
 			if addr.Status == AddressStatusReserved {
-				// Still unpaid, MUST REUSE to prevent gap limit!
-				addr.LastChecked = time.Now()
+				// ALWAYS REUSE same address for same user - GAP LIMIT PREVENTION
+				// Edge case (2x per month): User pays after monitoring stops, then requests new product
+				// Solution: Website should show timeout warning to user
+				now := time.Now()
+				addressAge := now.Sub(addr.ReservedAt)
+				addr.LastChecked = now
+
 				log.Printf("REUSING unpaid address %s for %s on %s (reserved %v ago) - GAP LIMIT PREVENTION",
-					existingAddr, email, p.site, time.Since(addr.ReservedAt))
+					existingAddr, email, p.site, addressAge.Round(time.Minute))
 
 				// Save to database
 				if p.persistence != nil && p.persistence.IsEnabled() {
@@ -211,6 +216,7 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	}
 
 	// PRIORITY 2: Find any expired address (72h old, unpaid) to recycle
+	// Note: RecycleExpiredAddresses() background job already verifies these for late payments
 	now := time.Now()
 	for address, addr := range p.addresses {
 		if addr.Status == AddressStatusReserved &&
