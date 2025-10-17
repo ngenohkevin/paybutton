@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ngenohkevin/paybutton/internals/database"
 	"github.com/ngenohkevin/paybutton/internals/db"
 	"github.com/ngenohkevin/paybutton/internals/monitoring"
@@ -282,6 +283,14 @@ func interfaceToFloat64(v interface{}) float64 {
 		// Try parsing string as float
 		if f, err := strconv.ParseFloat(val, 64); err == nil {
 			return f
+		}
+	case pgtype.Numeric:
+		// Handle PostgreSQL NUMERIC type
+		if val.Valid {
+			f64, err := val.Float64Value()
+			if err == nil {
+				return f64.Float64
+			}
 		}
 	}
 	return 0
