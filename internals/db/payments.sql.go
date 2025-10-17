@@ -12,6 +12,51 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const CountPaymentsGroupedByEmailAddress = `-- name: CountPaymentsGroupedByEmailAddress :one
+SELECT COUNT(*) FROM (
+    SELECT DISTINCT email, address, site, status
+    FROM payments
+    WHERE
+        ($1::text IS NULL OR site = $1)
+        AND ($2::text IS NULL OR status = $2)
+        AND (
+            $3::text IS NULL
+            OR email ILIKE '%' || $3 || '%'
+            OR address ILIKE '%' || $3 || '%'
+        )
+        AND (
+            $4::timestamptz IS NULL
+            OR created_at >= $4
+        )
+        AND (
+            $5::timestamptz IS NULL
+            OR created_at <= $5
+        )
+) AS unique_groups
+`
+
+type CountPaymentsGroupedByEmailAddressParams struct {
+	Site      *string            `json:"site"`
+	Status    *string            `json:"status"`
+	Search    *string            `json:"search"`
+	StartDate pgtype.Timestamptz `json:"start_date"`
+	EndDate   pgtype.Timestamptz `json:"end_date"`
+}
+
+// Count unique email+address combinations for pagination
+func (q *Queries) CountPaymentsGroupedByEmailAddress(ctx context.Context, arg CountPaymentsGroupedByEmailAddressParams) (int64, error) {
+	row := q.db.QueryRow(ctx, CountPaymentsGroupedByEmailAddress,
+		arg.Site,
+		arg.Status,
+		arg.Search,
+		arg.StartDate,
+		arg.EndDate,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const CountPaymentsWithFilters = `-- name: CountPaymentsWithFilters :one
 SELECT COUNT(*) FROM payments
 WHERE
@@ -71,7 +116,7 @@ INSERT INTO payments (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 )
-RETURNING id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at
+RETURNING id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count
 `
 
 type CreatePaymentParams struct {
@@ -135,6 +180,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 		&i.TelegramSentAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GenerationCount,
 	)
 	return i, err
 }
@@ -441,7 +487,7 @@ func (q *Queries) GetHourlyPaymentTrend(ctx context.Context) ([]GetHourlyPayment
 }
 
 const GetPayment = `-- name: GetPayment :one
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE payment_id = $1
 `
 
@@ -478,12 +524,13 @@ func (q *Queries) GetPayment(ctx context.Context, paymentID string) (Payment, er
 		&i.TelegramSentAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GenerationCount,
 	)
 	return i, err
 }
 
 const GetPaymentByAddress = `-- name: GetPaymentByAddress :one
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE address = $1 AND status != 'expired'
 ORDER BY created_at DESC
 LIMIT 1
@@ -522,6 +569,7 @@ func (q *Queries) GetPaymentByAddress(ctx context.Context, address string) (Paym
 		&i.TelegramSentAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.GenerationCount,
 	)
 	return i, err
 }
@@ -725,7 +773,7 @@ func (q *Queries) GetPaymentStatusDistribution(ctx context.Context) ([]GetPaymen
 }
 
 const GetPaymentsByDateRange = `-- name: GetPaymentsByDateRange :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE site = $1
   AND created_at BETWEEN $2 AND $3
 ORDER BY created_at DESC
@@ -776,6 +824,7 @@ func (q *Queries) GetPaymentsByDateRange(ctx context.Context, arg GetPaymentsByD
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}
@@ -868,7 +917,7 @@ func (q *Queries) GetRecentCompletedPayments(ctx context.Context, arg GetRecentC
 }
 
 const GetRecentPayments = `-- name: GetRecentPayments :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE site = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -918,6 +967,7 @@ func (q *Queries) GetRecentPayments(ctx context.Context, arg GetRecentPaymentsPa
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1150,7 +1200,7 @@ func (q *Queries) GetTopPaymentEmails(ctx context.Context, limit int32) ([]GetTo
 }
 
 const ListExpiredPayments = `-- name: ListExpiredPayments :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE status = 'pending'
   AND expires_at < NOW()
 ORDER BY expires_at ASC
@@ -1195,6 +1245,7 @@ func (q *Queries) ListExpiredPayments(ctx context.Context) ([]Payment, error) {
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1207,7 +1258,7 @@ func (q *Queries) ListExpiredPayments(ctx context.Context) ([]Payment, error) {
 }
 
 const ListPaymentsByEmail = `-- name: ListPaymentsByEmail :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE email = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -1258,6 +1309,7 @@ func (q *Queries) ListPaymentsByEmail(ctx context.Context, arg ListPaymentsByEma
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1270,7 +1322,7 @@ func (q *Queries) ListPaymentsByEmail(ctx context.Context, arg ListPaymentsByEma
 }
 
 const ListPaymentsBySite = `-- name: ListPaymentsBySite :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE site = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -1321,6 +1373,7 @@ func (q *Queries) ListPaymentsBySite(ctx context.Context, arg ListPaymentsBySite
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1333,7 +1386,7 @@ func (q *Queries) ListPaymentsBySite(ctx context.Context, arg ListPaymentsBySite
 }
 
 const ListPaymentsByStatus = `-- name: ListPaymentsByStatus :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE status = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -1384,6 +1437,181 @@ func (q *Queries) ListPaymentsByStatus(ctx context.Context, arg ListPaymentsBySt
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListPaymentsGroupedByEmailAddress = `-- name: ListPaymentsGroupedByEmailAddress :many
+WITH grouped_payments AS (
+    SELECT
+        email,
+        address,
+        site,
+        status,
+        COUNT(*) as generation_count,
+        MAX(id) as latest_payment_id,
+        MAX(created_at) as latest_created_at,
+        MIN(created_at) as first_created_at
+    FROM payments
+    WHERE
+        ($3::text IS NULL OR site = $3)
+        AND ($4::text IS NULL OR status = $4)
+        AND (
+            $5::text IS NULL
+            OR email ILIKE '%' || $5 || '%'
+            OR address ILIKE '%' || $5 || '%'
+        )
+        AND (
+            $6::timestamptz IS NULL
+            OR created_at >= $6
+        )
+        AND (
+            $7::timestamptz IS NULL
+            OR created_at <= $7
+        )
+    GROUP BY email, address, site, status
+)
+SELECT
+    p.id,
+    p.payment_id,
+    p.address,
+    p.site,
+    p.tx_hash,
+    p.amount_btc,
+    p.amount_usd,
+    p.currency,
+    p.confirmations,
+    p.required_confirmations,
+    p.status,
+    p.email,
+    p.order_id,
+    p.user_agent,
+    p.ip_address,
+    p.payment_initiated_at,
+    p.first_seen_at,
+    p.confirmed_at,
+    p.completed_at,
+    p.expires_at,
+    p.notes,
+    p.webhook_sent,
+    p.webhook_sent_at,
+    p.email_sent,
+    p.email_sent_at,
+    p.telegram_sent,
+    p.telegram_sent_at,
+    p.created_at,
+    p.updated_at,
+    gp.generation_count::integer as generation_count,
+    gp.first_created_at
+FROM grouped_payments gp
+JOIN payments p ON p.id = gp.latest_payment_id
+ORDER BY gp.latest_created_at DESC
+LIMIT $2
+OFFSET $1
+`
+
+type ListPaymentsGroupedByEmailAddressParams struct {
+	Offset    int32              `json:"offset"`
+	Limit     int32              `json:"limit"`
+	Site      *string            `json:"site"`
+	Status    *string            `json:"status"`
+	Search    *string            `json:"search"`
+	StartDate pgtype.Timestamptz `json:"start_date"`
+	EndDate   pgtype.Timestamptz `json:"end_date"`
+}
+
+type ListPaymentsGroupedByEmailAddressRow struct {
+	ID                    int32              `json:"id"`
+	PaymentID             string             `json:"payment_id"`
+	Address               string             `json:"address"`
+	Site                  string             `json:"site"`
+	TxHash                *string            `json:"tx_hash"`
+	AmountBtc             pgtype.Numeric     `json:"amount_btc"`
+	AmountUsd             pgtype.Numeric     `json:"amount_usd"`
+	Currency              string             `json:"currency"`
+	Confirmations         *int32             `json:"confirmations"`
+	RequiredConfirmations *int32             `json:"required_confirmations"`
+	Status                string             `json:"status"`
+	Email                 *string            `json:"email"`
+	OrderID               *string            `json:"order_id"`
+	UserAgent             *string            `json:"user_agent"`
+	IpAddress             *string            `json:"ip_address"`
+	PaymentInitiatedAt    time.Time          `json:"payment_initiated_at"`
+	FirstSeenAt           pgtype.Timestamptz `json:"first_seen_at"`
+	ConfirmedAt           pgtype.Timestamptz `json:"confirmed_at"`
+	CompletedAt           pgtype.Timestamptz `json:"completed_at"`
+	ExpiresAt             pgtype.Timestamptz `json:"expires_at"`
+	Notes                 *string            `json:"notes"`
+	WebhookSent           *bool              `json:"webhook_sent"`
+	WebhookSentAt         pgtype.Timestamptz `json:"webhook_sent_at"`
+	EmailSent             *bool              `json:"email_sent"`
+	EmailSentAt           pgtype.Timestamptz `json:"email_sent_at"`
+	TelegramSent          *bool              `json:"telegram_sent"`
+	TelegramSentAt        pgtype.Timestamptz `json:"telegram_sent_at"`
+	CreatedAt             time.Time          `json:"created_at"`
+	UpdatedAt             time.Time          `json:"updated_at"`
+	GenerationCount       int32              `json:"generation_count"`
+	FirstCreatedAt        interface{}        `json:"first_created_at"`
+}
+
+// Get payments grouped by email+address combination, showing only most recent with generation count
+func (q *Queries) ListPaymentsGroupedByEmailAddress(ctx context.Context, arg ListPaymentsGroupedByEmailAddressParams) ([]ListPaymentsGroupedByEmailAddressRow, error) {
+	rows, err := q.db.Query(ctx, ListPaymentsGroupedByEmailAddress,
+		arg.Offset,
+		arg.Limit,
+		arg.Site,
+		arg.Status,
+		arg.Search,
+		arg.StartDate,
+		arg.EndDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPaymentsGroupedByEmailAddressRow{}
+	for rows.Next() {
+		var i ListPaymentsGroupedByEmailAddressRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PaymentID,
+			&i.Address,
+			&i.Site,
+			&i.TxHash,
+			&i.AmountBtc,
+			&i.AmountUsd,
+			&i.Currency,
+			&i.Confirmations,
+			&i.RequiredConfirmations,
+			&i.Status,
+			&i.Email,
+			&i.OrderID,
+			&i.UserAgent,
+			&i.IpAddress,
+			&i.PaymentInitiatedAt,
+			&i.FirstSeenAt,
+			&i.ConfirmedAt,
+			&i.CompletedAt,
+			&i.ExpiresAt,
+			&i.Notes,
+			&i.WebhookSent,
+			&i.WebhookSentAt,
+			&i.EmailSent,
+			&i.EmailSentAt,
+			&i.TelegramSent,
+			&i.TelegramSentAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.GenerationCount,
+			&i.FirstCreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1396,7 +1624,7 @@ func (q *Queries) ListPaymentsByStatus(ctx context.Context, arg ListPaymentsBySt
 }
 
 const ListPaymentsWithFilters = `-- name: ListPaymentsWithFilters :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE
     ($1::text IS NULL OR site = $1)
     AND ($2::text IS NULL OR status = $2)
@@ -1476,6 +1704,7 @@ func (q *Queries) ListPaymentsWithFilters(ctx context.Context, arg ListPaymentsW
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1488,7 +1717,7 @@ func (q *Queries) ListPaymentsWithFilters(ctx context.Context, arg ListPaymentsW
 }
 
 const ListPendingPayments = `-- name: ListPendingPayments :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE status IN ('pending', 'detected', 'confirming')
 ORDER BY created_at ASC
 `
@@ -1532,6 +1761,7 @@ func (q *Queries) ListPendingPayments(ctx context.Context) ([]Payment, error) {
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1557,7 +1787,7 @@ func (q *Queries) MarkPaymentExpired(ctx context.Context, paymentID string) erro
 }
 
 const SearchPayments = `-- name: SearchPayments :many
-SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at FROM payments
+SELECT id, payment_id, address, site, tx_hash, amount_btc, amount_usd, currency, confirmations, required_confirmations, status, email, order_id, user_agent, ip_address, payment_initiated_at, first_seen_at, confirmed_at, completed_at, expires_at, notes, webhook_sent, webhook_sent_at, email_sent, email_sent_at, telegram_sent, telegram_sent_at, created_at, updated_at, generation_count FROM payments
 WHERE site = $1
   AND (
     email ILIKE '%' || $2 || '%'
@@ -1620,6 +1850,7 @@ func (q *Queries) SearchPayments(ctx context.Context, arg SearchPaymentsParams) 
 			&i.TelegramSentAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.GenerationCount,
 		); err != nil {
 			return nil, err
 		}

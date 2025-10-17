@@ -12,6 +12,8 @@ import (
 type Querier interface {
 	AddToQueue(ctx context.Context, arg AddToQueueParams) error
 	CountAddressesByStatus(ctx context.Context, arg CountAddressesByStatusParams) (int64, error)
+	// Count unique email+address combinations for pagination
+	CountPaymentsGroupedByEmailAddress(ctx context.Context, arg CountPaymentsGroupedByEmailAddressParams) (int64, error)
 	CountPaymentsWithFilters(ctx context.Context, arg CountPaymentsWithFiltersParams) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (AddressPoolAddress, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
@@ -71,6 +73,8 @@ type Querier interface {
 	ListPaymentsByEmail(ctx context.Context, arg ListPaymentsByEmailParams) ([]Payment, error)
 	ListPaymentsBySite(ctx context.Context, arg ListPaymentsBySiteParams) ([]Payment, error)
 	ListPaymentsByStatus(ctx context.Context, arg ListPaymentsByStatusParams) ([]Payment, error)
+	// Get payments grouped by email+address combination, showing only most recent with generation count
+	ListPaymentsGroupedByEmailAddress(ctx context.Context, arg ListPaymentsGroupedByEmailAddressParams) ([]ListPaymentsGroupedByEmailAddressRow, error)
 	ListPaymentsWithFilters(ctx context.Context, arg ListPaymentsWithFiltersParams) ([]Payment, error)
 	ListPendingPayments(ctx context.Context) ([]Payment, error)
 	MarkAddressUsed(ctx context.Context, address string) error

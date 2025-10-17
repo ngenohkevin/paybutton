@@ -27,23 +27,25 @@ type PaymentsPageData struct {
 
 // PaymentDisplay represents a payment for display
 type PaymentDisplay struct {
-	PaymentID        string    `json:"payment_id"`
-	Address          string    `json:"address"`
-	Site             string    `json:"site"`
-	AmountBTC        float64   `json:"amount_btc"`
-	AmountUSD        float64   `json:"amount_usd"`
-	Currency         string    `json:"currency"`
-	Status           string    `json:"status"`
-	Confirmations    int32     `json:"confirmations"`
-	RequiredConfs    int32     `json:"required_confirmations"`
-	Email            string    `json:"email"`
-	TxHash           string    `json:"tx_hash"`
-	CreatedAt        time.Time `json:"created_at"`
+	PaymentID        string     `json:"payment_id"`
+	Address          string     `json:"address"`
+	Site             string     `json:"site"`
+	AmountBTC        float64    `json:"amount_btc"`
+	AmountUSD        float64    `json:"amount_usd"`
+	Currency         string     `json:"currency"`
+	Status           string     `json:"status"`
+	Confirmations    int32      `json:"confirmations"`
+	RequiredConfs    int32      `json:"required_confirmations"`
+	Email            string     `json:"email"`
+	TxHash           string     `json:"tx_hash"`
+	CreatedAt        time.Time  `json:"created_at"`
 	ConfirmedAt      *time.Time `json:"confirmed_at,omitempty"`
 	CompletedAt      *time.Time `json:"completed_at,omitempty"`
 	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
-	TimeUntilExpiry  string    `json:"time_until_expiry,omitempty"`
-	StatusBadgeClass string    `json:"status_badge_class"`
+	TimeUntilExpiry  string     `json:"time_until_expiry,omitempty"`
+	StatusBadgeClass string     `json:"status_badge_class"`
+	GenerationCount  int32      `json:"generation_count,omitempty"`
+	FirstCreatedAt   *time.Time `json:"first_created_at,omitempty"`
 }
 
 // PaymentStats represents payment statistics
@@ -192,8 +194,8 @@ func getPaymentsDataFromDB(ctx context.Context, filters PaymentFilters, page, pa
 		}
 	}
 
-	// Get filtered payments
-	payments, err := database.Queries.ListPaymentsWithFilters(ctx, db.ListPaymentsWithFiltersParams{
+	// Get filtered payments grouped by email+address
+	payments, err := database.Queries.ListPaymentsGroupedByEmailAddress(ctx, db.ListPaymentsGroupedByEmailAddressParams{
 		Site:      sitePtr,
 		Status:    statusPtr,
 		Search:    searchPtr,
@@ -209,11 +211,11 @@ func getPaymentsDataFromDB(ctx context.Context, filters PaymentFilters, page, pa
 	// Convert to display format
 	data.Payments = make([]PaymentDisplay, len(payments))
 	for i, p := range payments {
-		data.Payments[i] = convertToPaymentDisplay(p)
+		data.Payments[i] = convertToPaymentDisplayGrouped(p)
 	}
 
 	// Get total count for pagination
-	totalCount, err := database.Queries.CountPaymentsWithFilters(ctx, db.CountPaymentsWithFiltersParams{
+	totalCount, err := database.Queries.CountPaymentsGroupedByEmailAddress(ctx, db.CountPaymentsGroupedByEmailAddressParams{
 		Site:      sitePtr,
 		Status:    statusPtr,
 		Search:    searchPtr,
@@ -288,6 +290,67 @@ func getPaymentsDataFromDB(ctx context.Context, filters PaymentFilters, page, pa
 	}
 
 	return data, nil
+}
+
+// convertToPaymentDisplayGrouped converts grouped payment query result to display format
+func convertToPaymentDisplayGrouped(p db.ListPaymentsGroupedByEmailAddressRow) PaymentDisplay {
+	display := PaymentDisplay{
+		PaymentID:       p.PaymentID,
+		Address:         p.Address,
+		Site:            p.Site,
+		Currency:        p.Currency,
+		Status:          p.Status,
+		CreatedAt:       p.PaymentInitiatedAt,
+		GenerationCount: p.GenerationCount,
+	}
+
+	// Handle confirmations (nullable int32 pointers)
+	if p.Confirmations != nil {
+		display.Confirmations = *p.Confirmations
+	}
+	if p.RequiredConfirmations != nil {
+		display.RequiredConfs = *p.RequiredConfirmations
+	}
+
+	// Convert amounts from pgtype.Numeric
+	if amountBTC, err := p.AmountBtc.Float64Value(); err == nil {
+		display.AmountBTC = amountBTC.Float64
+	}
+	if amountUSD, err := p.AmountUsd.Float64Value(); err == nil {
+		display.AmountUSD = amountUSD.Float64
+	}
+
+	// Handle optional string fields (pointers)
+	if p.Email != nil {
+		display.Email = *p.Email
+	}
+	if p.TxHash != nil {
+		display.TxHash = *p.TxHash
+	}
+
+	// Handle timestamp fields
+	if p.ConfirmedAt.Valid {
+		display.ConfirmedAt = &p.ConfirmedAt.Time
+	}
+	if p.CompletedAt.Valid {
+		display.CompletedAt = &p.CompletedAt.Time
+	}
+	if p.ExpiresAt.Valid {
+		display.ExpiresAt = &p.ExpiresAt.Time
+		if p.Status == "pending" && p.ExpiresAt.Time.After(time.Now()) {
+			duration := time.Until(p.ExpiresAt.Time)
+			display.TimeUntilExpiry = formatDuration(duration)
+		}
+	}
+	// Handle FirstCreatedAt - it's an interface{} from the query
+	if firstCreatedAt, ok := p.FirstCreatedAt.(time.Time); ok {
+		display.FirstCreatedAt = &firstCreatedAt
+	}
+
+	// Set badge class based on status
+	display.StatusBadgeClass = getStatusBadgeClass(p.Status)
+
+	return display
 }
 
 // convertToPaymentDisplay converts DB payment to display format

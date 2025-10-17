@@ -24,5 +24,6 @@ test-analytics-tracking.html
 test_build
 test_build_*
 paybutton
+paybutton_*
 gap_recovery_data.json
 check_funded_addresses.sh

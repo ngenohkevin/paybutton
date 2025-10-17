@@ -79,4 +79,5 @@ type Payment struct {
 	TelegramSentAt        pgtype.Timestamptz `json:"telegram_sent_at"`
 	CreatedAt             time.Time          `json:"created_at"`
 	UpdatedAt             time.Time          `json:"updated_at"`
+	GenerationCount       *int32             `json:"generation_count"`
 }
