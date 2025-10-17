@@ -421,6 +421,7 @@ func (p *SiteAddressPool) MarkAddressUsed(address string) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	// Update in-memory state if address exists in pool
 	if addr, exists := p.addresses[address]; exists {
 		addr.Status = AddressStatusUsed
 		addr.PaymentCount++
@@ -431,12 +432,20 @@ func (p *SiteAddressPool) MarkAddressUsed(address string) {
 		if addr.Email != "" {
 			delete(p.emailToAddress, addr.Email)
 		}
+	} else {
+		log.Printf("Address %s not in memory pool for %s, updating database directly", address, p.site)
+	}
 
-		// Save to database
-		if p.persistence != nil && p.persistence.IsEnabled() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_ = p.persistence.MarkAddressUsed(ctx, address)
+	// CRITICAL FIX: Always update database, even if address not in memory
+	// This prevents address reuse when addresses are assigned from global pool
+	if p.persistence != nil && p.persistence.IsEnabled() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := p.persistence.MarkAddressUsed(ctx, address)
+		if err != nil {
+			log.Printf("❌ ERROR: Failed to mark address %s as used in database for %s: %v", address, p.site, err)
+		} else {
+			log.Printf("✅ Address %s marked as USED in database for %s", address, p.site)
 		}
 	}
 }
