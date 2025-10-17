@@ -125,7 +125,7 @@ SELECT
     COALESCE(AVG(amount_btc) FILTER (WHERE status = 'completed'), 0) as avg_btc,
     COALESCE(AVG(amount_usd) FILTER (WHERE status = 'completed'), 0) as avg_usd
 FROM payments
-WHERE site = $1;
+WHERE ($1 = 'all' OR site = $1);
 
 -- name: GetPaymentStatsByDateRange :one
 SELECT

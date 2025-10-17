@@ -46,6 +46,8 @@ type PaymentDisplay struct {
 	StatusBadgeClass string     `json:"status_badge_class"`
 	GenerationCount  int32      `json:"generation_count,omitempty"`
 	FirstCreatedAt   *time.Time `json:"first_created_at,omitempty"`
+	EmailSent        bool       `json:"email_sent"`
+	TelegramSent     bool       `json:"telegram_sent"`
 }
 
 // PaymentStats represents payment statistics
@@ -347,6 +349,14 @@ func convertToPaymentDisplayGrouped(p db.ListPaymentsGroupedByEmailAddressRow) P
 		display.FirstCreatedAt = &firstCreatedAt
 	}
 
+	// Handle notification flags (nullable bool pointers)
+	if p.EmailSent != nil {
+		display.EmailSent = *p.EmailSent
+	}
+	if p.TelegramSent != nil {
+		display.TelegramSent = *p.TelegramSent
+	}
+
 	// Set badge class based on status
 	display.StatusBadgeClass = getStatusBadgeClass(p.Status)
 
@@ -401,6 +411,14 @@ func convertToPaymentDisplay(p db.Payment) PaymentDisplay {
 			duration := time.Until(p.ExpiresAt.Time)
 			display.TimeUntilExpiry = formatDuration(duration)
 		}
+	}
+
+	// Handle notification flags (nullable bool pointers)
+	if p.EmailSent != nil {
+		display.EmailSent = *p.EmailSent
+	}
+	if p.TelegramSent != nil {
+		display.TelegramSent = *p.TelegramSent
 	}
 
 	// Set badge class based on status

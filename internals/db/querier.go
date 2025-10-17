@@ -45,7 +45,7 @@ type Querier interface {
 	// Calculate payment success/conversion rate
 	GetPaymentConversionRate(ctx context.Context, createdAt time.Time) (GetPaymentConversionRateRow, error)
 	GetPaymentCountByStatus(ctx context.Context, site string) ([]GetPaymentCountByStatusRow, error)
-	GetPaymentStats(ctx context.Context, site string) (GetPaymentStatsRow, error)
+	GetPaymentStats(ctx context.Context, dollar_1 interface{}) (GetPaymentStatsRow, error)
 	GetPaymentStatsByDateRange(ctx context.Context, arg GetPaymentStatsByDateRangeParams) (GetPaymentStatsByDateRangeRow, error)
 	// Get count of payments by status for dashboard pie chart
 	GetPaymentStatusDistribution(ctx context.Context) ([]GetPaymentStatusDistributionRow, error)

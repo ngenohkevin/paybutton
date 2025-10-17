@@ -400,6 +400,21 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 						log.Printf("Skipping product delivery for %s as product not found in session", email)
 					}
 
+					// Send product delivery confirmation email
+					emailSent := false
+					if userName != "" && userName != "User" {
+						log.Println("📧 Sending product delivery email to user:", email)
+						err = utils.SendEmail(email, userName, fmt.Sprintf("%.2f", balanceUSD))
+						if err != nil {
+							log.Printf("Error sending product delivery email to user %s: %s", email, err)
+						} else {
+							log.Println("✅ Product delivery email sent successfully to user:", email)
+							emailSent = true
+						}
+					} else {
+						log.Printf("Skipping email send for %s - user name not available", email)
+					}
+
 					// Telegram notification for product delivery
 					botLogMessage := fmt.Sprintf(
 						"*Email:* `%s`\n*Product Delivered (%s):* `%s`\n*Amount:* `%s USD`\n*Site:* `%s`\n*Confirmation Time:* `%s`",
@@ -418,6 +433,12 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					// Mark notifications sent in payment record
 					if paymentPersistence.IsEnabled() && currentPayment != nil {
 						ctx := context.Background()
+						if emailSent {
+							err := paymentPersistence.MarkEmailSent(ctx, currentPayment.PaymentID)
+							if err != nil {
+								log.Printf("❌ Failed to mark email as sent for payment %s: %v", currentPayment.PaymentID, err)
+							}
+						}
 						if telegramSent {
 							err := paymentPersistence.MarkTelegramSent(ctx, currentPayment.PaymentID)
 							if err != nil {
@@ -428,7 +449,7 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 						if err != nil {
 							log.Printf("❌ Failed to mark payment completed %s: %v", currentPayment.PaymentID, err)
 						} else {
-							log.Printf("✅ Payment %s completed (telegram_sent: %v)", currentPayment.PaymentID, telegramSent)
+							log.Printf("✅ Payment %s completed (email_sent: %v, telegram_sent: %v)", currentPayment.PaymentID, emailSent, telegramSent)
 						}
 					}
 

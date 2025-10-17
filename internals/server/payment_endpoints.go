@@ -101,7 +101,7 @@ func getPaymentStatsAPI(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	site := c.DefaultQuery("site", "dwebstore")
+	site := c.DefaultQuery("site", "all")
 
 	persistence := payment_processing.NewPaymentPersistence()
 	if !persistence.IsEnabled() {

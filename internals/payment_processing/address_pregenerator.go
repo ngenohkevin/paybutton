@@ -154,9 +154,9 @@ func InitializeAddressPools() {
 
 // maintainSiteAddressPool - Background goroutine that keeps pool filled with verified addresses
 func maintainSiteAddressPool(site string) {
-	minPoolSize := 5  // Minimum verified addresses to keep ready
-	maxPoolSize := 10 // Maximum to pre-generate
-	refillThreshold := 3 // Refill when pool drops to this size
+	minPoolSize := 2  // Minimum verified addresses to keep ready (reduced to avoid Blockonomics gap limit errors)
+	maxPoolSize := 4  // Maximum to pre-generate (conservative for low traffic)
+	refillThreshold := 1 // Refill when pool drops to this size (only refill when nearly empty)
 
 	// Check if pool already has addresses from database before generating
 	pool := GetSitePool(site)

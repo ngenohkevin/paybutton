@@ -59,9 +59,9 @@ func InitializeAddressPool() *AddressPool {
 			availableAddrs:  make([]PoolAddress, 0),
 			reservedAddrs:   make(map[string]*PoolAddress),
 			usedAddrs:       make(map[string]*PoolAddress),
-			minPoolSize:     5,  // Minimum addresses to keep in pool
-			maxPoolSize:     20, // Maximum addresses in pool
-			refillThreshold: 3,  // Refill when pool drops to this size
+			minPoolSize:     2,  // Minimum addresses to keep in pool (reduced to avoid gap limit errors)
+			maxPoolSize:     10, // Maximum addresses in pool (reduced for low traffic)
+			refillThreshold: 1,  // Refill when pool drops to this size (more conservative)
 			refillCooldown:  5 * time.Minute,
 			persistFile:     "address_pool.json",
 		}

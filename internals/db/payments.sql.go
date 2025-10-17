@@ -657,7 +657,7 @@ SELECT
     COALESCE(AVG(amount_btc) FILTER (WHERE status = 'completed'), 0) as avg_btc,
     COALESCE(AVG(amount_usd) FILTER (WHERE status = 'completed'), 0) as avg_usd
 FROM payments
-WHERE site = $1
+WHERE ($1 = 'all' OR site = $1)
 `
 
 type GetPaymentStatsRow struct {
@@ -671,8 +671,8 @@ type GetPaymentStatsRow struct {
 	AvgUsd         interface{} `json:"avg_usd"`
 }
 
-func (q *Queries) GetPaymentStats(ctx context.Context, site string) (GetPaymentStatsRow, error) {
-	row := q.db.QueryRow(ctx, GetPaymentStats, site)
+func (q *Queries) GetPaymentStats(ctx context.Context, dollar_1 interface{}) (GetPaymentStatsRow, error) {
+	row := q.db.QueryRow(ctx, GetPaymentStats, dollar_1)
 	var i GetPaymentStatsRow
 	err := row.Scan(
 		&i.TotalPayments,
