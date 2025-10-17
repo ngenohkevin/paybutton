@@ -271,6 +271,9 @@ func refillSitePool(site string, minSize, maxSize int) error {
 
 		pool.mutex.Unlock()
 
+		// Add to GLOBAL pool for cross-site reuse
+		AddToGlobalPool(address)
+
 		// Register address-to-site mapping
 		RegisterAddressForSite(address, site)
 

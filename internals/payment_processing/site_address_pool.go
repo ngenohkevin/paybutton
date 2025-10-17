@@ -42,9 +42,78 @@ type SiteAddressPool struct {
 }
 
 var (
-	sitePools = make(map[string]*SiteAddressPool)
-	poolMutex sync.RWMutex
+	sitePools      = make(map[string]*SiteAddressPool)
+	poolMutex      sync.RWMutex
+	globalPool     = &GlobalAddressPool{
+		availableAddresses: make([]string, 0),
+		assignedToSite:     make(map[string]string), // address -> site
+	}
+	globalPoolMutex sync.RWMutex
 )
+
+// GlobalAddressPool - Shared pool of addresses available to any site
+type GlobalAddressPool struct {
+	availableAddresses []string          // FIFO queue of addresses available to ANY site
+	assignedToSite     map[string]string // address -> currently assigned site
+}
+
+// AddToGlobalPool - Add address to shared global pool
+func AddToGlobalPool(address string) {
+	globalPoolMutex.Lock()
+	defer globalPoolMutex.Unlock()
+
+	// Only add if not already in global pool
+	for _, addr := range globalPool.availableAddresses {
+		if addr == address {
+			return
+		}
+	}
+
+	globalPool.availableAddresses = append(globalPool.availableAddresses, address)
+	log.Printf("➕ Added address to GLOBAL pool (total available: %d)", len(globalPool.availableAddresses))
+}
+
+// TakeFromGlobalPool - Take address from global pool and assign to site
+func TakeFromGlobalPool(site string) (string, bool) {
+	globalPoolMutex.Lock()
+	defer globalPoolMutex.Unlock()
+
+	if len(globalPool.availableAddresses) == 0 {
+		return "", false
+	}
+
+	// Take first available address
+	address := globalPool.availableAddresses[0]
+	globalPool.availableAddresses = globalPool.availableAddresses[1:]
+	globalPool.assignedToSite[address] = site
+
+	log.Printf("🌍 GLOBAL POOL: Assigned address to site %s (remaining: %d)", site, len(globalPool.availableAddresses))
+	return address, true
+}
+
+// ReturnToGlobalPool - Return address to global pool when recycled
+func ReturnToGlobalPool(address string) {
+	globalPoolMutex.Lock()
+	defer globalPoolMutex.Unlock()
+
+	// Remove site assignment
+	delete(globalPool.assignedToSite, address)
+
+	// Add back to available pool
+	globalPool.availableAddresses = append(globalPool.availableAddresses, address)
+	log.Printf("♻️ Returned address to GLOBAL pool (total available: %d)", len(globalPool.availableAddresses))
+}
+
+// GetGlobalPoolStats - Get global pool statistics
+func GetGlobalPoolStats() map[string]interface{} {
+	globalPoolMutex.RLock()
+	defer globalPoolMutex.RUnlock()
+
+	return map[string]interface{}{
+		"available": len(globalPool.availableAddresses),
+		"assigned":  len(globalPool.assignedToSite),
+	}
+}
 
 func GetSitePool(site string) *SiteAddressPool {
 	poolMutex.RLock()
@@ -104,7 +173,12 @@ func (p *SiteAddressPool) LoadFromDatabase() error {
 	}
 	p.availableQueue = queue
 
-	log.Printf("✅ Loaded %d addresses, %d in queue for site %s",
+	// Add available addresses to GLOBAL pool for cross-site reuse
+	for _, addr := range queue {
+		AddToGlobalPool(addr)
+	}
+
+	log.Printf("✅ Loaded %d addresses, %d in queue for site %s (added to global pool)",
 		len(addresses), len(queue), p.site)
 
 	return nil
@@ -185,7 +259,42 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 		}
 	}
 
-	// PRIORITY 3: Get from available queue (pre-generated addresses)
+	// PRIORITY 3: Try global pool first (cross-site address sharing)
+	if address, found := TakeFromGlobalPool(p.site); found {
+		// Got address from global pool - need to set it up for this site
+		pooledAddr := p.addresses[address]
+		if pooledAddr == nil {
+			// Address not in our tracking yet - create entry
+			pooledAddr = &PooledAddress{
+				Address:     address,
+				Site:        p.site,
+				Status:      AddressStatusAvailable,
+				LastChecked: now,
+			}
+			p.addresses[address] = pooledAddr
+		}
+
+		// Assign to user
+		pooledAddr.Email = email
+		pooledAddr.ReservedAt = now
+		pooledAddr.LastChecked = now
+		pooledAddr.Status = AddressStatusReserved
+		pooledAddr.Site = p.site // Update site assignment
+		p.emailToAddress[email] = address
+
+		// Save to database
+		if p.persistence != nil && p.persistence.IsEnabled() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = p.persistence.SaveAddress(ctx, pooledAddr)
+			_ = p.persistence.UpdateAddressReservation(ctx, address, email, now)
+		}
+
+		log.Printf("✅ Assigned address from GLOBAL pool to %s on %s", email, p.site)
+		return address, nil
+	}
+
+	// PRIORITY 4: Get from site-specific available queue (legacy)
 	if len(p.availableQueue) > 0 {
 		address := p.availableQueue[0]
 		p.availableQueue = p.availableQueue[1:]
@@ -392,6 +501,9 @@ func RecycleExpiredAddresses() {
 				addr.Email = ""
 				addr.LastChecked = now // Update last checked time for age-based re-verification
 				pool.availableQueue = append(pool.availableQueue, address)
+
+				// Return to GLOBAL pool for cross-site reuse
+				ReturnToGlobalPool(address)
 
 				// Save to database
 				if pool.persistence != nil && pool.persistence.IsEnabled() {
