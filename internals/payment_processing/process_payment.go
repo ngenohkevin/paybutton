@@ -51,9 +51,11 @@ func InitializeAPIKeys() error {
 	blockonomicsAPIKey = config.BlockonomicsAPI
 
 	// Initialize subsystems
+	// OLD POOL KEPT for compatibility but auto-refill disabled - site-specific pools handle generation
 	InitializeAddressPool()
 	InitializeRateLimiter()
-	InitializeGapMonitor()
+	// GAP MONITOR DISABLED - Site pools have their own gap limit tracking
+	// InitializeGapMonitor()
 
 	return nil
 }

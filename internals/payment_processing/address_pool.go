@@ -69,8 +69,9 @@ func InitializeAddressPool() *AddressPool {
 		// Load persisted pool if exists
 		addressPool.loadFromDisk()
 
-		// Start background pool maintenance
-		go addressPool.maintainPool()
+		// DISABLED: Background pool maintenance now handled by site-specific pools
+		// This old pool is kept only for compatibility with existing code (MarkAddressUsed, etc)
+		// go addressPool.maintainPool()
 	})
 	return addressPool
 }
