@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"syscall"
+	"time"
 
 	"github.com/ngenohkevin/paybutton/internals/config"
 	"github.com/ngenohkevin/paybutton/internals/database"
@@ -72,6 +73,16 @@ func main() {
 
 	// Start background cleanup job for expired payments
 	go payment_processing.StartPaymentCleanupJob()
+
+	// Start comprehensive address health service (runs once per day)
+	if database.Queries != nil {
+		healthService := payment_processing.NewAddressHealthService(database.Queries, 24*time.Hour)
+		healthService.Start()
+		defer healthService.Stop()
+		logger.Info("✅ Address Health Service started (runs daily)")
+	} else {
+		logger.Info("⚠️ Address Health Service disabled - no database connection")
+	}
 
 	srv, err := server.NewServerWithConfig(logger, cfg)
 	if err != nil {

@@ -250,17 +250,16 @@ func (p *PoolPersistence) MarkAddressUsed(ctx context.Context, address string) e
 	return p.queries.MarkAddressUsed(ctx, address)
 }
 
-// MarkAddressUsedWithSite marks an address as used and updates its site ownership
-// This ensures the database correctly reflects which site the payment was processed for
+// MarkAddressUsedWithSite marks an address as used WITHOUT changing its site field
+// This prevents constraint violations when addresses are used cross-site via global pool
+// The site parameter is kept for logging/tracking purposes only
 func (p *PoolPersistence) MarkAddressUsedWithSite(ctx context.Context, address string, site string) error {
 	if !p.enabled {
 		return nil
 	}
 
-	return p.queries.MarkAddressUsedWithSite(ctx, dbgen.MarkAddressUsedWithSiteParams{
-		Address: address,
-		Site:    site,
-	})
+	// Note: site parameter not passed to DB - addresses keep their original site
+	return p.queries.MarkAddressUsedWithSite(ctx, address)
 }
 
 // AddToQueue adds an address to the available queue

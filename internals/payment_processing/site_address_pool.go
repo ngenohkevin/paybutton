@@ -443,10 +443,14 @@ func (p *SiteAddressPool) MarkAddressUsed(address string) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	// Track address info for cross-site detection
+	var addrInfo *PooledAddress
+
 	// Update in-memory state if address exists in pool
 	if addr, exists := p.addresses[address]; exists {
 		addr.Status = AddressStatusUsed
 		addr.PaymentCount++
+		addrInfo = addr // Save for later cross-site check
 		log.Printf("Address %s marked as USED for %s on %s (payment #%d)",
 			address, addr.Email, p.site, addr.PaymentCount)
 
@@ -459,15 +463,21 @@ func (p *SiteAddressPool) MarkAddressUsed(address string) {
 	}
 
 	// CRITICAL FIX: Always update database, even if address not in memory
-	// Update BOTH status and site to ensure database reflects correct ownership
+	// NOTE: This does NOT change the address's original site, preventing constraint violations
 	if p.persistence != nil && p.persistence.IsEnabled() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err := p.persistence.MarkAddressUsedWithSite(ctx, address, p.site)
 		if err != nil {
-			log.Printf("❌ ERROR: Failed to mark address %s as used in database for %s: %v", address, p.site, err)
+			log.Printf("❌ ERROR: Failed to mark address %s as used in database: %v", address, err)
 		} else {
-			log.Printf("✅ Address %s marked as USED in database for %s (site confirmed)", address, p.site)
+			// Check if this was a cross-site usage
+			if addrInfo != nil && addrInfo.Site != p.site {
+				log.Printf("✅ Address %s marked as USED (cross-site: generated for %s, used by %s)",
+					address, addrInfo.Site, p.site)
+			} else {
+				log.Printf("✅ Address %s marked as USED in database", address)
+			}
 		}
 	}
 

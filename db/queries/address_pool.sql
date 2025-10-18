@@ -87,11 +87,12 @@ SET status = 'used',
 WHERE address = $1;
 
 -- name: MarkAddressUsedWithSite :exec
+-- Mark address as used WITHOUT changing the site field
+-- This prevents constraint violations when addresses are used cross-site
 UPDATE address_pool_addresses
-SET site = $2,
-    status = 'used',
+SET status = 'used',
     used_at = NOW(),
-    payment_count = payment_count + 1,
+    payment_count = COALESCE(payment_count, 0) + 1,
     last_checked = NOW()
 WHERE address = $1;
 

@@ -667,21 +667,17 @@ func (q *Queries) MarkAddressUsed(ctx context.Context, address string) error {
 
 const MarkAddressUsedWithSite = `-- name: MarkAddressUsedWithSite :exec
 UPDATE address_pool_addresses
-SET site = $2,
-    status = 'used',
+SET status = 'used',
     used_at = NOW(),
-    payment_count = payment_count + 1,
+    payment_count = COALESCE(payment_count, 0) + 1,
     last_checked = NOW()
 WHERE address = $1
 `
 
-type MarkAddressUsedWithSiteParams struct {
-	Address string `json:"address"`
-	Site    string `json:"site"`
-}
-
-func (q *Queries) MarkAddressUsedWithSite(ctx context.Context, arg MarkAddressUsedWithSiteParams) error {
-	_, err := q.db.Exec(ctx, MarkAddressUsedWithSite, arg.Address, arg.Site)
+// Mark address as used WITHOUT changing the site field
+// This prevents constraint violations when addresses are used cross-site
+func (q *Queries) MarkAddressUsedWithSite(ctx context.Context, address string) error {
+	_, err := q.db.Exec(ctx, MarkAddressUsedWithSite, address)
 	return err
 }
 

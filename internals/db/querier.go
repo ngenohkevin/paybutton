@@ -15,18 +15,30 @@ type Querier interface {
 	// Count unique email+address combinations for pagination
 	CountPaymentsGroupedByEmailAddress(ctx context.Context, arg CountPaymentsGroupedByEmailAddressParams) (int64, error)
 	CountPaymentsWithFilters(ctx context.Context, arg CountPaymentsWithFiltersParams) (int64, error)
+	// Count how many reserved addresses have completed payments
+	CountReservedWithPayments(ctx context.Context) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (AddressPoolAddress, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
 	// Delete expired payments for a specific address (used when address is recycled)
 	DeleteExpiredPaymentsByAddress(ctx context.Context, address string) error
 	DeleteOldPayments(ctx context.Context, createdAt time.Time) error
 	DeletePayment(ctx context.Context, paymentID string) error
+	// Find addresses marked as "reserved" but have completed payments
+	FindReservedAddressesWithPayments(ctx context.Context) ([]FindReservedAddressesWithPaymentsRow, error)
+	// Fix addresses marked as "used" but have NULL payment_count
+	FixNullPaymentCounts(ctx context.Context) error
+	// Mark a reserved address as used (called by health checker)
+	FixReservedAddressWithPayment(ctx context.Context, address string) error
 	// Get currently active pending payments for monitoring
 	GetActivePendingPayments(ctx context.Context) ([]GetActivePendingPaymentsRow, error)
 	GetAddress(ctx context.Context, address string) (AddressPoolAddress, error)
 	GetAddressByIndex(ctx context.Context, arg GetAddressByIndexParams) (AddressPoolAddress, error)
+	// Get ALL addresses to verify transaction history on blockchain
+	GetAllAddressesForBlockchainCheck(ctx context.Context) ([]GetAllAddressesForBlockchainCheckRow, error)
 	// Get aggregated pool statistics across all sites
 	GetAllPoolStats(ctx context.Context) (GetAllPoolStatsRow, error)
+	// Get all reserved addresses for blockchain verification
+	GetAllReservedAddresses(ctx context.Context) ([]GetAllReservedAddressesRow, error)
 	// Get pool statistics grouped by site
 	GetAllSitePoolStats(ctx context.Context) ([]GetAllSitePoolStatsRow, error)
 	GetAvailableQueue(ctx context.Context, site string) ([]GetAvailableQueueRow, error)
@@ -38,6 +50,8 @@ type Querier interface {
 	GetDashboardOverview(ctx context.Context) (GetDashboardOverviewRow, error)
 	GetExpiredReservations(ctx context.Context) ([]AddressPoolAddress, error)
 	GetExpiredReservationsBySite(ctx context.Context, site string) ([]AddressPoolAddress, error)
+	// Get addresses reserved for >72 hours for health check verification
+	GetExpiredReservationsForHealthCheck(ctx context.Context) ([]GetExpiredReservationsForHealthCheckRow, error)
 	// Get hourly payment trends for the last 24 hours
 	GetHourlyPaymentTrend(ctx context.Context) ([]GetHourlyPaymentTrendRow, error)
 	GetPayment(ctx context.Context, paymentID string) (Payment, error)
@@ -67,6 +81,8 @@ type Querier interface {
 	GetTodayStatistics(ctx context.Context) (GetTodayStatisticsRow, error)
 	// Get top paying email addresses
 	GetTopPaymentEmails(ctx context.Context, limit int32) ([]GetTopPaymentEmailsRow, error)
+	// Get overall health check summary
+	HealthCheckSummary(ctx context.Context) (HealthCheckSummaryRow, error)
 	ListAddressesBySite(ctx context.Context, site string) ([]AddressPoolAddress, error)
 	ListAddressesBySiteAndStatus(ctx context.Context, arg ListAddressesBySiteAndStatusParams) ([]AddressPoolAddress, error)
 	ListExpiredPayments(ctx context.Context) ([]Payment, error)
@@ -78,9 +94,13 @@ type Querier interface {
 	ListPaymentsWithFilters(ctx context.Context, arg ListPaymentsWithFiltersParams) ([]Payment, error)
 	ListPendingPayments(ctx context.Context) ([]Payment, error)
 	MarkAddressUsed(ctx context.Context, address string) error
-	MarkAddressUsedWithSite(ctx context.Context, arg MarkAddressUsedWithSiteParams) error
+	// Mark address as used WITHOUT changing the site field
+	// This prevents constraint violations when addresses are used cross-site
+	MarkAddressUsedWithSite(ctx context.Context, address string) error
 	MarkPaymentExpired(ctx context.Context, paymentID string) error
 	RemoveFromQueue(ctx context.Context, arg RemoveFromQueueParams) error
+	// Remove all "used" addresses from the queue
+	RemoveUsedAddressesFromQueue(ctx context.Context) error
 	SearchPayments(ctx context.Context, arg SearchPaymentsParams) ([]Payment, error)
 	UpdateAddressBalance(ctx context.Context, arg UpdateAddressBalanceParams) error
 	UpdateAddressReservation(ctx context.Context, arg UpdateAddressReservationParams) error
