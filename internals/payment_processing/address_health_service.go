@@ -254,8 +254,8 @@ func (s *AddressHealthService) verifyExpiredReservations(ctx context.Context, st
 
 		if balance > 0 || txCount > 0 {
 			// Late payment found!
-			log.Printf("   🚨 LATE PAYMENT detected: %s (age: %.1fh, balance: %d, txs: %d)",
-				addr.Address, addr.HoursOld, balance, txCount)
+			log.Printf("   🚨 LATE PAYMENT detected: %s (age: %dh, balance: %d, txs: %d)",
+				addr.Address, int(addr.HoursOld), balance, txCount)
 
 			// Mark as used
 			err = s.queries.FixReservedAddressWithPayment(ctx, addr.Address)
@@ -263,7 +263,7 @@ func (s *AddressHealthService) verifyExpiredReservations(ctx context.Context, st
 				stats.LatePaymentsDetected++
 			}
 		} else {
-			log.Printf("   ✅ Verified clean: %s (age: %.1fh)", addr.Address, addr.HoursOld)
+			log.Printf("   ✅ Verified clean: %s (age: %dh)", addr.Address, int(addr.HoursOld))
 		}
 
 		// Rate limit to avoid API limits
