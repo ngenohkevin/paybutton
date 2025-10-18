@@ -262,12 +262,40 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	}
 
 	// PRIORITY 2: Find any expired address (72h old, unpaid) to recycle
-	// Note: RecycleExpiredAddresses() background job already verifies these for late payments
+	// CRITICAL: Must verify NO transaction history before recycling
 	now := time.Now()
 	for address, addr := range p.addresses {
 		if addr.Status == AddressStatusReserved &&
 			now.Sub(addr.ReservedAt) > 72*time.Hour {
-			// Recycle this address to prevent gap limit!
+
+			// SAFETY CHECK: Verify address has NO transaction history before recycling
+			_, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(address)
+			if err != nil {
+				log.Printf("⚠️ Could not verify expired address %s history, skipping recycling: %v", address, err)
+				continue
+			}
+
+			if txCount > 0 {
+				// Address has payment history - mark as used and NEVER recycle
+				log.Printf("🚨 LATE PAYMENT DETECTED: Expired address %s has %d transactions - marking as USED",
+					address, txCount)
+				addr.Status = AddressStatusUsed
+
+				// Remove from available/reserved tracking
+				if addr.Email != "" {
+					delete(p.emailToAddress, addr.Email)
+				}
+
+				// Update database
+				if p.persistence != nil && p.persistence.IsEnabled() {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					_ = p.persistence.MarkAddressUsedWithSite(ctx, address, p.site)
+				}
+				continue // Skip to next address
+			}
+
+			// Address is clean (no transactions) - safe to recycle!
 			log.Printf("RECYCLING expired address %s (was reserved by %s) for new user %s on %s - GAP LIMIT PREVENTION",
 				address, addr.Email, email, p.site)
 
