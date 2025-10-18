@@ -3,12 +3,13 @@
 
 .env
 .env.*
-
+.env.local
 ./tmp
 tmp
 
 *.md
 !README.md
+CLAUDE.md
 
 .claude
 .mcp.json
