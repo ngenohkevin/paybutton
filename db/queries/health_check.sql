@@ -21,7 +21,7 @@ SET status = 'used',
 WHERE address = $1
 AND status = 'reserved';
 
--- name: RemoveUsedAddressesFromQueue :exec
+-- name: RemoveUsedAddressesFromQueue :execrows
 -- Remove all "used" addresses from the queue
 DELETE FROM address_pool_queue q
 WHERE EXISTS (
@@ -30,7 +30,7 @@ WHERE EXISTS (
     AND a.status = 'used'
 );
 
--- name: FixNullPaymentCounts :exec
+-- name: FixNullPaymentCounts :execrows
 -- Fix addresses marked as "used" but have NULL payment_count
 UPDATE address_pool_addresses a
 SET payment_count = COALESCE((
@@ -43,7 +43,7 @@ WHERE a.status = 'used'
 AND a.payment_count IS NULL;
 
 -- name: GetExpiredReservationsForHealthCheck :many
--- Get addresses reserved for >72 hours for health check verification
+-- Get addresses reserved for >48 hours for health check verification
 SELECT
     address,
     site,
@@ -52,7 +52,7 @@ SELECT
     EXTRACT(EPOCH FROM (NOW() - reserved_at))/3600 as hours_old
 FROM address_pool_addresses
 WHERE status = 'reserved'
-AND reserved_at < NOW() - INTERVAL '72 hours'
+AND reserved_at < NOW() - INTERVAL '48 hours'
 ORDER BY reserved_at;
 
 -- name: GetAllReservedAddresses :many
@@ -73,7 +73,7 @@ SELECT
     COUNT(*) FILTER (WHERE status = 'available') as available_count,
     COUNT(*) FILTER (WHERE status = 'reserved') as reserved_count,
     COUNT(*) FILTER (WHERE status = 'used') as used_count,
-    COUNT(*) FILTER (WHERE status = 'reserved' AND reserved_at < NOW() - INTERVAL '72 hours') as expired_reservations,
+    COUNT(*) FILTER (WHERE status = 'reserved' AND reserved_at < NOW() - INTERVAL '48 hours') as expired_reservations,
     COUNT(*) FILTER (WHERE status = 'used' AND payment_count IS NULL) as null_payment_counts,
     COUNT(*) FILTER (WHERE status = 'used' AND used_at IS NULL) as null_used_timestamps,
     (SELECT COUNT(*) FROM address_pool_queue q

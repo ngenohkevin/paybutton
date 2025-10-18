@@ -125,7 +125,7 @@ SELECT id, site, address, address_index, status, email,
        balance_sats, tx_count, notes, created_at
 FROM address_pool_addresses
 WHERE status = 'reserved'
-  AND reserved_at < NOW() - INTERVAL '72 hours'
+  AND reserved_at < NOW() - INTERVAL '48 hours'
 ORDER BY reserved_at;
 
 -- name: GetExpiredReservationsBySite :many
@@ -135,7 +135,7 @@ SELECT id, site, address, address_index, status, email,
 FROM address_pool_addresses
 WHERE site = $1
   AND status = 'reserved'
-  AND reserved_at < NOW() - INTERVAL '72 hours'
+  AND reserved_at < NOW() - INTERVAL '48 hours'
 ORDER BY reserved_at;
 
 -- name: CountAddressesByStatus :one

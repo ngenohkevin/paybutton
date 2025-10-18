@@ -104,9 +104,9 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 		}
 	}
 
-	// If user has a reserved address within 72 hours that hasn't been paid, return that same address
+	// If user has a reserved address within 48 hours that hasn't been paid, return that same address
 	// This is CRITICAL for managing gap limit - we must reuse unpaid addresses!
-	if mostRecentReservation != nil && time.Since(*mostRecentReservation) < 72*time.Hour {
+	if mostRecentReservation != nil && time.Since(*mostRecentReservation) < 48*time.Hour {
 		// Check if this address has been paid
 		if _, isUsed := p.usedAddrs[existingReservedAddr]; !isUsed {
 			// Address is still unpaid - REUSE IT to avoid gap limit issues
@@ -123,7 +123,7 @@ func (p *AddressPool) ReserveAddress(email string, amount float64) (string, erro
 
 	// Note: We removed the check for used addresses here
 	// Users who have successfully paid SHOULD be able to get a new address for their next payment
-	// The 72-hour reservation on their previous address is already handled above
+	// The 48-hour reservation on their previous address is already handled above
 
 	// Get address from pool
 	if len(p.availableAddrs) == 0 {
@@ -247,7 +247,7 @@ func (p *AddressPool) recycleExpiredReservationsInternal() {
 
 	for addr, poolAddr := range p.reservedAddrs {
 		// More aggressive recycling: 24 hours for unpaid addresses when gap limit is high
-		recycleTimeout := 72 * time.Hour
+		recycleTimeout := 48 * time.Hour
 		gapMonitor := GetGapMonitor()
 		if gapMonitor != nil && gapMonitor.ShouldUseFallback() {
 			// When in fallback mode, recycle more aggressively
@@ -277,7 +277,7 @@ func (p *AddressPool) recycleExpiredReservationsInternal() {
 					poolAddr.Amount = 0
 					p.availableAddrs = append(p.availableAddrs, *poolAddr)
 					recycled++
-					log.Printf("Recycled unused address %s after 72 hours (originally for %s, age: %v) - GAP LIMIT PREVENTION",
+					log.Printf("Recycled unused address %s after 48 hours (originally for %s, age: %v) - GAP LIMIT PREVENTION",
 						addr, poolAddr.ReservedFor, now.Sub(poolAddr.CreatedAt).Round(time.Hour))
 				} else {
 					log.Printf("WARNING: Prevented recycling of used address %s", addr)
@@ -402,7 +402,7 @@ func (p *AddressPool) generateSingleAddress() (string, error) {
 // maintainPool runs periodic maintenance tasks
 func (p *AddressPool) maintainPool() {
 	// Runs every 5 minutes to check for expired reservations
-	// But addresses are only recycled after 72 hours of no payment
+	// But addresses are only recycled after 48 hours of no payment
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -767,7 +767,7 @@ func (p *AddressPool) RecycleExpiredReservations() int {
 	defer p.mu.Unlock()
 
 	recycled := 0
-	reservationTimeout := 72 * time.Hour // 72 hours timeout - matches user expiry time
+	reservationTimeout := 48 * time.Hour // 48 hours timeout - matches user expiry time
 	usedAddressesFound := 0
 
 	for address, addr := range p.reservedAddrs {

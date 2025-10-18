@@ -4028,7 +4028,7 @@ func getGapRecommendations(poolStats payment_processing.PoolStats, gapStats map[
 		// Check for unpaid addresses
 		if len(blockonomicsStatus.UnpaidAddresses) > 10 {
 			recommendations = append(recommendations, fmt.Sprintf("📊 %d unpaid addresses detected. "+
-				"Your 72-hour recycling will help manage this.", len(blockonomicsStatus.UnpaidAddresses)))
+				"Your 48-hour recycling will help manage this.", len(blockonomicsStatus.UnpaidAddresses)))
 		}
 	}
 
@@ -4047,7 +4047,7 @@ func getGapRecommendations(poolStats payment_processing.PoolStats, gapStats map[
 
 	// Check recycling stats
 	if poolStats.TotalRecycled > 0 {
-		recommendations = append(recommendations, fmt.Sprintf("♻️ %d addresses recycled from 72-hour expiry. "+
+		recommendations = append(recommendations, fmt.Sprintf("♻️ %d addresses recycled from 48-hour expiry. "+
 			"This helps manage gap limit effectively.", poolStats.TotalRecycled))
 	}
 
@@ -4103,11 +4103,11 @@ func getDetailedPoolInfo(c *gin.Context) {
 			if reservedAt, ok := reserved[i]["reserved_at"].(*time.Time); ok && reservedAt != nil {
 				age := time.Since(*reservedAt)
 				reserved[i]["age_hours"] = int(age.Hours())
-				reserved[i]["expires_in_hours"] = int(72 - age.Hours())
+				reserved[i]["expires_in_hours"] = int(48 - age.Hours())
 
-				if age.Hours() >= 72 {
+				if age.Hours() >= 48 {
 					reserved[i]["status"] = "expired_pending_recycle"
-				} else if age.Hours() >= 60 {
+				} else if age.Hours() >= 36 {
 					reserved[i]["status"] = "expiring_soon"
 				} else {
 					reserved[i]["status"] = "active"
@@ -4172,7 +4172,7 @@ func countExpiringSoon(reserved []map[string]interface{}) int {
 	for _, r := range reserved {
 		if reservedAt, ok := r["reserved_at"].(*time.Time); ok && reservedAt != nil {
 			age := time.Since(*reservedAt)
-			if age.Hours() >= 60 && age.Hours() < 72 {
+			if age.Hours() >= 36 && age.Hours() < 48 {
 				count++
 			}
 		}
@@ -4185,7 +4185,7 @@ func countExpired(reserved []map[string]interface{}) int {
 	for _, r := range reserved {
 		if reservedAt, ok := r["reserved_at"].(*time.Time); ok && reservedAt != nil {
 			age := time.Since(*reservedAt)
-			if age.Hours() >= 72 {
+			if age.Hours() >= 48 {
 				count++
 			}
 		}

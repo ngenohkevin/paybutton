@@ -126,7 +126,7 @@ func RecoverFromGapLimit() error {
 	}
 
 	for _, addr := range addressesToRecover {
-		log.Printf("  - Marking address %s for recycling (72h expired check)", addr)
+		log.Printf("  - Marking address %s for recycling (48h expired check)", addr)
 		// The actual recycling will be handled by the address pool
 	}
 

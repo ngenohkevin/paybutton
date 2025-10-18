@@ -74,7 +74,7 @@ func (q *Queries) FindReservedAddressesWithPayments(ctx context.Context) ([]Find
 	return items, nil
 }
 
-const FixNullPaymentCounts = `-- name: FixNullPaymentCounts :exec
+const FixNullPaymentCounts = `-- name: FixNullPaymentCounts :execrows
 UPDATE address_pool_addresses a
 SET payment_count = COALESCE((
     SELECT COUNT(*)
@@ -87,9 +87,12 @@ AND a.payment_count IS NULL
 `
 
 // Fix addresses marked as "used" but have NULL payment_count
-func (q *Queries) FixNullPaymentCounts(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, FixNullPaymentCounts)
-	return err
+func (q *Queries) FixNullPaymentCounts(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, FixNullPaymentCounts)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const FixReservedAddressWithPayment = `-- name: FixReservedAddressWithPayment :exec
@@ -223,7 +226,7 @@ SELECT
     EXTRACT(EPOCH FROM (NOW() - reserved_at))/3600 as hours_old
 FROM address_pool_addresses
 WHERE status = 'reserved'
-AND reserved_at < NOW() - INTERVAL '72 hours'
+AND reserved_at < NOW() - INTERVAL '48 hours'
 ORDER BY reserved_at
 `
 
@@ -235,7 +238,7 @@ type GetExpiredReservationsForHealthCheckRow struct {
 	HoursOld   int32              `json:"hours_old"`
 }
 
-// Get addresses reserved for >72 hours for health check verification
+// Get addresses reserved for >48 hours for health check verification
 func (q *Queries) GetExpiredReservationsForHealthCheck(ctx context.Context) ([]GetExpiredReservationsForHealthCheckRow, error) {
 	rows, err := q.db.Query(ctx, GetExpiredReservationsForHealthCheck)
 	if err != nil {
@@ -268,7 +271,7 @@ SELECT
     COUNT(*) FILTER (WHERE status = 'available') as available_count,
     COUNT(*) FILTER (WHERE status = 'reserved') as reserved_count,
     COUNT(*) FILTER (WHERE status = 'used') as used_count,
-    COUNT(*) FILTER (WHERE status = 'reserved' AND reserved_at < NOW() - INTERVAL '72 hours') as expired_reservations,
+    COUNT(*) FILTER (WHERE status = 'reserved' AND reserved_at < NOW() - INTERVAL '48 hours') as expired_reservations,
     COUNT(*) FILTER (WHERE status = 'used' AND payment_count IS NULL) as null_payment_counts,
     COUNT(*) FILTER (WHERE status = 'used' AND used_at IS NULL) as null_used_timestamps,
     (SELECT COUNT(*) FROM address_pool_queue q
@@ -305,7 +308,7 @@ func (q *Queries) HealthCheckSummary(ctx context.Context) (HealthCheckSummaryRow
 	return i, err
 }
 
-const RemoveUsedAddressesFromQueue = `-- name: RemoveUsedAddressesFromQueue :exec
+const RemoveUsedAddressesFromQueue = `-- name: RemoveUsedAddressesFromQueue :execrows
 DELETE FROM address_pool_queue q
 WHERE EXISTS (
     SELECT 1 FROM address_pool_addresses a
@@ -315,7 +318,10 @@ WHERE EXISTS (
 `
 
 // Remove all "used" addresses from the queue
-func (q *Queries) RemoveUsedAddressesFromQueue(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, RemoveUsedAddressesFromQueue)
-	return err
+func (q *Queries) RemoveUsedAddressesFromQueue(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, RemoveUsedAddressesFromQueue)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

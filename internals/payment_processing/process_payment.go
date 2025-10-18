@@ -24,7 +24,7 @@ var (
 	SessionStatusUpdater func(address, status string)
 	// SessionWebSocketUpdater WebSocket connection status callback - set by server package to avoid circular imports
 	SessionWebSocketUpdater func(address string, connected bool)
-	addressExpiry           = 72 * time.Hour // Set address expiry time to 72 hours
+	addressExpiry           = 48 * time.Hour // Set address expiry time to 48 hours
 	blockCypherToken        string
 	blockonomicsAPIKey      string
 	checkingAddresses       = make(map[string]bool)
@@ -238,7 +238,7 @@ func ProcessPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtcAddr
 		paymentPersistence := NewPaymentPersistence()
 		if paymentPersistence.IsEnabled() {
 			ctx := c.Request.Context()
-			expiresAt := time.Now().Add(72 * time.Hour)
+			expiresAt := time.Now().Add(48 * time.Hour)
 
 			// Get BTC price
 			priceBTC, _ := utils.ConvertToBitcoinUSD(priceUSD)
@@ -413,7 +413,7 @@ func ProcessFastPaymentRequest(c *gin.Context, bot *tgbotapi.BotAPI, generateBtc
 		paymentPersistence := NewPaymentPersistence()
 		if paymentPersistence.IsEnabled() {
 			ctx := c.Request.Context()
-			expiresAt := time.Now().Add(72 * time.Hour)
+			expiresAt := time.Now().Add(48 * time.Hour)
 
 			// Get BTC price
 			priceBTC, _ := utils.ConvertToBitcoinUSD(priceUSD)

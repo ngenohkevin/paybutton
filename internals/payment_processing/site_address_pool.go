@@ -16,7 +16,7 @@ const (
 	AddressStatusAvailable AddressStatus = "available" // Can be assigned
 	AddressStatusReserved  AddressStatus = "reserved"  // Assigned, waiting for payment
 	AddressStatusUsed      AddressStatus = "used"      // Payment received
-	AddressStatusExpired   AddressStatus = "expired"   // 72h passed, ready to recycle
+	AddressStatusExpired   AddressStatus = "expired"   // 48h passed, ready to recycle
 	AddressStatusSkipped   AddressStatus = "skipped"   // Has history, permanently skipped
 )
 
@@ -275,12 +275,12 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 		}
 	}
 
-	// PRIORITY 2: Find any expired address (72h old, unpaid) to recycle
+	// PRIORITY 2: Find any expired address (48h old, unpaid) to recycle
 	// CRITICAL: Must verify NO transaction history before recycling
 	now := time.Now()
 	for address, addr := range p.addresses {
 		if addr.Status == AddressStatusReserved &&
-			now.Sub(addr.ReservedAt) > 72*time.Hour {
+			now.Sub(addr.ReservedAt) > 48*time.Hour {
 
 			// SAFETY CHECK: Verify address has NO transaction history before recycling
 			_, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(address)
@@ -310,7 +310,7 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 			}
 
 			// Address is clean (no transactions) - safe to recycle!
-			log.Printf("RECYCLING expired address %s (was reserved by %s) for new user %s on %s - GAP LIMIT PREVENTION",
+			log.Printf("RECYCLING expired address %s (was reserved by %s, >48h old) for new user %s on %s - GAP LIMIT PREVENTION",
 				address, addr.Email, email, p.site)
 
 			// Remove from old user
@@ -598,14 +598,14 @@ func RecycleExpiredAddresses() {
 		for address, addr := range pool.addresses {
 			// Recycle addresses that are:
 			// 1. Reserved (not paid) AND
-			// 2. Older than 72 hours
+			// 2. Older than 48 hours
 			if addr.Status == AddressStatusReserved &&
-				now.Sub(addr.ReservedAt) > 72*time.Hour {
+				now.Sub(addr.ReservedAt) > 48*time.Hour {
 
 				log.Printf("Attempting to recycle expired address %s from %s on %s (age: %v)",
 					address, addr.Email, siteName, now.Sub(addr.ReservedAt))
 
-				// CRITICAL: Check if address received payment during the 72 hours
+				// CRITICAL: Check if address received payment during the 48 hours
 				// Someone might have paid after the monitoring stopped
 				balance, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(address)
 				if err != nil {

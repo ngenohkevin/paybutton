@@ -26,7 +26,7 @@ type Querier interface {
 	// Find addresses marked as "reserved" but have completed payments
 	FindReservedAddressesWithPayments(ctx context.Context) ([]FindReservedAddressesWithPaymentsRow, error)
 	// Fix addresses marked as "used" but have NULL payment_count
-	FixNullPaymentCounts(ctx context.Context) error
+	FixNullPaymentCounts(ctx context.Context) (int64, error)
 	// Mark a reserved address as used (called by health checker)
 	FixReservedAddressWithPayment(ctx context.Context, address string) error
 	// Get currently active pending payments for monitoring
@@ -50,7 +50,7 @@ type Querier interface {
 	GetDashboardOverview(ctx context.Context) (GetDashboardOverviewRow, error)
 	GetExpiredReservations(ctx context.Context) ([]AddressPoolAddress, error)
 	GetExpiredReservationsBySite(ctx context.Context, site string) ([]AddressPoolAddress, error)
-	// Get addresses reserved for >72 hours for health check verification
+	// Get addresses reserved for >48 hours for health check verification
 	GetExpiredReservationsForHealthCheck(ctx context.Context) ([]GetExpiredReservationsForHealthCheckRow, error)
 	// Get hourly payment trends for the last 24 hours
 	GetHourlyPaymentTrend(ctx context.Context) ([]GetHourlyPaymentTrendRow, error)
@@ -100,7 +100,7 @@ type Querier interface {
 	MarkPaymentExpired(ctx context.Context, paymentID string) error
 	RemoveFromQueue(ctx context.Context, arg RemoveFromQueueParams) error
 	// Remove all "used" addresses from the queue
-	RemoveUsedAddressesFromQueue(ctx context.Context) error
+	RemoveUsedAddressesFromQueue(ctx context.Context) (int64, error)
 	SearchPayments(ctx context.Context, arg SearchPaymentsParams) ([]Payment, error)
 	UpdateAddressBalance(ctx context.Context, arg UpdateAddressBalanceParams) error
 	UpdateAddressReservation(ctx context.Context, arg UpdateAddressReservationParams) error

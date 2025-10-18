@@ -88,7 +88,7 @@ func (s *AddressHealthService) RunHealthCheck() {
 	if issuesFound > 0 {
 		log.Printf("⚠️  Issues to fix:")
 		if summaryBefore.ExpiredReservations > 0 {
-			log.Printf("   - Expired reservations (>72h): %d", summaryBefore.ExpiredReservations)
+			log.Printf("   - Expired reservations (>48h): %d", summaryBefore.ExpiredReservations)
 		}
 		if summaryBefore.NullPaymentCounts > 0 {
 			log.Printf("   - NULL payment counts: %d", summaryBefore.NullPaymentCounts)
@@ -200,34 +200,41 @@ func (s *AddressHealthService) fixReservedWithPayments(ctx context.Context, stat
 func (s *AddressHealthService) removeUsedFromQueue(ctx context.Context, stats *HealthStats) {
 	log.Println("🔧 Step 2: Removing used addresses from queue...")
 
-	err := s.queries.RemoveUsedAddressesFromQueue(ctx)
+	rowsAffected, err := s.queries.RemoveUsedAddressesFromQueue(ctx)
 	if err != nil {
 		log.Printf("⚠️ Error removing used from queue: %v", err)
 		return
 	}
 
-	// Count how many were removed (exec doesn't return count in sqlc)
-	stats.UsedRemovedFromQueue++
-	log.Println("   ✅ Cleaned up queue")
+	if rowsAffected > 0 {
+		stats.UsedRemovedFromQueue += int(rowsAffected)
+		log.Printf("   ✅ Removed %d used addresses from queue", rowsAffected)
+	} else {
+		log.Println("   ✅ Queue is clean - no used addresses found")
+	}
 }
 
 // fixNullPaymentCounts fixes addresses with NULL payment counts
 func (s *AddressHealthService) fixNullPaymentCounts(ctx context.Context, stats *HealthStats) {
 	log.Println("🔧 Step 3: Fixing NULL payment counts...")
 
-	err := s.queries.FixNullPaymentCounts(ctx)
+	rowsAffected, err := s.queries.FixNullPaymentCounts(ctx)
 	if err != nil {
 		log.Printf("⚠️ Error fixing NULL payment counts: %v", err)
 		return
 	}
 
-	stats.NullPaymentCountsFixed++
-	log.Println("   ✅ Fixed NULL payment counts")
+	if rowsAffected > 0 {
+		stats.NullPaymentCountsFixed += int(rowsAffected)
+		log.Printf("   ✅ Fixed %d addresses with NULL payment counts", rowsAffected)
+	} else {
+		log.Println("   ✅ All payment counts are set - no NULL values found")
+	}
 }
 
 // verifyExpiredReservations checks expired reservations on blockchain
 func (s *AddressHealthService) verifyExpiredReservations(ctx context.Context, stats *HealthStats) {
-	log.Println("🔧 Step 4: Verifying expired reservations (>72h) on blockchain...")
+	log.Println("🔧 Step 4: Verifying expired reservations (>48h) on blockchain...")
 
 	expired, err := s.queries.GetExpiredReservationsForHealthCheck(ctx)
 	if err != nil {
