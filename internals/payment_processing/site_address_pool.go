@@ -82,13 +82,37 @@ func TakeFromGlobalPool(site string) (string, bool) {
 		return "", false
 	}
 
-	// Take first available address
-	address := globalPool.availableAddresses[0]
-	globalPool.availableAddresses = globalPool.availableAddresses[1:]
-	globalPool.assignedToSite[address] = site
+	// CRITICAL: Verify address has NO transaction history before reusing
+	// Addresses can be reused only if they were never paid to
+	for i := 0; i < len(globalPool.availableAddresses); i++ {
+		address := globalPool.availableAddresses[i]
 
-	log.Printf("🌍 GLOBAL POOL: Assigned address to site %s (remaining: %d)", site, len(globalPool.availableAddresses))
-	return address, true
+		// Check blockchain for transaction history
+		_, txCount, err := payments.CheckAddressHistoryWithMempoolSpace(address)
+		if err != nil {
+			log.Printf("⚠️ Could not verify address %s history, skipping: %v", address, err)
+			continue
+		}
+
+		// Only use address if it has NO transaction history
+		if txCount == 0 {
+			// Remove from pool
+			globalPool.availableAddresses = append(globalPool.availableAddresses[:i], globalPool.availableAddresses[i+1:]...)
+			globalPool.assignedToSite[address] = site
+
+			log.Printf("🌍 GLOBAL POOL: Assigned clean address to site %s (remaining: %d)", site, len(globalPool.availableAddresses))
+			return address, true
+		} else {
+			// Address has transaction history - should NEVER be reused
+			log.Printf("🚨 BLOCKED ADDRESS REUSE: %s has %d transactions - removing from global pool", address, txCount)
+			// Remove from pool permanently
+			globalPool.availableAddresses = append(globalPool.availableAddresses[:i], globalPool.availableAddresses[i+1:]...)
+			i-- // Adjust index since we removed an element
+		}
+	}
+
+	log.Printf("⚠️ No clean addresses available in global pool")
+	return "", false
 }
 
 // ReturnToGlobalPool - Return address to global pool when recycled
