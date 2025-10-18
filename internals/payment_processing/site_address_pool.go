@@ -195,15 +195,29 @@ func (p *SiteAddressPool) LoadFromDatabase() error {
 	if err != nil {
 		return fmt.Errorf("failed to load queue: %w", err)
 	}
-	p.availableQueue = queue
 
-	// Add available addresses to GLOBAL pool for cross-site reuse
+	// CRITICAL: Only add truly AVAILABLE addresses to queue and global pool
+	// Filter out any reserved/used addresses that are still in queue table
+	var cleanQueue []string
 	for _, addr := range queue {
-		AddToGlobalPool(addr)
+		if pooledAddr := p.addresses[addr]; pooledAddr != nil {
+			// Check actual status in memory (loaded from address_pool_addresses table)
+			if pooledAddr.Status == AddressStatusAvailable {
+				cleanQueue = append(cleanQueue, addr)
+				AddToGlobalPool(addr) // Only add available addresses
+			} else {
+				log.Printf("⚠️ Skipping address %s in queue - status is '%s' not 'available'",
+					addr, pooledAddr.Status)
+			}
+		} else {
+			// Address in queue but not in addresses table - shouldn't happen
+			log.Printf("⚠️ Address %s in queue but not found in addresses table", addr)
+		}
 	}
+	p.availableQueue = cleanQueue
 
-	log.Printf("✅ Loaded %d addresses, %d in queue for site %s (added to global pool)",
-		len(addresses), len(queue), p.site)
+	log.Printf("✅ Loaded %d addresses, %d in clean queue for site %s (filtered %d reserved/used from queue)",
+		len(addresses), len(cleanQueue), p.site, len(queue)-len(cleanQueue))
 
 	return nil
 }
@@ -327,11 +341,12 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 			addr.Status = AddressStatusReserved
 			p.emailToAddress[email] = address
 
-			// Save to database
+			// Save to database and remove from queue
 			if p.persistence != nil && p.persistence.IsEnabled() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				_ = p.persistence.SaveAddress(ctx, addr)
+				_ = p.persistence.RemoveFromQueue(ctx, p.site, address) // Ensure removed from queue
 				_ = p.persistence.UpdateAddressReservation(ctx, address, email, now)
 			}
 
@@ -362,11 +377,12 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 		pooledAddr.Site = p.site // Update site assignment
 		p.emailToAddress[email] = address
 
-		// Save to database
+		// Save to database and remove from queue
 		if p.persistence != nil && p.persistence.IsEnabled() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			_ = p.persistence.SaveAddress(ctx, pooledAddr)
+			_ = p.persistence.RemoveFromQueue(ctx, p.site, address) // Ensure removed from queue
 			_ = p.persistence.UpdateAddressReservation(ctx, address, email, now)
 		}
 
@@ -475,11 +491,12 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	// Register address-to-site mapping
 	RegisterAddressForSite(address, p.site)
 
-	// Save to database
+	// Save to database and remove from queue
 	if p.persistence != nil && p.persistence.IsEnabled() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = p.persistence.SaveAddress(ctx, pooledAddr)
+		_ = p.persistence.RemoveFromQueue(ctx, p.site, address) // Ensure removed from queue
 		_ = p.persistence.SavePoolState(ctx, p.site, p.nextIndex)
 		_ = p.persistence.UpdateAddressReservation(ctx, address, email, now)
 	}
