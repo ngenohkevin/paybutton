@@ -2,6 +2,7 @@
 .idea
 
 .env
+.env.*
 
 ./tmp
 tmp
@@ -27,3 +28,5 @@ paybutton
 paybutton_*
 gap_recovery_data.json
 check_funded_addresses.sh
+test_*
+test-*
