@@ -192,6 +192,24 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 	// PRIORITY 1: Check if user already has an unpaid address for this site
 	if existingAddr, exists := p.emailToAddress[email]; exists {
 		if addr := p.addresses[existingAddr]; addr != nil {
+			// CRITICAL: Verify address status in DATABASE before reusing
+			// In-memory status can be stale if service restarted or address marked used in different site pool
+			if p.persistence != nil && p.persistence.IsEnabled() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				dbAddr, err := p.persistence.GetAddressByAddress(ctx, existingAddr)
+				if err == nil && dbAddr != nil {
+					// Update in-memory status from database (source of truth)
+					addr.Status = AddressStatus(dbAddr.Status)
+					addr.Email = dbAddr.Email
+					log.Printf("✅ Verified address %s status from DB: %s",
+						existingAddr, dbAddr.Status)
+				} else {
+					log.Printf("⚠️  Could not verify address %s in database: %v", existingAddr, err)
+				}
+			}
+
 			if addr.Status == AddressStatusReserved {
 				// ALWAYS REUSE same address for same user - GAP LIMIT PREVENTION
 				// Edge case (2x per month): User pays after monitoring stops, then requests new product
@@ -211,6 +229,10 @@ func (p *SiteAddressPool) GetOrReuseAddress(email string, amount float64) (strin
 				}
 
 				return existingAddr, nil
+			} else {
+				// Address was paid or expired - remove from email mapping
+				log.Printf("🚫 Address %s has status '%s', not reusing for %s", existingAddr, addr.Status, email)
+				delete(p.emailToAddress, email)
 			}
 		}
 	}
@@ -437,16 +459,51 @@ func (p *SiteAddressPool) MarkAddressUsed(address string) {
 	}
 
 	// CRITICAL FIX: Always update database, even if address not in memory
-	// This prevents address reuse when addresses are assigned from global pool
+	// Update BOTH status and site to ensure database reflects correct ownership
 	if p.persistence != nil && p.persistence.IsEnabled() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		err := p.persistence.MarkAddressUsed(ctx, address)
+		err := p.persistence.MarkAddressUsedWithSite(ctx, address, p.site)
 		if err != nil {
 			log.Printf("❌ ERROR: Failed to mark address %s as used in database for %s: %v", address, p.site, err)
 		} else {
-			log.Printf("✅ Address %s marked as USED in database for %s", address, p.site)
+			log.Printf("✅ Address %s marked as USED in database for %s (site confirmed)", address, p.site)
 		}
+	}
+
+	// CRITICAL FIX: Update ALL other site pools that might have this address
+	// This handles the case where address was assigned from global pool to different site
+	MarkAddressUsedInAllPools(address, p.site)
+}
+
+// MarkAddressUsedInAllPools updates all site pools to mark address as used
+// This is critical when addresses are reassigned across sites via global pool
+func MarkAddressUsedInAllPools(address string, alreadyUpdatedSite string) {
+	poolMutex.RLock()
+	poolsToUpdate := make([]*SiteAddressPool, 0)
+	for site, pool := range sitePools {
+		if site != alreadyUpdatedSite {
+			poolsToUpdate = append(poolsToUpdate, pool)
+		}
+	}
+	poolMutex.RUnlock()
+
+	// Update each pool
+	for _, pool := range poolsToUpdate {
+		pool.mutex.Lock()
+		if addr, exists := pool.addresses[address]; exists {
+			oldStatus := addr.Status
+			addr.Status = AddressStatusUsed
+			addr.PaymentCount++
+
+			// Remove from email mapping
+			if addr.Email != "" {
+				delete(pool.emailToAddress, addr.Email)
+				log.Printf("🔄 Cross-pool update: Address %s marked as USED in %s pool (was %s, email %s)",
+					address, pool.site, oldStatus, addr.Email)
+			}
+		}
+		pool.mutex.Unlock()
 	}
 }
 

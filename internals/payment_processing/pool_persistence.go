@@ -127,16 +127,19 @@ func (p *PoolPersistence) SaveAddress(ctx context.Context, addr *PooledAddress) 
 	if err != nil {
 		// If address already exists (duplicate key error), update it instead
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
-			// Address already exists, update the reservation
-			updateErr := p.queries.UpdateAddressReservation(ctx, dbgen.UpdateAddressReservationParams{
+			// Address already exists, update the reservation AND site
+			// CRITICAL: Must update site when reassigning from global pool
+			updateErr := p.queries.UpdateAddressSiteAndReservation(ctx, dbgen.UpdateAddressSiteAndReservationParams{
 				Address:    addr.Address,
+				Site:       addr.Site,
 				Email:      email,
 				ReservedAt: reservedAt,
 			})
 			if updateErr != nil {
-				log.Printf("❌ Failed to update address %s: %v", addr.Address, updateErr)
+				log.Printf("❌ Failed to update address %s with new site: %v", addr.Address, updateErr)
 				return updateErr
 			}
+			log.Printf("✅ Updated address %s: site='%s', email='%s'", addr.Address, addr.Site, addr.Email)
 			// Success - address was updated
 			return nil
 		}
@@ -146,6 +149,44 @@ func (p *PoolPersistence) SaveAddress(ctx context.Context, addr *PooledAddress) 
 	}
 
 	return nil
+}
+
+// GetAddressByAddress retrieves a single address by its address string
+func (p *PoolPersistence) GetAddressByAddress(ctx context.Context, address string) (*PooledAddress, error) {
+	if !p.enabled {
+		return nil, nil
+	}
+
+	addr, err := p.queries.GetAddress(ctx, address)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	poolAddr := &PooledAddress{
+		Site:        addr.Site,
+		Address:     addr.Address,
+		Index:       int(addr.AddressIndex),
+		Status:      AddressStatus(addr.Status),
+		LastChecked: addr.LastChecked,
+	}
+
+	// Handle nullable fields
+	if addr.Email != nil {
+		poolAddr.Email = *addr.Email
+	}
+
+	if addr.PaymentCount != nil {
+		poolAddr.PaymentCount = int(*addr.PaymentCount)
+	}
+
+	if addr.ReservedAt.Valid {
+		poolAddr.ReservedAt = addr.ReservedAt.Time
+	}
+
+	return poolAddr, nil
 }
 
 // LoadAllAddresses loads all addresses for a site
@@ -207,6 +248,19 @@ func (p *PoolPersistence) MarkAddressUsed(ctx context.Context, address string) e
 	}
 
 	return p.queries.MarkAddressUsed(ctx, address)
+}
+
+// MarkAddressUsedWithSite marks an address as used and updates its site ownership
+// This ensures the database correctly reflects which site the payment was processed for
+func (p *PoolPersistence) MarkAddressUsedWithSite(ctx context.Context, address string, site string) error {
+	if !p.enabled {
+		return nil
+	}
+
+	return p.queries.MarkAddressUsedWithSite(ctx, dbgen.MarkAddressUsedWithSiteParams{
+		Address: address,
+		Site:    site,
+	})
 }
 
 // AddToQueue adds an address to the available queue

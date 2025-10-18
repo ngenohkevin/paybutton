@@ -135,15 +135,25 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 		userName = "User" // Set default name
 	}
 
-	// Extract product information first
+	// CRITICAL FIX: Use payment record site, NOT session site
+	// Session can be stale or wrong if address was reassigned across sites
 	productName := ""
 	site := ""
+	if currentPayment != nil {
+		site = currentPayment.Site
+		log.Printf("✅ Webhook: Using site '%s' from payment record for address %s", site, payload.Address)
+	}
+
+	// Fallback: Extract product information from session if payment record not found
 	mutex.Lock()
 	session := userSessions[email]
 	if session != nil && len(session.PaymentInfo) > 0 {
 		latestPayment := session.PaymentInfo[len(session.PaymentInfo)-1]
 		productName = latestPayment.Description
-		site = latestPayment.Site
+		if site == "" {
+			site = latestPayment.Site
+			log.Printf("⚠️  Webhook: Using fallback site '%s' from session (no payment record found)", site)
+		}
 	}
 	mutex.Unlock()
 
@@ -158,10 +168,29 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 	delete(checkingAddresses, payload.Address) // Stop polling since webhook received
 	mutex.Unlock()
 
-	// Site-based conditional logic (same as balance_ops.go)
-	if site == "Dwebstore" || site == "dwebstore" {
-		// DWEBSTORE: Product delivery flow
-		log.Printf("🚀 Webhook: Dwebstore payment detected - processing product delivery for %s: %s", email, productName)
+	// CRITICAL FIX: Use site configuration registry instead of hardcoded strings
+	// Get site configuration to determine processing type
+	siteConfig, exists := SiteRegistry[strings.ToLower(site)]
+	if !exists {
+		log.Printf("⚠️  Webhook: Unknown site %s, defaulting to dwebstore", site)
+		siteConfig = SiteRegistry["dwebstore"]
+	}
+
+	// CRITICAL: Mark address as used in site-specific pool WITH site confirmation
+	// This ensures database reflects which site processed the payment
+	pool := GetSitePool(strings.ToLower(siteConfig.Name))
+	pool.MarkAddressUsed(payload.Address)
+
+	// Also update legacy address pool for backward compatibility
+	addressPool := GetAddressPool()
+	addressPool.MarkAddressUsed(payload.Address, email)
+
+	// Site-based routing using configuration (matches balance_ops.go logic)
+	switch siteConfig.Type {
+	case SiteTypeProductDelivery:
+		// Product delivery flow (dwebstore, ganymede, kuiper)
+		log.Printf("🚀 Webhook: %s payment detected - processing product delivery for %s: %s",
+			siteConfig.Name, email, productName)
 
 		if productName != "" {
 			err = HandleAutomaticDelivery(email, userName, productName, site, bot)
@@ -191,9 +220,10 @@ func HandleBlockonomicsWebhook(c *gin.Context, bot *tgbotapi.BotAPI) {
 			}
 		}
 
-	} else {
-		// CARDERSHAVEN or other sites: Balance update flow
-		log.Printf("🚀 Webhook: Cardershaven/other payment detected - processing balance update for %s", email)
+	case SiteTypeBalanceUpdate:
+		// Balance update flow (cardershaven and other balance-based sites)
+		log.Printf("🚀 Webhook: %s payment detected - processing balance update for %s",
+			siteConfig.Name, email)
 
 		// Update database balance
 		err = database.UpdateUserBalance(email, balanceUSDRounded)

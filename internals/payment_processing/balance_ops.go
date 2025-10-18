@@ -308,10 +308,21 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					payment, err := paymentPersistence.GetPaymentByAddress(ctx, address)
 					if err == nil && payment != nil {
 						currentPayment = payment
+
+						// CRITICAL: Fetch transaction hash when balance detected
+						// Webhook has txid automatically, but balance polling needs to fetch it
+						txHash := ""
+						if txHashFetched, err := payments2.GetRecentTransactionHash(address); err == nil {
+							txHash = txHashFetched
+							log.Printf("✅ Fetched transaction hash for %s: %s", address, txHash)
+						} else {
+							log.Printf("⚠️  Could not fetch transaction hash for %s: %v (will update without txid)", address, err)
+						}
+
 						// Update with transaction details (confirmations = 1 for BTC balance detected)
-						_ = paymentPersistence.UpdatePaymentTransaction(ctx, payment.PaymentID, "", 1)
+						_ = paymentPersistence.UpdatePaymentTransaction(ctx, payment.PaymentID, txHash, 1)
 						_ = paymentPersistence.UpdatePaymentConfirmed(ctx, payment.PaymentID, 1)
-						log.Printf("✅ Updated payment record %s: confirmed", payment.PaymentID)
+						log.Printf("✅ Updated payment record %s: confirmed (tx: %s)", payment.PaymentID, txHash)
 					}
 				}
 
@@ -323,13 +334,16 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 					userName = "User" // Set default name
 				}
 
-				// NEW: Determine site from address, not session
-				site := GetSiteForAddress(address)
-				if site == "" {
-					// Fallback: try to determine from address pattern
-					site = DetermineSiteFromAddressPattern(address)
+				// CRITICAL FIX: Always use payment record site, NOT address mapping
+				// Address mapping can be wrong when addresses are reassigned across sites via global pool
+				site := ""
+				if currentPayment != nil {
+					site = currentPayment.Site
+					log.Printf("Using site '%s' from payment record for address %s", site, address)
+				} else {
+					// Fallback: try address mapping (can be inaccurate for global pool addresses)
+					site = GetSiteForAddress(address)
 					if site == "" {
-						log.Printf("WARNING: Cannot determine site for address %s, checking session", address)
 						// Last resort: check session
 						mutex.Lock()
 						if session, exists := userSessions[email]; exists && len(session.PaymentInfo) > 0 {
@@ -337,6 +351,9 @@ func checkBalanceWithInterval(address, email, token string, bot *tgbotapi.BotAPI
 							site = latestPayment.Site
 						}
 						mutex.Unlock()
+					}
+					if site != "" {
+						log.Printf("⚠️  WARNING: Using fallback site '%s' for address %s (no payment record found)", site, address)
 					}
 				}
 

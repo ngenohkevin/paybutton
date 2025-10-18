@@ -343,6 +343,54 @@ func GetBitcoinAddressBalanceWithMempoolSpace(address string) (int64, error) {
 	return balance, err
 }
 
+// GetRecentTransactionHash fetches the most recent transaction hash for an address
+// Returns the txid of the most recent transaction, or empty string if none found
+func GetRecentTransactionHash(address string) (string, error) {
+	url := fmt.Sprintf("https://mempool.space/api/address/%s/txs", address)
+
+	// Wait for rate limiter permission
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	rateLimiter := GetRateLimiter()
+	if err := rateLimiter.WaitForPermission(ctx, "mempoolspace"); err != nil {
+		return "", fmt.Errorf("rate limiter timeout: %w", err)
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "PayButton/1.0 (Bitcoin Transaction Checker)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch transactions: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("error fetching transactions, status code: %v, response: %s", resp.StatusCode, body)
+	}
+
+	// Parse transaction list (returns array of transactions, newest first)
+	var transactions []struct {
+		TxID string `json:"txid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&transactions); err != nil {
+		return "", fmt.Errorf("failed to parse transactions: %w", err)
+	}
+
+	if len(transactions) == 0 {
+		return "", fmt.Errorf("no transactions found for address")
+	}
+
+	// Return the most recent transaction hash
+	return transactions[0].TxID, nil
+}
+
 func GetBitcoinAddressBalanceWithTrezor(address string) (int64, error) {
 	url := fmt.Sprintf("https://btc1.trezor.io/api/v2/address/%s", address)
 

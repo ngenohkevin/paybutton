@@ -69,9 +69,27 @@ SET status = 'reserved',
     last_checked = NOW()
 WHERE address = $1;
 
+-- name: UpdateAddressSiteAndReservation :exec
+UPDATE address_pool_addresses
+SET site = $2,
+    status = 'reserved',
+    email = $3,
+    reserved_at = $4,
+    last_checked = NOW()
+WHERE address = $1;
+
 -- name: MarkAddressUsed :exec
 UPDATE address_pool_addresses
 SET status = 'used',
+    used_at = NOW(),
+    payment_count = payment_count + 1,
+    last_checked = NOW()
+WHERE address = $1;
+
+-- name: MarkAddressUsedWithSite :exec
+UPDATE address_pool_addresses
+SET site = $2,
+    status = 'used',
     used_at = NOW(),
     payment_count = payment_count + 1,
     last_checked = NOW()

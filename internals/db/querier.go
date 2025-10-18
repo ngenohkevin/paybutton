@@ -78,11 +78,13 @@ type Querier interface {
 	ListPaymentsWithFilters(ctx context.Context, arg ListPaymentsWithFiltersParams) ([]Payment, error)
 	ListPendingPayments(ctx context.Context) ([]Payment, error)
 	MarkAddressUsed(ctx context.Context, address string) error
+	MarkAddressUsedWithSite(ctx context.Context, arg MarkAddressUsedWithSiteParams) error
 	MarkPaymentExpired(ctx context.Context, paymentID string) error
 	RemoveFromQueue(ctx context.Context, arg RemoveFromQueueParams) error
 	SearchPayments(ctx context.Context, arg SearchPaymentsParams) ([]Payment, error)
 	UpdateAddressBalance(ctx context.Context, arg UpdateAddressBalanceParams) error
 	UpdateAddressReservation(ctx context.Context, arg UpdateAddressReservationParams) error
+	UpdateAddressSiteAndReservation(ctx context.Context, arg UpdateAddressSiteAndReservationParams) error
 	UpdateAddressStatus(ctx context.Context, arg UpdateAddressStatusParams) error
 	UpdatePaymentCompleted(ctx context.Context, paymentID string) error
 	UpdatePaymentConfirmed(ctx context.Context, arg UpdatePaymentConfirmedParams) error

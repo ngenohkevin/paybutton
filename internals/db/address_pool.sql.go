@@ -665,6 +665,26 @@ func (q *Queries) MarkAddressUsed(ctx context.Context, address string) error {
 	return err
 }
 
+const MarkAddressUsedWithSite = `-- name: MarkAddressUsedWithSite :exec
+UPDATE address_pool_addresses
+SET site = $2,
+    status = 'used',
+    used_at = NOW(),
+    payment_count = payment_count + 1,
+    last_checked = NOW()
+WHERE address = $1
+`
+
+type MarkAddressUsedWithSiteParams struct {
+	Address string `json:"address"`
+	Site    string `json:"site"`
+}
+
+func (q *Queries) MarkAddressUsedWithSite(ctx context.Context, arg MarkAddressUsedWithSiteParams) error {
+	_, err := q.db.Exec(ctx, MarkAddressUsedWithSite, arg.Address, arg.Site)
+	return err
+}
+
 const RemoveFromQueue = `-- name: RemoveFromQueue :exec
 DELETE FROM address_pool_queue
 WHERE site = $1 AND address = $2
@@ -716,6 +736,33 @@ type UpdateAddressReservationParams struct {
 
 func (q *Queries) UpdateAddressReservation(ctx context.Context, arg UpdateAddressReservationParams) error {
 	_, err := q.db.Exec(ctx, UpdateAddressReservation, arg.Address, arg.Email, arg.ReservedAt)
+	return err
+}
+
+const UpdateAddressSiteAndReservation = `-- name: UpdateAddressSiteAndReservation :exec
+UPDATE address_pool_addresses
+SET site = $2,
+    status = 'reserved',
+    email = $3,
+    reserved_at = $4,
+    last_checked = NOW()
+WHERE address = $1
+`
+
+type UpdateAddressSiteAndReservationParams struct {
+	Address    string             `json:"address"`
+	Site       string             `json:"site"`
+	Email      *string            `json:"email"`
+	ReservedAt pgtype.Timestamptz `json:"reserved_at"`
+}
+
+func (q *Queries) UpdateAddressSiteAndReservation(ctx context.Context, arg UpdateAddressSiteAndReservationParams) error {
+	_, err := q.db.Exec(ctx, UpdateAddressSiteAndReservation,
+		arg.Address,
+		arg.Site,
+		arg.Email,
+		arg.ReservedAt,
+	)
 	return err
 }
 
