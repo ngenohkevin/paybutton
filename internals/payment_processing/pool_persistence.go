@@ -127,19 +127,18 @@ func (p *PoolPersistence) SaveAddress(ctx context.Context, addr *PooledAddress) 
 	if err != nil {
 		// If address already exists (duplicate key error), update it instead
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
-			// Address already exists, update the reservation AND site
-			// CRITICAL: Must update site when reassigning from global pool
+			// Address already exists, update the reservation (but NOT site to avoid constraint violations)
+			// Note: Addresses keep their original site when used by different sites from global pool
 			updateErr := p.queries.UpdateAddressSiteAndReservation(ctx, dbgen.UpdateAddressSiteAndReservationParams{
 				Address:    addr.Address,
-				Site:       addr.Site,
 				Email:      email,
 				ReservedAt: reservedAt,
 			})
 			if updateErr != nil {
-				log.Printf("❌ Failed to update address %s with new site: %v", addr.Address, updateErr)
+				log.Printf("❌ Failed to update address %s reservation: %v", addr.Address, updateErr)
 				return updateErr
 			}
-			log.Printf("✅ Updated address %s: site='%s', email='%s'", addr.Address, addr.Site, addr.Email)
+			log.Printf("✅ Updated address %s reservation: email='%s' (site remains '%s')", addr.Address, addr.Email, addr.Site)
 			// Success - address was updated
 			return nil
 		}

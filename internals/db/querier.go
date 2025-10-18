@@ -104,6 +104,8 @@ type Querier interface {
 	SearchPayments(ctx context.Context, arg SearchPaymentsParams) ([]Payment, error)
 	UpdateAddressBalance(ctx context.Context, arg UpdateAddressBalanceParams) error
 	UpdateAddressReservation(ctx context.Context, arg UpdateAddressReservationParams) error
+	// Note: Does NOT update site field to prevent constraint violations when
+	// addresses from global pool are used by different sites
 	UpdateAddressSiteAndReservation(ctx context.Context, arg UpdateAddressSiteAndReservationParams) error
 	UpdateAddressStatus(ctx context.Context, arg UpdateAddressStatusParams) error
 	UpdatePaymentCompleted(ctx context.Context, paymentID string) error

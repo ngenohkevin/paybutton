@@ -737,28 +737,23 @@ func (q *Queries) UpdateAddressReservation(ctx context.Context, arg UpdateAddres
 
 const UpdateAddressSiteAndReservation = `-- name: UpdateAddressSiteAndReservation :exec
 UPDATE address_pool_addresses
-SET site = $2,
-    status = 'reserved',
-    email = $3,
-    reserved_at = $4,
+SET status = 'reserved',
+    email = $2,
+    reserved_at = $3,
     last_checked = NOW()
 WHERE address = $1
 `
 
 type UpdateAddressSiteAndReservationParams struct {
 	Address    string             `json:"address"`
-	Site       string             `json:"site"`
 	Email      *string            `json:"email"`
 	ReservedAt pgtype.Timestamptz `json:"reserved_at"`
 }
 
+// Note: Does NOT update site field to prevent constraint violations when
+// addresses from global pool are used by different sites
 func (q *Queries) UpdateAddressSiteAndReservation(ctx context.Context, arg UpdateAddressSiteAndReservationParams) error {
-	_, err := q.db.Exec(ctx, UpdateAddressSiteAndReservation,
-		arg.Address,
-		arg.Site,
-		arg.Email,
-		arg.ReservedAt,
-	)
+	_, err := q.db.Exec(ctx, UpdateAddressSiteAndReservation, arg.Address, arg.Email, arg.ReservedAt)
 	return err
 }
 

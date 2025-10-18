@@ -70,11 +70,12 @@ SET status = 'reserved',
 WHERE address = $1;
 
 -- name: UpdateAddressSiteAndReservation :exec
+-- Note: Does NOT update site field to prevent constraint violations when
+-- addresses from global pool are used by different sites
 UPDATE address_pool_addresses
-SET site = $2,
-    status = 'reserved',
-    email = $3,
-    reserved_at = $4,
+SET status = 'reserved',
+    email = $2,
+    reserved_at = $3,
     last_checked = NOW()
 WHERE address = $1;
 
