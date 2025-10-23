@@ -253,6 +253,7 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
 	message := gomail.NewMessage()
 	message.SetHeader("From", smtpUsername)
 	message.SetHeader("To", userEmail)
+	message.SetHeader("Reply-To", smtpUsername)
 
 	// Check if this is Clone Cards - special handling
 	isCloneCards := CheckIfCloneCards(productName)
@@ -312,8 +313,8 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
 		// Regular digital product delivery with attachment
 		message.SetHeader("Subject", "Your Kuiper Purchase - Product Delivery")
 
-		// Generate product file content (1-4MB)
-		fileContent, err := GenerateRandomBytes(1*1024*1024, 4*1024*1024)
+		// Generate product file content (200KB-800KB for better deliverability)
+		fileContent, err := GenerateRandomBytes(200*1024, 800*1024)
 		if err != nil {
 			return fmt.Errorf("error generating product file content: %w", err)
 		}
@@ -330,46 +331,174 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
 			}),
 		)
 
-		// Email body for Kuiper products
-		message.SetBody("text/html", fmt.Sprintf(`
-<div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px; margin: auto;">
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h2 style="color: #4CAF50;">Hello!</h2>
-    </div>
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #3B5998; font-size: 28px;">Your Purchase is Ready</h1>
-        <p style="font-size: 16px; line-height: 1.5; color: #555;">Thank you for your purchase of <strong>%s</strong>.</p>
-        <p style="font-size: 16px; line-height: 1.5; color: #555;">Your product file has been attached to this email.</p>
-    </div>
-    <div style="margin-bottom: 20px; padding: 15px; background-color: #f0f0f0; border-left: 4px solid #4CAF50; border-radius: 3px;">
-        <h3 style="margin-top: 0; color: #333;">How to Open Your Attached File:</h3>
-        <p style="text-align: left; color: #555; margin-bottom: 15px;">The file attached to this email is in .lsky format and requires special software to open it.</p>
+		// Beautiful, spam-safe email body for Kuiper products
+		htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Kuiper Purchase</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <table role="presentation" style="width: 100%%; border-collapse: collapse; background-color: #f4f7fa; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <!-- Main Container -->
+                <table role="presentation" style="max-width: 600px; width: 100%%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden;">
 
-        <p style="text-align: left; color: #555; margin-bottom: 10px;"><strong>Required Software:</strong> LSKY Decryption Tool</p>
+                    <!-- Header with gradient -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); padding: 40px 30px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 600; letter-spacing: -0.5px;">
+                                ✓ Purchase Complete
+                            </h1>
+                            <p style="margin: 12px 0 0 0; color: #e8eaf6; font-size: 16px; font-weight: 400;">
+                                Your digital product is ready
+                            </p>
+                        </td>
+                    </tr>
 
-        <p style="text-align: left; color: #555; margin-bottom: 15px;">This tool is critical in ensuring the privacy and safety of your sensitive data. It provides secure decryption that protects your information during the viewing process.</p>
+                    <!-- Personalized Greeting -->
+                    <tr>
+                        <td style="padding: 35px 30px 25px 30px;">
+                            <p style="margin: 0; font-size: 18px; color: #1a1a1a; font-weight: 500;">
+                                Hi %s,
+                            </p>
+                            <p style="margin: 15px 0 0 0; font-size: 15px; color: #4a4a4a; line-height: 1.6;">
+                                Thank you for your purchase of <strong style="color: #667eea;">%s</strong>. We've prepared your digital product and it's attached to this email for your convenience.
+                            </p>
+                        </td>
+                    </tr>
 
-        <p style="text-align: left; color: #555; margin-bottom: 15px;"><strong>How to get the LSKY Decryption Tool:</strong></p>
-        <ol style="text-align: left; color: #555; line-height: 1.6;">
-            <li>Open Tor browser on your computer</li>
-            <li><strong>Option 1:</strong> Navigate to the following secure location:<br>
-                <span style="font-family: monospace; background-color: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 13px; word-break: break-all;">http://kuiperoyeb6q3uuszy7quvf4mxwnvlb4ar5e2accsjkpnykwmvndxkyd.onion/products/52185567-d28a-4ad6-9ef7-a3b410998ca1</span>
-            </li>
-            <li><strong>Option 2:</strong> Visit our Kuiper store and search for <strong>"lsakey"</strong> to find the LSKY Decryption Tool</li>
-            <li>Follow the instructions on that page to get the LSKY Decryption Tool</li>
-            <li>Once you have the tool, you can safely open the .lsky file attached to this email</li>
-        </ol>
+                    <!-- Product Details Card -->
+                    <tr>
+                        <td style="padding: 0 30px;">
+                            <table role="presentation" style="width: 100%%; border-collapse: collapse; background: linear-gradient(135deg, #e8f5e9 0%%, #c8e6c9 100%%); border-radius: 10px; padding: 25px; border: 1px solid #81c784;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0 0 15px 0; font-size: 16px; color: #2e7d32; font-weight: 600;">
+                                            📦 What's Included
+                                        </p>
+                                        <ul style="margin: 0; padding-left: 20px; color: #1b5e20; line-height: 1.8;">
+                                            <li style="margin-bottom: 8px;">Your purchased product file is attached</li>
+                                            <li style="margin-bottom: 8px;">File format: .lsky (secure encrypted format)</li>
+                                            <li style="margin-bottom: 0;">Viewer tool available in your account dashboard</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-        <p style="text-align: left; color: #777; font-size: 14px; margin-top: 15px;"><em>Note: You must use Tor browser to access the secure location. The LSKY Decryption Tool is essential for maintaining the security and privacy of your data when viewing .lsky files.</em></p>
-    </div>
-    <div style="text-align: center; margin-bottom: 20px;">
-        <p style="font-size: 16px; color: #555;">If you have any questions about your purchase or need assistance, please don't hesitate to contact our support team.</p>
-    </div>
-    <div style="text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
-        <p style="font-size: 14px; color: #777;">Thank you for shopping with Kuiper!</p>
-    </div>
-</div>
-`, productName))
+                    <!-- Access Instructions -->
+                    <tr>
+                        <td style="padding: 30px 30px 20px 30px;">
+                            <h2 style="margin: 0 0 18px 0; font-size: 20px; color: #1a1a1a; font-weight: 600;">
+                                📋 Access Instructions
+                            </h2>
+                            <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+                                <p style="margin: 0 0 12px 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
+                                    <strong>Step 1:</strong> Download the attached file to your computer
+                                </p>
+                                <p style="margin: 0 0 12px 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
+                                    <strong>Step 2:</strong> Log into your account dashboard
+                                </p>
+                                <p style="margin: 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
+                                    <strong>Step 3:</strong> Use the file viewer tool (available in dashboard) to open your product
+                                </p>
+                            </div>
+
+                            <!-- CTA Button -->
+                            <table role="presentation" style="width: 100%%; border-collapse: collapse; margin-top: 25px;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="https://kuiperstore.cc/dashboard" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.3s;">
+                                            Access Your Dashboard →
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Important Note -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 18px;">
+                                <p style="margin: 0; font-size: 14px; color: #856404; line-height: 1.6;">
+                                    <strong>💡 Important:</strong> Your file is encrypted for security. The viewer tool in your dashboard will allow you to access the content safely. Keep your login credentials secure.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Support Section -->
+                    <tr>
+                        <td style="padding: 0 30px 35px 30px;">
+                            <div style="background-color: #e3f2fd; border-radius: 8px; padding: 20px; text-align: center;">
+                                <p style="margin: 0 0 10px 0; font-size: 15px; color: #0d47a1; font-weight: 600;">
+                                    Need Help?
+                                </p>
+                                <p style="margin: 0; font-size: 14px; color: #1565c0; line-height: 1.5;">
+                                    Our support team is here to assist you with any questions.
+                                    <br>Contact us through your account dashboard.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #1a1a1a; font-weight: 500;">
+                                Thank you for choosing Kuiper
+                            </p>
+                            <p style="margin: 0 0 15px 0; font-size: 13px; color: #666666; line-height: 1.5;">
+                                This email was sent to %s because you made a purchase on our platform.
+                            </p>
+                            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                                <p style="margin: 0; font-size: 12px; color: #999999;">
+                                    Kuiper Digital Marketplace<br>
+                                    <a href="https://kuiperstore.cc/contact" style="color: #667eea; text-decoration: none;">Contact Support</a> |
+                                    <a href="https://kuiperstore.cc/privacy" style="color: #667eea; text-decoration: none;">Privacy Policy</a>
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+`, userName, productName, userEmail)
+
+		// Add plain text alternative for better deliverability
+		plainBody := fmt.Sprintf(`Hi %s,
+
+Thank you for your purchase of %s!
+
+Your digital product file has been attached to this email in .lsky format.
+
+TO ACCESS YOUR FILE:
+1. Download the attached file
+2. Log into your Kuiper dashboard at: https://kuiperstore.cc/dashboard
+3. Use the file viewer tool in your dashboard to open the product
+
+IMPORTANT: Your file is encrypted for security. The viewer tool in your dashboard will help you access the content safely.
+
+Need help? Contact our support team through your dashboard.
+
+Thank you for choosing Kuiper!
+
+---
+This email was sent to %s
+Kuiper Digital Marketplace
+`, userName, productName, userEmail)
+
+		message.SetBody("text/plain", plainBody)
+		message.AddAlternative("text/html", htmlBody)
 	}
 
 	// Send the email
