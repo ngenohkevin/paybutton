@@ -77,7 +77,7 @@ func main() {
 	// Start comprehensive address health service (runs once per day)
 	if database.Queries != nil {
 		healthService := payment_processing.NewAddressHealthService(database.Queries, 24*time.Hour)
-		healthService.Start()
+		go healthService.Start() // Run in background to not block server startup
 		defer healthService.Stop()
 		logger.Info("✅ Address Health Service started (runs daily)")
 	} else {
