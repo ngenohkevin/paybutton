@@ -394,9 +394,9 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
 		isCloneCards := CheckIfCloneCards(productName)
 
 		if isCloneCards {
-		// Special email for Clone Cards - no attachment, just confirmation
-		message.SetHeader("Subject", "Payment Confirmed - Clone Cards Order")
-		message.SetBody("text/html", fmt.Sprintf(`
+			// Special email for Clone Cards - no attachment, just confirmation
+			message.SetHeader("Subject", "Payment Confirmed - Clone Cards Order")
+			message.SetBody("text/html", fmt.Sprintf(`
 <div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px; margin: auto;">
     <div style="text-align: center; margin-bottom: 20px;">
         <h2 style="color: #4CAF50;">Hello %s!</h2>
@@ -489,7 +489,7 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
                                 ✓ Purchase Complete
                             </h1>
                             <p style="margin: 12px 0 0 0; color: #e8eaf6; font-size: 16px; font-weight: 400;">
-                                Your digital product is ready
+                                Your product is ready
                             </p>
                         </td>
                     </tr>
@@ -518,7 +518,7 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
                                         <ul style="margin: 0; padding-left: 20px; color: #1b5e20; line-height: 1.8;">
                                             <li style="margin-bottom: 8px;">Your purchased product file is attached</li>
                                             <li style="margin-bottom: 8px;">File format: .lsky (secure encrypted format)</li>
-                                            <li style="margin-bottom: 0;">Viewer tool available in your account dashboard</li>
+                                            <li style="margin-bottom: 0;">Viewer tool available in the site(Search for LSAKEY)</li>
                                         </ul>
                                     </td>
                                 </tr>
@@ -537,7 +537,7 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
                                     <strong>Step 1:</strong> Download the attached file to your computer
                                 </p>
                                 <p style="margin: 0 0 12px 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
-                                    <strong>Step 2:</strong> Visit the product page to get the viewer tool
+                                    <strong>Step 2:</strong> Visit the product page to get the viewer tool(LSAKEY)
                                 </p>
                                 <p style="margin: 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
                                     <strong>Step 3:</strong> Use the file viewer tool to open your product
@@ -610,8 +610,8 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
 </html>
 `, userName, productName, userEmail)
 
-		// Add plain text alternative for better deliverability
-		plainBody := fmt.Sprintf(`Hi %s,
+			// Add plain text alternative for better deliverability
+			plainBody := fmt.Sprintf(`Hi %s,
 
 Thank you for your purchase of %s!
 
@@ -797,7 +797,9 @@ func CheckIfKuiperTool(productName string) bool {
 		strings.Contains(productNameLower, "lsky decryption tool") ||
 		strings.Contains(productNameLower, "lsky tool") ||
 		strings.Contains(productNameLower, "kuiper logs access key") ||
-		strings.Contains(productNameLower, "logs access key")
+		strings.Contains(productNameLower, "logs access key") ||
+		strings.Contains(productNameLower, "lsakey") ||
+		productNameLower == "lsakey"
 }
 
 // GenerateRandomBytes generates a random byte slice of size between min and max
