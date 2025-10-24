@@ -255,10 +255,145 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
 	message.SetHeader("To", userEmail)
 	message.SetHeader("Reply-To", smtpUsername)
 
-	// Check if this is Clone Cards - special handling
-	isCloneCards := CheckIfCloneCards(productName)
+	// Check if the product is the Kuiper decryption tool
+	isKuiperTool := CheckIfKuiperTool(productName)
 
-	if isCloneCards {
+	if isKuiperTool {
+		// Special email for Kuiper tool with download links for all platforms
+		kuiperToolWin := "https://mega.nz/file/amxXWIhK#GmJkZ4PNzPh4omf0y8T0vzaY_OFDf0tZ7YMeK7WeZ-A"
+		kuiperToolMacAS := "https://mega.nz/file/mjBgAQZK#fy1tf9gCwaxOY9OcIQ8_io7A02rjoMHJXiDWkwsh2ws"
+		kuiperToolMacIntel := "https://mega.nz/file/6zIAWChQ#_C0Rv9ph9zjzbRC2mTrl04vXiuvSkNjivSSJbzzsx7o"
+
+		message.SetHeader("Subject", "Your Kuiper Purchase - Logs Access Key Tool")
+		message.SetBody("text/html", fmt.Sprintf(`
+<div style="font-family: Arial, sans-serif; font-size: 16px; color: #444; background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 650px; margin: auto;">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #4CAF50;">Hello!</h2>
+    </div>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #667eea; font-size: 28px;">Your Kuiper Logs Access Key</h1>
+        <p style="font-size: 16px; line-height: 1.5; color: #555;">Thank you for your purchase of the <strong>Kuiper Logs Access Key</strong>.</p>
+    </div>
+
+    <div style="margin-bottom: 25px; padding: 20px; background-color: #e8f5e8; border: 2px solid #4CAF50; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #2e7d32; text-align: center;">📋 Complete Setup Instructions</h3>
+
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 1: Choose Your Operating System</h4>
+            <p style="color: #333; margin-bottom: 15px;">Select the appropriate version for your computer:</p>
+
+            <div style="background-color: #fff; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+                <h5 style="color: #667eea; margin: 0 0 8px 0;">🪟 Windows (10/11)</h5>
+                <p style="margin: 0 0 10px 0; color: #555; font-size: 14px;">For Windows 10 or Windows 11 users</p>
+                <a href="%s" style="background-color: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Download for Windows</a>
+            </div>
+
+            <div style="background-color: #fff; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+                <h5 style="color: #667eea; margin: 0 0 8px 0;">🍎 macOS Apple Silicon (M1/M2/M3/M4)</h5>
+                <p style="margin: 0 0 10px 0; color: #555; font-size: 14px;">For Macs with Apple Silicon chips (2020 and newer)</p>
+                <a href="%s" style="background-color: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Download for Apple Silicon</a>
+            </div>
+
+            <div style="background-color: #fff; padding: 15px; border-radius: 5px;">
+                <h5 style="color: #667eea; margin: 0 0 8px 0;">🍎 macOS Intel</h5>
+                <p style="margin: 0 0 10px 0; color: #555; font-size: 14px;">For Intel-based Macs (2019 and earlier)</p>
+                <a href="%s" style="background-color: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Download for Intel Mac</a>
+            </div>
+
+            <div style="margin-top: 15px; padding: 10px; background-color: #e3f2fd; border-radius: 5px;">
+                <p style="margin: 0; font-size: 13px; color: #0277bd;">
+                    <strong>Not sure which Mac version?</strong><br>
+                    Click Apple menu () → About This Mac → Look for "Chip":<br>
+                    • Apple M1/M2/M3/M4/M5 = Apple Silicon<br>
+                    • Intel Core i3/i5/i7/i9 = Intel Mac
+                </p>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 2: Extract the Downloaded File</h4>
+            <p style="color: #333; margin-bottom: 10px;">The file will be in a compressed ZIP format:</p>
+
+            <p style="color: #333; margin-bottom: 5px;"><strong>Windows:</strong></p>
+            <ul style="color: #333; margin: 0 0 10px 0; padding-left: 20px;">
+                <li>Right-click the ZIP file → "Extract All" or "Extract Here"</li>
+                <li>Or use WinRAR, WinZip, 7-Zip</li>
+            </ul>
+
+            <p style="color: #333; margin-bottom: 5px;"><strong>macOS:</strong></p>
+            <ul style="color: #333; margin: 0; padding-left: 20px;">
+                <li>Double-click the ZIP file (extracts automatically)</li>
+                <li>Or right-click → "Open With" → "Archive Utility"</li>
+            </ul>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 3: Run the Application</h4>
+
+            <p style="color: #333; margin-bottom: 5px;"><strong>Windows:</strong></p>
+            <ol style="color: #333; margin: 0 0 15px 0; padding-left: 20px; line-height: 1.6;">
+                <li>Navigate to the extracted folder</li>
+                <li>Find and double-click <strong>"KuiperLogsAccessKey.exe"</strong></li>
+                <li>If Windows Defender shows a warning, click "More info" → "Run anyway"</li>
+            </ol>
+
+            <p style="color: #333; margin-bottom: 5px;"><strong>macOS:</strong></p>
+            <ol style="color: #333; margin: 0; padding-left: 20px; line-height: 1.6;">
+                <li>Navigate to the extracted folder</li>
+                <li>Find <strong>"KuiperLogsAccessKey.app"</strong></li>
+                <li><strong>Right-click</strong> the app → Click "Open"</li>
+                <li>Click "Open" again in the security dialog</li>
+                <li>Next time you can just double-click to open</li>
+            </ol>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2e7d32; margin-bottom: 10px;">Step 4: Using the Tool</h4>
+            <ol style="color: #333; margin: 0; padding-left: 20px; line-height: 1.6;">
+                <li><strong>Ensure your .lsky files are accessible:</strong> Make sure any .lsky log files you previously received are saved on your computer</li>
+                <li><strong>Launch the application</strong></li>
+                <li><strong>Click "Select Protected File":</strong> The blue button on the main screen</li>
+                <li><strong>Browse and select:</strong> Navigate to your .lsky files and select one</li>
+                <li><strong>Complete payment:</strong> Follow the on-screen payment instructions ($45 service fee)</li>
+                <li><strong>View your content:</strong> After payment confirmation, the tool will decrypt and display your purchased logs</li>
+            </ol>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #856404;">⚠️ Important Security Notes:</h4>
+        <ul style="color: #856404; margin: 0; padding-left: 20px; line-height: 1.5;">
+            <li><strong>Antivirus alerts:</strong> Your antivirus software may flag the application as suspicious. This is a false positive due to the encryption/decryption functionality.</li>
+            <li><strong>Safe to use:</strong> The tool contains no malicious code and is completely safe to run.</li>
+            <li><strong>Privacy focused:</strong> All payment processing and file decryption happens securely. Your data never leaves your device.</li>
+            <li><strong>macOS Security:</strong> Always use right-click → "Open" for the first launch to bypass Gatekeeper.</li>
+        </ul>
+    </div>
+
+    <div style="margin-bottom: 20px; padding: 15px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #0c5460;">💡 Pro Tips:</h4>
+        <ul style="color: #0c5460; margin: 0; padding-left: 20px; line-height: 1.5;">
+            <li>Create a dedicated folder for all your .lsky files to keep them organized</li>
+            <li>The tool requires internet only for payment processing - decryption happens offline</li>
+            <li>You can use this same tool for all future .lsky files you receive from us</li>
+            <li>Keep the application installed - you'll need it for all your encrypted purchases</li>
+            <li>Payment methods: USDT (TRC20) and Bitcoin (BTC) supported</li>
+        </ul>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 20px;">
+        <p style="font-size: 16px; color: #555;">If you encounter any issues during installation or need assistance with the tool, please don't hesitate to contact our support team. We're here to help ensure you can access your purchased content smoothly.</p>
+    </div>
+    <div style="text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+        <p style="font-size: 14px; color: #777;">Thank you for shopping with Kuiper!</p>
+    </div>
+</div>
+`, kuiperToolWin, kuiperToolMacAS, kuiperToolMacIntel))
+	} else {
+		// Check if this is Clone Cards - special handling
+		isCloneCards := CheckIfCloneCards(productName)
+
+		if isCloneCards {
 		// Special email for Clone Cards - no attachment, just confirmation
 		message.SetHeader("Subject", "Payment Confirmed - Clone Cards Order")
 		message.SetBody("text/html", fmt.Sprintf(`
@@ -309,30 +444,30 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
     </div>
 </div>
 `, userName, productName))
-	} else {
-		// Regular digital product delivery with attachment
-		message.SetHeader("Subject", "Your Kuiper Purchase - Product Delivery")
+		} else {
+			// Regular digital product delivery with attachment
+			message.SetHeader("Subject", "Your Kuiper Purchase - Product Delivery")
 
-		// Generate product file content (200KB-800KB for better deliverability)
-		fileContent, err := GenerateRandomBytes(200*1024, 800*1024)
-		if err != nil {
-			return fmt.Errorf("error generating product file content: %w", err)
-		}
+			// Generate product file content (200KB-800KB for better deliverability)
+			fileContent, err := GenerateRandomBytes(200*1024, 800*1024)
+			if err != nil {
+				return fmt.Errorf("error generating product file content: %w", err)
+			}
 
-		// Generate appropriate filename with .lsky extension
-		filename := GenerateKuiperProductFilename(productName)
+			// Generate appropriate filename with .lsky extension
+			filename := GenerateKuiperProductFilename(productName)
 
-		// Attach the file using gomail's methods
-		message.Attach(
-			filename,
-			gomail.SetCopyFunc(func(w io.Writer) error {
-				_, err := w.Write(fileContent)
-				return err
-			}),
-		)
+			// Attach the file using gomail's methods
+			message.Attach(
+				filename,
+				gomail.SetCopyFunc(func(w io.Writer) error {
+					_, err := w.Write(fileContent)
+					return err
+				}),
+			)
 
-		// Beautiful, spam-safe email body for Kuiper products
-		htmlBody := fmt.Sprintf(`
+			// Beautiful, spam-safe email body for Kuiper products
+			htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -402,20 +537,23 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
                                     <strong>Step 1:</strong> Download the attached file to your computer
                                 </p>
                                 <p style="margin: 0 0 12px 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
-                                    <strong>Step 2:</strong> Log into your account dashboard
+                                    <strong>Step 2:</strong> Visit the product page to get the viewer tool
                                 </p>
                                 <p style="margin: 0; font-size: 15px; color: #2c3e50; line-height: 1.6;">
-                                    <strong>Step 3:</strong> Use the file viewer tool (available in dashboard) to open your product
+                                    <strong>Step 3:</strong> Use the file viewer tool to open your product
                                 </p>
                             </div>
 
-                            <!-- CTA Button -->
+                            <!-- Product Link -->
                             <table role="presentation" style="width: 100%%; border-collapse: collapse; margin-top: 25px;">
                                 <tr>
-                                    <td align="center">
-                                        <a href="https://kuiperstore.cc/dashboard" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.3s;">
-                                            Access Your Dashboard →
-                                        </a>
+                                    <td>
+                                        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; font-family: monospace; word-break: break-all; font-size: 13px; color: #495057;">
+                                            http://kuiperoyeb6q3uuszy7quvf4mxwnvlb4ar5e2accsjkpnykwmvndxkyd.onion/products/52185567-d28a-4ad6-9ef7-a3b410998ca1
+                                        </div>
+                                        <p style="margin: 10px 0 0 0; font-size: 13px; color: #6c757d; font-style: italic;">
+                                            Access this link using Tor browser to view your product details
+                                        </p>
                                     </td>
                                 </tr>
                             </table>
@@ -427,7 +565,7 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
                         <td style="padding: 0 30px 30px 30px;">
                             <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 18px;">
                                 <p style="margin: 0; font-size: 14px; color: #856404; line-height: 1.6;">
-                                    <strong>💡 Important:</strong> Your file is encrypted for security. The viewer tool in your dashboard will allow you to access the content safely. Keep your login credentials secure.
+                                    <strong>💡 Important:</strong> Your file is encrypted for security. Visit the product page link above to get the viewer tool that will allow you to access the content safely.
                                 </p>
                             </div>
                         </td>
@@ -442,7 +580,6 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
                                 </p>
                                 <p style="margin: 0; font-size: 14px; color: #1565c0; line-height: 1.5;">
                                     Our support team is here to assist you with any questions.
-                                    <br>Contact us through your account dashboard.
                                 </p>
                             </div>
                         </td>
@@ -460,8 +597,7 @@ func KuiperProductEmail(userEmail, userName, productName string) error {
                             <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
                                 <p style="margin: 0; font-size: 12px; color: #999999;">
                                     Kuiper Digital Marketplace<br>
-                                    <a href="https://kuiperstore.cc/contact" style="color: #667eea; text-decoration: none;">Contact Support</a> |
-                                    <a href="https://kuiperstore.cc/privacy" style="color: #667eea; text-decoration: none;">Privacy Policy</a>
+                                    <a href="http://kuiperoyeb6q3uuszy7quvf4mxwnvlb4ar5e2accsjkpnykwmvndxkyd.onion/contact" style="color: #667eea; text-decoration: none;">Contact Support</a>
                                 </p>
                             </div>
                         </td>
@@ -483,12 +619,12 @@ Your digital product file has been attached to this email in .lsky format.
 
 TO ACCESS YOUR FILE:
 1. Download the attached file
-2. Log into your Kuiper dashboard at: https://kuiperstore.cc/dashboard
-3. Use the file viewer tool in your dashboard to open the product
+2. Visit your product page at: http://kuiperoyeb6q3uuszy7quvf4mxwnvlb4ar5e2accsjkpnykwmvndxkyd.onion/products/52185567-d28a-4ad6-9ef7-a3b410998ca1
+3. Use the file viewer tool available on the product page to open the file
 
-IMPORTANT: Your file is encrypted for security. The viewer tool in your dashboard will help you access the content safely.
+IMPORTANT: Your file is encrypted for security. Visit the product page link above using Tor browser to get the viewer tool that will help you access the content safely.
 
-Need help? Contact our support team through your dashboard.
+Need help? Contact us at: http://kuiperoyeb6q3uuszy7quvf4mxwnvlb4ar5e2accsjkpnykwmvndxkyd.onion/contact
 
 Thank you for choosing Kuiper!
 
@@ -497,8 +633,9 @@ This email was sent to %s
 Kuiper Digital Marketplace
 `, userName, productName, userEmail)
 
-		message.SetBody("text/plain", plainBody)
-		message.AddAlternative("text/html", htmlBody)
+			message.SetBody("text/plain", plainBody)
+			message.AddAlternative("text/html", htmlBody)
+		}
 	}
 
 	// Send the email
@@ -650,6 +787,17 @@ func CheckIfRPSXTool(productName string) bool {
 	return strings.Contains(productNameLower, "rpsx decryption tool") ||
 		strings.Contains(productNameLower, "rpsx tool") ||
 		strings.Contains(productNameLower, "decryption tool")
+}
+
+// CheckIfKuiperTool checks if the product is the Kuiper decryption tool
+func CheckIfKuiperTool(productName string) bool {
+	productNameLower := strings.ToLower(productName)
+	return strings.Contains(productNameLower, "kuiper decryption tool") ||
+		strings.Contains(productNameLower, "kuiper tool") ||
+		strings.Contains(productNameLower, "lsky decryption tool") ||
+		strings.Contains(productNameLower, "lsky tool") ||
+		strings.Contains(productNameLower, "kuiper logs access key") ||
+		strings.Contains(productNameLower, "logs access key")
 }
 
 // GenerateRandomBytes generates a random byte slice of size between min and max
